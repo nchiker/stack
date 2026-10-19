@@ -1,0 +1,394 @@
+{
+  "provenance": "Independently authored, fictional printed-English text; no personal/reference content. Not camera documents. Rules frozen before held-out examples; same author, no external blind evaluation.",
+  "documents": [
+    {
+      "id": "t-bill",
+      "split": "tuning",
+      "pages": [
+        "Cedar Energy\nUtility bill\nAmount due 45.00\nDue date 2026-01-31"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "t-bank",
+      "split": "tuning",
+      "pages": [
+        "Atlas Bank\nBank statement\nOpening balance 100.00\nTransactions"
+      ],
+      "labels": [
+        "banking"
+      ]
+    },
+    {
+      "id": "t-id",
+      "split": "tuning",
+      "pages": [
+        "Identity Card\nGiven name Synthetic\nDate of birth 1990-01-01"
+      ],
+      "labels": [
+        "ids"
+      ]
+    },
+    {
+      "id": "t-house",
+      "split": "tuning",
+      "pages": [
+        "Rental agreement\nTenant Example\nLandlord Cedar\nPremises Unit A"
+      ],
+      "labels": [
+        "house"
+      ]
+    },
+    {
+      "id": "t-medical",
+      "split": "tuning",
+      "pages": [
+        "Cedar Clinic\nPatient name Example\nDiagnosis routine\nTreatment follow up"
+      ],
+      "labels": [
+        "medical"
+      ]
+    },
+    {
+      "id": "t-receipt",
+      "split": "tuning",
+      "pages": [
+        "Cedar Market\nSales receipt\nSubtotal 8.00\nTotal 9.00\nCash"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    },
+    {
+      "id": "h-bill1",
+      "split": "held-out",
+      "pages": [
+        "Aster Broadband\nInvoice\nInvoice total 70.00\nPay by June 5"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "h-bill2",
+      "split": "held-out",
+      "pages": [
+        "Harbor Utilities\nAmount due 29.00\nPayment due July 7"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "h-bill3",
+      "split": "held-out",
+      "pages": [
+        "Tutor Invoice\nBalance due 80.00\nDue date August 1"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "h-bank1",
+      "split": "held-out",
+      "pages": [
+        "Juniper Credit Union\nSavings account\nClosing balance 150.00\nStatement period May"
+      ],
+      "labels": [
+        "banking"
+      ]
+    },
+    {
+      "id": "h-bank2",
+      "split": "held-out",
+      "pages": [
+        "Card Services\nCredit card statement\nAvailable credit 900\nTransactions"
+      ],
+      "labels": [
+        "banking"
+      ]
+    },
+    {
+      "id": "h-bank3",
+      "split": "held-out",
+      "pages": [
+        "Finch Financial\nAccount statement\nAccount number 0000\nClosing balance 99"
+      ],
+      "labels": [
+        "banking"
+      ]
+    },
+    {
+      "id": "h-id1",
+      "split": "held-out",
+      "pages": [
+        "Passport\nNationality Example\nGiven name Fictional"
+      ],
+      "labels": [
+        "ids"
+      ]
+    },
+    {
+      "id": "h-id2",
+      "split": "held-out",
+      "pages": [
+        "Driver License\nLicense number DEMO\nExpires 2030"
+      ],
+      "labels": [
+        "ids"
+      ]
+    },
+    {
+      "id": "h-id3",
+      "split": "held-out",
+      "pages": [
+        "Birth Certificate\nPlace of birth Example City"
+      ],
+      "labels": [
+        "ids"
+      ]
+    },
+    {
+      "id": "h-house1",
+      "split": "held-out",
+      "pages": [
+        "Home inspection\nInspection report\nProperty address 1 Example Road"
+      ],
+      "labels": [
+        "house"
+      ]
+    },
+    {
+      "id": "h-house2",
+      "split": "held-out",
+      "pages": [
+        "Home Insurance\nPolicy number DEMO\nProperty address Example"
+      ],
+      "labels": [
+        "house"
+      ]
+    },
+    {
+      "id": "h-house3",
+      "split": "held-out",
+      "pages": [
+        "Mortgage statement\nMortgage balance 1000\nProperty address Example"
+      ],
+      "labels": [
+        "house",
+        "banking"
+      ]
+    },
+    {
+      "id": "h-med1",
+      "split": "held-out",
+      "pages": [
+        "Aster Hospital\nPatient name Example\nDate of service May 5"
+      ],
+      "labels": [
+        "medical"
+      ]
+    },
+    {
+      "id": "h-med2",
+      "split": "held-out",
+      "pages": [
+        "Prescription\nDosage one tablet daily"
+      ],
+      "labels": [
+        "medical"
+      ]
+    },
+    {
+      "id": "h-med3",
+      "split": "held-out",
+      "pages": [
+        "Clinical Test Report\nLaboratory results\nTest results normal"
+      ],
+      "labels": [
+        "medical"
+      ]
+    },
+    {
+      "id": "h-receipt1",
+      "split": "held-out",
+      "pages": [
+        "Willow Books\nPurchase receipt\nAmount paid 12.00"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    },
+    {
+      "id": "h-receipt2",
+      "split": "held-out",
+      "pages": [
+        "Orchard Cafe\nReceipt\nTotal 10.00\nVisa"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    },
+    {
+      "id": "h-receipt3",
+      "split": "held-out",
+      "pages": [
+        "Museum Shop\nTransaction receipt\nPaid 5.00"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    },
+    {
+      "id": "h-multi1",
+      "split": "held-out",
+      "pages": [
+        "Cedar Water\nWater bill\nService address Example\nMeter 12\nAmount due 31\nDue date June 2"
+      ],
+      "labels": [
+        "bills",
+        "house"
+      ]
+    },
+    {
+      "id": "h-multi2",
+      "split": "held-out",
+      "pages": [
+        "Birch Clinic\nMedical invoice\nPatient name Example\nDate of service June 1\nAmount due 20\nPayment due July 1"
+      ],
+      "labels": [
+        "medical",
+        "bills"
+      ]
+    },
+    {
+      "id": "h-multi3",
+      "split": "held-out",
+      "pages": [
+        "Fern Pharmacy\nPrescription\nDosage daily\nSales receipt\nTotal 9\nCash"
+      ],
+      "labels": [
+        "medical",
+        "receipts"
+      ]
+    },
+    {
+      "id": "h-multi4",
+      "split": "held-out",
+      "pages": [
+        "Aster Bank\nCredit card statement\nAccount number DEMO\nTransactions\nAmount due 60\nDue date July 1"
+      ],
+      "labels": [
+        "banking",
+        "bills"
+      ]
+    },
+    {
+      "id": "h-later1",
+      "split": "held-out",
+      "pages": [
+        "Harbor Services",
+        "Invoice\nInvoice total 100\nPayment due May 5"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "h-later2",
+      "split": "held-out",
+      "pages": [
+        "Laboratory report",
+        "Patient name Example\nLaboratory\nTest results normal"
+      ],
+      "labels": [
+        "medical"
+      ]
+    },
+    {
+      "id": "h-negative1",
+      "split": "held-out",
+      "pages": [
+        "Meeting notes\nAsk the bank about payment options"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-negative2",
+      "split": "held-out",
+      "pages": [
+        "Travel diary\nThe house near the hospital was blue"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-negative3",
+      "split": "held-out",
+      "pages": [
+        "Address list\n1 Example Road\nExample City"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-negative4",
+      "split": "held-out",
+      "pages": [
+        "Vocabulary exercise\nReceipt total\nInvoice amount due"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-negative5",
+      "split": "held-out",
+      "pages": [
+        "Example only\nPassport\nDate of birth 1990"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-blank",
+      "split": "held-out",
+      "pages": [
+        ""
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-poor",
+      "split": "held-out",
+      "pages": [
+        "1l| %^ 09 ? ? nnn"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-ambiguous",
+      "split": "held-out",
+      "pages": [
+        "Payment record\nTotal 30\nThank you"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-negation",
+      "split": "held-out",
+      "pages": [
+        "This is not an invoice\nNo amount due\nA garden essay"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-receipt-missing",
+      "split": "held-out",
+      "pages": [
+        "Spruce Store\nThank you for shopping\nSubtotal 4\nTotal 5\nCash 5"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    }
+  ]
+}

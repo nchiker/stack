@@ -1,0 +1,48 @@
+INSTRUMENTATION_STATUS: stream=PASS 1: P1_RESTART_READY staged
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: shortMsg=Process crashed.
+INSTRUMENTATION_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS 1: P1 external force-stop/new process staged: stable import identity / scoped delete / authoritative notes, details and editor drafts preserved
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+PASS: 1 scanner check groups; synthetic data only.
+
+INSTRUMENTATION_CODE: -1
+INSTRUMENTATION_STATUS: stream=PASS 1: P1_RESTART_READY committed
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: shortMsg=Process crashed.
+INSTRUMENTATION_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS 1: P1 external force-stop/new process committed: stable import identity / scoped delete / authoritative notes, details and editor drafts preserved
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+PASS: 1 scanner check groups; synthetic data only.
+
+INSTRUMENTATION_CODE: -1
+INSTRUMENTATION_STATUS: stream=PASS 1: P1_RESTART_READY delete
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: shortMsg=Process crashed.
+INSTRUMENTATION_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS 1: P1 external force-stop/new process delete: stable import identity / scoped delete / authoritative notes, details and editor drafts preserved
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+PASS: 1 scanner check groups; synthetic data only.
+
+INSTRUMENTATION_CODE: -1
+INSTRUMENTATION_STATUS: stream=PASS 1: P1_RESTART_READY metadata
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: shortMsg=Process crashed.
+INSTRUMENTATION_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS 1: P1 external force-stop/new process metadata: stable import identity / scoped delete / authoritative notes, details and editor drafts preserved
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+PASS: 1 scanner check groups; synthetic data only.
+
+INSTRUMENTATION_CODE: -1

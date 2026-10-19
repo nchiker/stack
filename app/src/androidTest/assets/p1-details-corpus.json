@@ -1,0 +1,27 @@
+{
+  "version":1,"license":"CC0-1.0","author":"implementation agent","reviewer":"implementation agent",
+  "provenance":"Independently authored synthetic text; frozen before A4. No human or real-photo labels.",
+  "rubric":"Exact role/value/currency matches; unsupported or ambiguous roles/formats abstain. Organization must be an issuer. Name usefulness: unchanged/small-edit/unhelpful/abstain. Targets provisional, not agreed.",
+  "cases":[
+    {"id":"t-iso","split":"tuning","pages":["Harbor Energy Company\nInvoice date: 2026-02-12\nAmount due: USD 24.50"],"expected":{"date:document":"2026-02-12|day","amount:due":"24.50|USD","organization:issuer":"Harbor Energy Company|"}},
+    {"id":"t-ambiguous","split":"tuning","pages":["Date: 04/05/2026\nTotal: $40.00"],"expected":{"amount:total":"40.00|unknown"}},
+    {"id":"t-negative","split":"tuning","pages":["Grocery list\nApples 2\nCall tomorrow"],"expected":{}},
+    {"id":"t-later","split":"tuning","pages":["","Due date: 2026-12-31\nBalance due: EUR 18.40"],"expected":{"date:due":"2026-12-31|day","amount:due":"18.40|EUR"}},
+    {"id":"e-english","split":"evaluation","pages":["Willow Credit Union\nStatement date: October 8, 2026\nTotal: CAD 1,240.25"],"expected":{"organization:issuer":"Willow Credit Union|","date:document":"2026-10-08|day","amount:total":"1240.25|CAD"}},
+    {"id":"e-two-dates","split":"evaluation","pages":["Invoice date: 2026-01-20\nDue date: 2026-02-20\nAmount due: GBP 10.00"],"expected":{"date:document":"2026-01-20|day","date:due":"2026-02-20|day","amount:due":"10.00|GBP"}},
+    {"id":"e-invalid","split":"evaluation","pages":["Date: 2026-02-30\nTotal: tomorrow"],"expected":{}},
+    {"id":"e-address","split":"evaluation","pages":["104 Energy Road\nUnit 9\nPhone: 555 0101\nInvoice number: 92"],"expected":{}},
+    {"id":"e-blank","split":"evaluation","pages":[""],"expected":{}},
+    {"id":"e-amount-conflict","split":"evaluation","pages":["Total: USD 12.50\nTotal: USD 18.50"],"expected":{}},
+    {"id":"e-org-conflict","split":"evaluation","pages":["Pine Energy Company\nCedar Insurance Company"],"expected":{}},
+    {"id":"e-numeric-safe","split":"evaluation","pages":["Date: 28/11/2026\nTotal: €19.25"],"expected":{"date:document":"2026-11-28|day","amount:total":"19.25|EUR"}},
+    {"id":"e-no-role","split":"evaluation","pages":["Account: 20261204\n90.00 1000.00\nDeposit 87.25"],"expected":{}},
+    {"id":"e-later-only","split":"evaluation","pages":["Cover sheet","Invoice date: 2026-07-14\nAmount due: AUD 27.00"],"expected":{"date:document":"2026-07-14|day","amount:due":"27.00|AUD"}},
+    {"id":"e-unknown-dollar","split":"evaluation","pages":["Total: $89.99"],"expected":{"amount:total":"89.99|unknown"}},
+    {"id":"e-currency-conflict","split":"evaluation","pages":["Total: USD 8.50 EUR"],"expected":{}},
+    {"id":"e-negative","split":"evaluation","pages":["Grand total: CHF -4.20"],"expected":{"amount:total":"-4.20|CHF"}},
+    {"id":"e-date-conflict","split":"evaluation","pages":["Date: 2026-08-01\nDate: 2026-09-01"],"expected":{}},
+    {"id":"e-ambiguous-date","split":"evaluation","pages":["Due date: 05/06/2026"],"expected":{}},
+    {"id":"e-failed-ocr","split":"evaluation","pages":["",""],"expected":{}}
+  ]
+}

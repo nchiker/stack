@@ -1,0 +1,1194 @@
+{
+  "rules": "local-details-6",
+  "device": "Pixel 4a",
+  "api": 33,
+  "provenance": "Independently authored synthetic text; frozen before A4. No human or real-photo labels.",
+  "cases": [
+    {
+      "id": "t-iso",
+      "split": "tuning",
+      "expected": {
+        "date:document": "2026-02-12|day",
+        "amount:due": "24.50|USD",
+        "organization:issuer": "Harbor Energy Company|"
+      },
+      "source": {
+        "organization:issuer": "Harbor Energy Company|",
+        "date:document": "2026-02-12|day",
+        "amount:due": "24.50|USD"
+      },
+      "rendered_ocr": {
+        "organization:issuer": "Harbor Energy Company|",
+        "date:document": "2026-02-12|day",
+        "amount:due": "24.50|USD"
+      },
+      "source_details": [
+        {
+          "field_id": "organization:issuer",
+          "kind": "organization",
+          "label": "Organization",
+          "value": "Harbor Energy Company",
+          "qualifier": "",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Harbor Energy Company\",\"role\":\"issuer\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "date:document",
+          "kind": "date",
+          "label": "Document date",
+          "value": "2026-02-12",
+          "qualifier": "day",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Invoice date: 2026-02-12\",\"role\":\"document\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "amount:due",
+          "kind": "amount",
+          "label": "Amount due",
+          "value": "24.50",
+          "qualifier": "USD",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Amount due: USD 24.50\",\"role\":\"due\",\"currency_basis\":\"explicit-code\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "rendered_ocr_details": [
+        {
+          "field_id": "organization:issuer",
+          "kind": "organization",
+          "label": "Organization",
+          "value": "Harbor Energy Company",
+          "qualifier": "",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"9ca28d9e38494df816a95446bd0fd641a7a09708de4b44d821a3b3cd33d7adb0\",\"text_evidence\":\"49d5f2dbf86c3b4aa1452c51bb7838eebd496a54455a24ead7a6056199fe78c2\",\"page\":1,\"raw\":\"Harbor Energy Company\",\"role\":\"issuer\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "date:document",
+          "kind": "date",
+          "label": "Document date",
+          "value": "2026-02-12",
+          "qualifier": "day",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"9ca28d9e38494df816a95446bd0fd641a7a09708de4b44d821a3b3cd33d7adb0\",\"text_evidence\":\"49d5f2dbf86c3b4aa1452c51bb7838eebd496a54455a24ead7a6056199fe78c2\",\"page\":1,\"raw\":\"Invoice date: 2026-02-12\",\"role\":\"document\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "amount:due",
+          "kind": "amount",
+          "label": "Amount due",
+          "value": "24.50",
+          "qualifier": "USD",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"9ca28d9e38494df816a95446bd0fd641a7a09708de4b44d821a3b3cd33d7adb0\",\"text_evidence\":\"49d5f2dbf86c3b4aa1452c51bb7838eebd496a54455a24ead7a6056199fe78c2\",\"page\":1,\"raw\":\"Amount due: USD 24.50\",\"role\":\"due\",\"currency_basis\":\"explicit-code\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "source_rule_ms": 17.999585,
+      "snapshot_analysis_commit_ms": 61.089642,
+      "ocr_ms": 307,
+      "pages": 1,
+      "name_completions": [
+        "Harbor Energy Company \u00b7 Bill",
+        "Harbor Energy Company \u00b7 2026-02-12",
+        "Document \u00b7 2026-02-12",
+        "Receipt \u00b7 2026-02-12",
+        "Bill \u00b7 2026-02-12"
+      ],
+      "post_case_pss_kib": 50690
+    },
+    {
+      "id": "t-ambiguous",
+      "split": "tuning",
+      "expected": {
+        "amount:total": "40.00|unknown"
+      },
+      "source": {
+        "amount:total": "40.00|USD"
+      },
+      "rendered_ocr": {
+        "amount:total": "40.00|USD"
+      },
+      "source_details": [
+        {
+          "field_id": "amount:total",
+          "kind": "amount",
+          "label": "Total",
+          "value": "40.00",
+          "qualifier": "USD",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Total: $40.00\",\"role\":\"total\",\"currency_basis\":\"bare-dollar-default\",\"dollar_currency_default\":\"USD\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "rendered_ocr_details": [
+        {
+          "field_id": "amount:total",
+          "kind": "amount",
+          "label": "Total",
+          "value": "40.00",
+          "qualifier": "USD",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"430c17b98bcddb07c8120552fa95e3ad5c5238f4e13dfcb83b61b499b0846f19\",\"text_evidence\":\"df08e4021b3f28b4ecc2fcd99d9e509e652af2c9abb02409e804b5edc4d47b58\",\"page\":1,\"raw\":\"Total: $40.00\",\"role\":\"total\",\"currency_basis\":\"bare-dollar-default\",\"dollar_currency_default\":\"USD\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "source_rule_ms": 1.280729,
+      "snapshot_analysis_commit_ms": 11.149584,
+      "ocr_ms": 239,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 52194
+    },
+    {
+      "id": "t-negative",
+      "split": "tuning",
+      "expected": {},
+      "source": {},
+      "rendered_ocr": {},
+      "source_details": [],
+      "rendered_ocr_details": [],
+      "source_rule_ms": 3.671823,
+      "snapshot_analysis_commit_ms": 7.772448,
+      "ocr_ms": 240,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 53858
+    },
+    {
+      "id": "t-later",
+      "split": "tuning",
+      "expected": {
+        "date:due": "2026-12-31|day",
+        "amount:due": "18.40|EUR"
+      },
+      "source": {
+        "date:due": "2026-12-31|day",
+        "amount:due": "18.40|EUR"
+      },
+      "rendered_ocr": {
+        "date:due": "2026-12-31|day",
+        "amount:due": "18.40|EUR"
+      },
+      "source_details": [
+        {
+          "field_id": "date:due",
+          "kind": "date",
+          "label": "Due date",
+          "value": "2026-12-31",
+          "qualifier": "day",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":2,\"raw\":\"Due date: 2026-12-31\",\"role\":\"due\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "amount:due",
+          "kind": "amount",
+          "label": "Amount due",
+          "value": "18.40",
+          "qualifier": "EUR",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":2,\"raw\":\"Balance due: EUR 18.40\",\"role\":\"due\",\"currency_basis\":\"explicit-code\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "rendered_ocr_details": [
+        {
+          "field_id": "date:due",
+          "kind": "date",
+          "label": "Due date",
+          "value": "2026-12-31",
+          "qualifier": "day",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"342f63fc9705e97bbce39c1b798d4971ad8136a27eeb14eed6a2b5a46a863216\",\"text_evidence\":\"5ddcbb36bda4ed6f24d3db647d27d4c13047933c89392e30b429d1b5887498ae\",\"page\":2,\"raw\":\"Due date: 2026-12-31\",\"role\":\"due\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "amount:due",
+          "kind": "amount",
+          "label": "Amount due",
+          "value": "18.40",
+          "qualifier": "EUR",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"342f63fc9705e97bbce39c1b798d4971ad8136a27eeb14eed6a2b5a46a863216\",\"text_evidence\":\"5ddcbb36bda4ed6f24d3db647d27d4c13047933c89392e30b429d1b5887498ae\",\"page\":2,\"raw\":\"Balance due: EUR 18.40\",\"role\":\"due\",\"currency_basis\":\"explicit-code\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "source_rule_ms": 1.067292,
+      "snapshot_analysis_commit_ms": 10.427137,
+      "ocr_ms": 441,
+      "pages": 2,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 52670
+    },
+    {
+      "id": "e-english",
+      "split": "evaluation",
+      "expected": {
+        "organization:issuer": "Willow Credit Union|",
+        "date:document": "2026-10-08|day",
+        "amount:total": "1240.25|CAD"
+      },
+      "source": {
+        "organization:issuer": "Willow Credit Union|",
+        "date:document": "2026-10-08|day",
+        "amount:total": "1240.25|CAD"
+      },
+      "rendered_ocr": {
+        "organization:issuer": "Willow Credit Union|",
+        "date:document": "2026-10-08|day",
+        "amount:total": "1240.25|CAD"
+      },
+      "source_details": [
+        {
+          "field_id": "organization:issuer",
+          "kind": "organization",
+          "label": "Organization",
+          "value": "Willow Credit Union",
+          "qualifier": "",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Willow Credit Union\",\"role\":\"issuer\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "date:document",
+          "kind": "date",
+          "label": "Document date",
+          "value": "2026-10-08",
+          "qualifier": "day",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Statement date: October 8, 2026\",\"role\":\"document\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "amount:total",
+          "kind": "amount",
+          "label": "Total",
+          "value": "1240.25",
+          "qualifier": "CAD",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Total: CAD 1,240.25\",\"role\":\"total\",\"currency_basis\":\"explicit-code\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "rendered_ocr_details": [
+        {
+          "field_id": "organization:issuer",
+          "kind": "organization",
+          "label": "Organization",
+          "value": "Willow Credit Union",
+          "qualifier": "",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"ef9976437ea93f4ed60554e5189c1029d1c0c286849a2418826b3d3049ab2513\",\"text_evidence\":\"1ddada0cadff1177acfa02be0ba0eb37c05e74881deff72950a0c6fa9f5c7bf9\",\"page\":1,\"raw\":\"Willow Credit Union\",\"role\":\"issuer\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "date:document",
+          "kind": "date",
+          "label": "Document date",
+          "value": "2026-10-08",
+          "qualifier": "day",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"ef9976437ea93f4ed60554e5189c1029d1c0c286849a2418826b3d3049ab2513\",\"text_evidence\":\"1ddada0cadff1177acfa02be0ba0eb37c05e74881deff72950a0c6fa9f5c7bf9\",\"page\":1,\"raw\":\"Statement date: October 8, 2026\",\"role\":\"document\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "amount:total",
+          "kind": "amount",
+          "label": "Total",
+          "value": "1240.25",
+          "qualifier": "CAD",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"ef9976437ea93f4ed60554e5189c1029d1c0c286849a2418826b3d3049ab2513\",\"text_evidence\":\"1ddada0cadff1177acfa02be0ba0eb37c05e74881deff72950a0c6fa9f5c7bf9\",\"page\":1,\"raw\":\"Total: CAD 1,240.25\",\"role\":\"total\",\"currency_basis\":\"explicit-code\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "source_rule_ms": 7.028542,
+      "snapshot_analysis_commit_ms": 13.464011,
+      "ocr_ms": 291,
+      "pages": 1,
+      "name_completions": [
+        "Willow Credit Union \u00b7 2026-10-08",
+        "Document \u00b7 2026-10-08",
+        "Receipt \u00b7 2026-10-08",
+        "Bill \u00b7 2026-10-08"
+      ],
+      "post_case_pss_kib": 56518
+    },
+    {
+      "id": "e-two-dates",
+      "split": "evaluation",
+      "expected": {
+        "date:document": "2026-01-20|day",
+        "date:due": "2026-02-20|day",
+        "amount:due": "10.00|GBP"
+      },
+      "source": {
+        "date:document": "2026-01-20|day",
+        "date:due": "2026-02-20|day",
+        "amount:due": "10.00|GBP"
+      },
+      "rendered_ocr": {
+        "date:document": "2026-01-20|day",
+        "date:due": "2026-02-20|day",
+        "amount:due": "10.00|GBP"
+      },
+      "source_details": [
+        {
+          "field_id": "date:document",
+          "kind": "date",
+          "label": "Document date",
+          "value": "2026-01-20",
+          "qualifier": "day",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Invoice date: 2026-01-20\",\"role\":\"document\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "date:due",
+          "kind": "date",
+          "label": "Due date",
+          "value": "2026-02-20",
+          "qualifier": "day",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Due date: 2026-02-20\",\"role\":\"due\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "amount:due",
+          "kind": "amount",
+          "label": "Amount due",
+          "value": "10.00",
+          "qualifier": "GBP",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Amount due: GBP 10.00\",\"role\":\"due\",\"currency_basis\":\"explicit-code\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "rendered_ocr_details": [
+        {
+          "field_id": "date:document",
+          "kind": "date",
+          "label": "Document date",
+          "value": "2026-01-20",
+          "qualifier": "day",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"32daecbf1f7aca9a85a4f6a9426a6f83c1e8d55acd702a755ca3144bde54a214\",\"text_evidence\":\"ea6496862a55067aa0c684f3b261cb435483df46b595518e311d653f24d67e42\",\"page\":1,\"raw\":\"Invoice date: 2026-01-20\",\"role\":\"document\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "date:due",
+          "kind": "date",
+          "label": "Due date",
+          "value": "2026-02-20",
+          "qualifier": "day",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"32daecbf1f7aca9a85a4f6a9426a6f83c1e8d55acd702a755ca3144bde54a214\",\"text_evidence\":\"ea6496862a55067aa0c684f3b261cb435483df46b595518e311d653f24d67e42\",\"page\":1,\"raw\":\"Due date: 2026-02-20\",\"role\":\"due\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "amount:due",
+          "kind": "amount",
+          "label": "Amount due",
+          "value": "10.00",
+          "qualifier": "GBP",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"32daecbf1f7aca9a85a4f6a9426a6f83c1e8d55acd702a755ca3144bde54a214\",\"text_evidence\":\"ea6496862a55067aa0c684f3b261cb435483df46b595518e311d653f24d67e42\",\"page\":1,\"raw\":\"Amount due: GBP 10.00\",\"role\":\"due\",\"currency_basis\":\"explicit-code\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "source_rule_ms": 2.323229,
+      "snapshot_analysis_commit_ms": 13.535366,
+      "ocr_ms": 286,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-01-20",
+        "Receipt \u00b7 2026-01-20",
+        "Bill \u00b7 2026-01-20"
+      ],
+      "post_case_pss_kib": 57574
+    },
+    {
+      "id": "e-invalid",
+      "split": "evaluation",
+      "expected": {},
+      "source": {},
+      "rendered_ocr": {},
+      "source_details": [],
+      "rendered_ocr_details": [],
+      "source_rule_ms": 1.42625,
+      "snapshot_analysis_commit_ms": 5.40823,
+      "ocr_ms": 242,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 56178
+    },
+    {
+      "id": "e-address",
+      "split": "evaluation",
+      "expected": {},
+      "source": {
+        "text:invoice-number": "92|"
+      },
+      "rendered_ocr": {
+        "text:invoice-number": "92|"
+      },
+      "source_details": [
+        {
+          "field_id": "text:invoice-number",
+          "kind": "text",
+          "label": "Invoice #",
+          "value": "92",
+          "qualifier": "",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Invoice number: 92\",\"role\":\"invoice-number\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "rendered_ocr_details": [
+        {
+          "field_id": "text:invoice-number",
+          "kind": "text",
+          "label": "Invoice #",
+          "value": "92",
+          "qualifier": "",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"27303bdfcaf0077a710adff20c752da9cb8b8533246431ef5c56ae83f2d1f882\",\"text_evidence\":\"f327cf247f1a89d0263362247f60920d9b56d85484b0f55320347254f8e371a4\",\"page\":1,\"raw\":\"Invoice number: 92\",\"role\":\"invoice-number\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "source_rule_ms": 1.936875,
+      "snapshot_analysis_commit_ms": 8.183698,
+      "ocr_ms": 265,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 56962
+    },
+    {
+      "id": "e-blank",
+      "split": "evaluation",
+      "expected": {},
+      "source": {},
+      "rendered_ocr": {},
+      "source_details": [],
+      "rendered_ocr_details": [],
+      "source_rule_ms": 0.135573,
+      "snapshot_analysis_commit_ms": 3.192136,
+      "ocr_ms": 188,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 57342
+    },
+    {
+      "id": "e-amount-conflict",
+      "split": "evaluation",
+      "expected": {},
+      "source": {},
+      "rendered_ocr": {},
+      "source_details": [],
+      "rendered_ocr_details": [],
+      "source_rule_ms": 1.136198,
+      "snapshot_analysis_commit_ms": 4.108698,
+      "ocr_ms": 232,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 57914
+    },
+    {
+      "id": "e-org-conflict",
+      "split": "evaluation",
+      "expected": {},
+      "source": {},
+      "rendered_ocr": {},
+      "source_details": [],
+      "rendered_ocr_details": [],
+      "source_rule_ms": 2.243282,
+      "snapshot_analysis_commit_ms": 5.407709,
+      "ocr_ms": 255,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 58810
+    },
+    {
+      "id": "e-numeric-safe",
+      "split": "evaluation",
+      "expected": {
+        "date:document": "2026-11-28|day",
+        "amount:total": "19.25|EUR"
+      },
+      "source": {
+        "date:document": "2026-11-28|day",
+        "amount:total": "19.25|EUR"
+      },
+      "rendered_ocr": {
+        "date:document": "2026-11-28|day",
+        "amount:total": "19.25|EUR"
+      },
+      "source_details": [
+        {
+          "field_id": "date:document",
+          "kind": "date",
+          "label": "Date (role unknown)",
+          "value": "2026-11-28",
+          "qualifier": "day",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Date: 28\\/11\\/2026\",\"role\":\"unknown\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "amount:total",
+          "kind": "amount",
+          "label": "Total",
+          "value": "19.25",
+          "qualifier": "EUR",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Total: \u20ac19.25\",\"role\":\"total\",\"currency_basis\":\"symbol\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "rendered_ocr_details": [
+        {
+          "field_id": "date:document",
+          "kind": "date",
+          "label": "Date (role unknown)",
+          "value": "2026-11-28",
+          "qualifier": "day",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"e857be8b7edfca61784b5d1c74c9fced0cd5b5144384a7fc072185a5092bb09c\",\"text_evidence\":\"28808ce849c69ae1ff87d380698496942543c7e3d457b5b1af6058148e0af2da\",\"page\":1,\"raw\":\"Date: 28\\/11\\/2026\",\"role\":\"unknown\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "amount:total",
+          "kind": "amount",
+          "label": "Total",
+          "value": "19.25",
+          "qualifier": "EUR",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"e857be8b7edfca61784b5d1c74c9fced0cd5b5144384a7fc072185a5092bb09c\",\"text_evidence\":\"28808ce849c69ae1ff87d380698496942543c7e3d457b5b1af6058148e0af2da\",\"page\":1,\"raw\":\"Total: \u20ac19.25\",\"role\":\"total\",\"currency_basis\":\"symbol\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "source_rule_ms": 1.714271,
+      "snapshot_analysis_commit_ms": 10.608022,
+      "ocr_ms": 235,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-11-28",
+        "Receipt \u00b7 2026-11-28",
+        "Bill \u00b7 2026-11-28"
+      ],
+      "post_case_pss_kib": 59570
+    },
+    {
+      "id": "e-no-role",
+      "split": "evaluation",
+      "expected": {},
+      "source": {},
+      "rendered_ocr": {},
+      "source_details": [],
+      "rendered_ocr_details": [],
+      "source_rule_ms": 1.894636,
+      "snapshot_analysis_commit_ms": 5.582032,
+      "ocr_ms": 258,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 60280
+    },
+    {
+      "id": "e-later-only",
+      "split": "evaluation",
+      "expected": {
+        "date:document": "2026-07-14|day",
+        "amount:due": "27.00|AUD"
+      },
+      "source": {
+        "date:document": "2026-07-14|day",
+        "amount:due": "27.00|AUD"
+      },
+      "rendered_ocr": {
+        "date:document": "2026-07-14|day",
+        "amount:due": "27.00|AUD"
+      },
+      "source_details": [
+        {
+          "field_id": "date:document",
+          "kind": "date",
+          "label": "Document date",
+          "value": "2026-07-14",
+          "qualifier": "day",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":2,\"raw\":\"Invoice date: 2026-07-14\",\"role\":\"document\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "amount:due",
+          "kind": "amount",
+          "label": "Amount due",
+          "value": "27.00",
+          "qualifier": "AUD",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":2,\"raw\":\"Amount due: AUD 27.00\",\"role\":\"due\",\"currency_basis\":\"explicit-code\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "rendered_ocr_details": [
+        {
+          "field_id": "date:document",
+          "kind": "date",
+          "label": "Document date",
+          "value": "2026-07-14",
+          "qualifier": "day",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"5e25f17c3fbb23e9cc6beb78635c82b42ad2efe91991e9281d12a1ec213a714e\",\"text_evidence\":\"01dd808dc4dceb61ca7949511437c128901f9c8bf4031ab7c6a2afaf22e10e1c\",\"page\":2,\"raw\":\"Invoice date: 2026-07-14\",\"role\":\"document\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        },
+        {
+          "field_id": "amount:due",
+          "kind": "amount",
+          "label": "Amount due",
+          "value": "27.00",
+          "qualifier": "AUD",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"5e25f17c3fbb23e9cc6beb78635c82b42ad2efe91991e9281d12a1ec213a714e\",\"text_evidence\":\"01dd808dc4dceb61ca7949511437c128901f9c8bf4031ab7c6a2afaf22e10e1c\",\"page\":2,\"raw\":\"Amount due: AUD 27.00\",\"role\":\"due\",\"currency_basis\":\"explicit-code\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "source_rule_ms": 2.229323,
+      "snapshot_analysis_commit_ms": 10.972293,
+      "ocr_ms": 469,
+      "pages": 2,
+      "name_completions": [
+        "Document \u00b7 2026-07-14",
+        "Receipt \u00b7 2026-07-14",
+        "Bill \u00b7 2026-07-14"
+      ],
+      "post_case_pss_kib": 61356
+    },
+    {
+      "id": "e-unknown-dollar",
+      "split": "evaluation",
+      "expected": {
+        "amount:total": "89.99|unknown"
+      },
+      "source": {
+        "amount:total": "89.99|USD"
+      },
+      "rendered_ocr": {
+        "amount:total": "89.99|USD"
+      },
+      "source_details": [
+        {
+          "field_id": "amount:total",
+          "kind": "amount",
+          "label": "Total",
+          "value": "89.99",
+          "qualifier": "USD",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Total: $89.99\",\"role\":\"total\",\"currency_basis\":\"bare-dollar-default\",\"dollar_currency_default\":\"USD\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "rendered_ocr_details": [
+        {
+          "field_id": "amount:total",
+          "kind": "amount",
+          "label": "Total",
+          "value": "89.99",
+          "qualifier": "USD",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"c375edadccc620ddacd0d2f2efd748fa93afd15a5f7aeedd13a9a57ff21a4f7f\",\"text_evidence\":\"a39556c9eeffc9a21498aae81456668caba220678aea2ddb5c8d67e350f39ccf\",\"page\":1,\"raw\":\"Total: $89.99\",\"role\":\"total\",\"currency_basis\":\"bare-dollar-default\",\"dollar_currency_default\":\"USD\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "source_rule_ms": 0.685156,
+      "snapshot_analysis_commit_ms": 7.061824,
+      "ocr_ms": 212,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 61976
+    },
+    {
+      "id": "e-currency-conflict",
+      "split": "evaluation",
+      "expected": {},
+      "source": {},
+      "rendered_ocr": {},
+      "source_details": [],
+      "rendered_ocr_details": [],
+      "source_rule_ms": 0.258177,
+      "snapshot_analysis_commit_ms": 3.3675,
+      "ocr_ms": 217,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 62400
+    },
+    {
+      "id": "e-negative",
+      "split": "evaluation",
+      "expected": {
+        "amount:total": "-4.20|CHF"
+      },
+      "source": {
+        "amount:total": "-4.20|CHF"
+      },
+      "rendered_ocr": {
+        "amount:total": "-4.20|CHF"
+      },
+      "source_details": [
+        {
+          "field_id": "amount:total",
+          "kind": "amount",
+          "label": "Total",
+          "value": "-4.20",
+          "qualifier": "CHF",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"synthetic\",\"text_evidence\":\"synthetic\",\"page\":1,\"raw\":\"Grand total: CHF -4.20\",\"role\":\"total\",\"currency_basis\":\"explicit-code\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "rendered_ocr_details": [
+        {
+          "field_id": "amount:total",
+          "kind": "amount",
+          "label": "Total",
+          "value": "-4.20",
+          "qualifier": "CHF",
+          "evidence": "{\"rule\":\"local-details-6\",\"config\":\"t4a-4.9.0\\/tess-5.5.1\\/eng\\/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2\\/page-renderer-2400-sauvola-v2\",\"input\":\"f03179ca85a287f5922da851d9fa1ab24d655a7f58b7bf6a2183695f425fc890\",\"text_evidence\":\"e09ae055045c250f22a1a52e3f1aa4bba997e3b3056001a0cb2a0d6a988816d2\",\"page\":1,\"raw\":\"Grand total: CHF -4.20\",\"role\":\"total\",\"currency_basis\":\"explicit-code\"}",
+          "origin": "accepted",
+          "state": "saved",
+          "revision": 0
+        }
+      ],
+      "source_rule_ms": 0.70625,
+      "snapshot_analysis_commit_ms": 7.755053,
+      "ocr_ms": 227,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 62908
+    },
+    {
+      "id": "e-date-conflict",
+      "split": "evaluation",
+      "expected": {},
+      "source": {},
+      "rendered_ocr": {},
+      "source_details": [],
+      "rendered_ocr_details": [],
+      "source_rule_ms": 2.182344,
+      "snapshot_analysis_commit_ms": 5.328073,
+      "ocr_ms": 248,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 63487
+    },
+    {
+      "id": "e-ambiguous-date",
+      "split": "evaluation",
+      "expected": {},
+      "source": {},
+      "rendered_ocr": {},
+      "source_details": [],
+      "rendered_ocr_details": [],
+      "source_rule_ms": 0.642917,
+      "snapshot_analysis_commit_ms": 4.044897,
+      "ocr_ms": 223,
+      "pages": 1,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 63995
+    },
+    {
+      "id": "e-failed-ocr",
+      "split": "evaluation",
+      "expected": {},
+      "source": {},
+      "rendered_ocr": {},
+      "source_details": [],
+      "rendered_ocr_details": [],
+      "source_rule_ms": 0.183958,
+      "snapshot_analysis_commit_ms": 3.521927,
+      "ocr_ms": 377,
+      "pages": 2,
+      "name_completions": [
+        "Document \u00b7 2026-10-16",
+        "Receipt \u00b7 2026-10-16",
+        "Bill \u00b7 2026-10-16"
+      ],
+      "post_case_pss_kib": 64359
+    }
+  ],
+  "photo_detector": [
+    {
+      "id": "rendered-0",
+      "expected_document": true,
+      "candidate": true,
+      "ms": 601.062873
+    },
+    {
+      "id": "rendered-1",
+      "expected_document": true,
+      "candidate": true,
+      "ms": 231.692731
+    },
+    {
+      "id": "rendered-2",
+      "expected_document": true,
+      "candidate": true,
+      "ms": 206.359916
+    },
+    {
+      "id": "rendered-3",
+      "expected_document": true,
+      "candidate": true,
+      "ms": 196.591634
+    },
+    {
+      "id": "rendered-4",
+      "expected_document": true,
+      "candidate": true,
+      "ms": 178.85856
+    },
+    {
+      "id": "rendered-5",
+      "expected_document": true,
+      "candidate": false,
+      "ms": 182.955383
+    },
+    {
+      "id": "rendered-6",
+      "expected_document": true,
+      "candidate": true,
+      "ms": 196.145853
+    },
+    {
+      "id": "rendered-7",
+      "expected_document": true,
+      "candidate": true,
+      "ms": 190.071529
+    },
+    {
+      "id": "rendered-8",
+      "expected_document": true,
+      "candidate": true,
+      "ms": 190.11804
+    },
+    {
+      "id": "rendered-9",
+      "expected_document": true,
+      "candidate": true,
+      "ms": 198.333197
+    },
+    {
+      "id": "rendered-10",
+      "expected_document": false,
+      "candidate": false,
+      "ms": 160.474339
+    },
+    {
+      "id": "rendered-11",
+      "expected_document": false,
+      "candidate": false,
+      "ms": 160.313193
+    },
+    {
+      "id": "rendered-12",
+      "expected_document": false,
+      "candidate": false,
+      "ms": 163.160849
+    },
+    {
+      "id": "rendered-13",
+      "expected_document": false,
+      "candidate": false,
+      "ms": 47.834016
+    },
+    {
+      "id": "rendered-14",
+      "expected_document": false,
+      "candidate": false,
+      "ms": 41.422244
+    },
+    {
+      "id": "rendered-15",
+      "expected_document": false,
+      "candidate": false,
+      "ms": 41.616462
+    },
+    {
+      "id": "rendered-16",
+      "expected_document": false,
+      "candidate": false,
+      "ms": 41.527348
+    },
+    {
+      "id": "rendered-17",
+      "expected_document": false,
+      "candidate": false,
+      "ms": 57.077141
+    },
+    {
+      "id": "rendered-18",
+      "expected_document": false,
+      "candidate": false,
+      "ms": 64.382455
+    },
+    {
+      "id": "rendered-19",
+      "expected_document": false,
+      "candidate": false,
+      "ms": 59.715475
+    }
+  ],
+  "summary": {
+    "tuning": {
+      "documents": 4,
+      "source": {
+        "all": {
+          "true": 5,
+          "false": 1,
+          "missed": 1,
+          "precision": 0.8333333333333334,
+          "recall": 0.8333333333333334,
+          "documents_with_no_proposal": 1
+        },
+        "date": {
+          "true": 2,
+          "false": 0,
+          "missed": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "documents_with_no_proposal": 2
+        },
+        "amount": {
+          "true": 2,
+          "false": 1,
+          "missed": 1,
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "documents_with_no_proposal": 1
+        },
+        "organization": {
+          "true": 1,
+          "false": 0,
+          "missed": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "documents_with_no_proposal": 3
+        }
+      },
+      "rendered_ocr": {
+        "all": {
+          "true": 5,
+          "false": 1,
+          "missed": 1,
+          "precision": 0.8333333333333334,
+          "recall": 0.8333333333333334,
+          "documents_with_no_proposal": 1
+        },
+        "date": {
+          "true": 2,
+          "false": 0,
+          "missed": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "documents_with_no_proposal": 2
+        },
+        "amount": {
+          "true": 2,
+          "false": 1,
+          "missed": 1,
+          "precision": 0.6666666666666666,
+          "recall": 0.6666666666666666,
+          "documents_with_no_proposal": 1
+        },
+        "organization": {
+          "true": 1,
+          "false": 0,
+          "missed": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "documents_with_no_proposal": 3
+        }
+      }
+    },
+    "evaluation": {
+      "documents": 16,
+      "source": {
+        "all": {
+          "true": 11,
+          "false": 2,
+          "missed": 1,
+          "precision": 0.8461538461538461,
+          "recall": 0.9166666666666666,
+          "documents_with_no_proposal": 9
+        },
+        "date": {
+          "true": 5,
+          "false": 0,
+          "missed": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "documents_with_no_proposal": 12
+        },
+        "amount": {
+          "true": 5,
+          "false": 1,
+          "missed": 1,
+          "precision": 0.8333333333333334,
+          "recall": 0.8333333333333334,
+          "documents_with_no_proposal": 10
+        },
+        "organization": {
+          "true": 1,
+          "false": 0,
+          "missed": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "documents_with_no_proposal": 15
+        }
+      },
+      "rendered_ocr": {
+        "all": {
+          "true": 11,
+          "false": 2,
+          "missed": 1,
+          "precision": 0.8461538461538461,
+          "recall": 0.9166666666666666,
+          "documents_with_no_proposal": 9
+        },
+        "date": {
+          "true": 5,
+          "false": 0,
+          "missed": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "documents_with_no_proposal": 12
+        },
+        "amount": {
+          "true": 5,
+          "false": 1,
+          "missed": 1,
+          "precision": 0.8333333333333334,
+          "recall": 0.8333333333333334,
+          "documents_with_no_proposal": 10
+        },
+        "organization": {
+          "true": 1,
+          "false": 0,
+          "missed": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "documents_with_no_proposal": 15
+        }
+      }
+    },
+    "photo_detector": {
+      "rendered_scenes": 20,
+      "positive": 10,
+      "negative": 10,
+      "true": 9,
+      "false_imports": 0,
+      "misses": 1,
+      "precision": 1.0,
+      "recall": 0.9,
+      "scope": "Agent-authored/labeled rendered scenes, not real-photo camera-roll acceptance"
+    },
+    "limits": "Small agent-authored and agent-labeled frozen set, not blind independent evidence. Acceptance targets unagreed; human reviews pending."
+  },
+  "measurement_scope": "Post-user-feedback rule-6 regression replay of the original authored 20-case rubric. No new blind/real-photo/Google parity claim. User explicitly changed bare-dollar behavior to USD; the old frozen unknown-dollar expectations intentionally differ. New core vectors and actual rendered receipt OCR verify the changed USD contract.",
+  "rubric_change": "Original frozen expectations are unchanged. e-address has an additional now-supported Invoice #. t-ambiguous and e-unknown-dollar expected unknown for $, while user-requested rule 6 outputs USD. Do not report these old-rubric scores as current-contract accuracy or silently relabel the old set."
+}

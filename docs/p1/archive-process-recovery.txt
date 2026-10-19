@@ -1,0 +1,60 @@
+INSTRUMENTATION_STATUS: stream=PASS 1: ARCHIVE_RESTART_READY staged
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: shortMsg=Process crashed.
+INSTRUMENTATION_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS 1: External force-stop/new-process restore recovery passed at staged; originals=1, no partial records, existing name retained, repeat recovery idempotent
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+PASS: 1 scanner check groups; synthetic data only.
+
+INSTRUMENTATION_CODE: -1
+INSTRUMENTATION_STATUS: stream=PASS 1: ARCHIVE_RESTART_READY journal
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: shortMsg=Process crashed.
+INSTRUMENTATION_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS 1: External force-stop/new-process restore recovery passed at journal; originals=1, no partial records, existing name retained, repeat recovery idempotent
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+PASS: 1 scanner check groups; synthetic data only.
+
+INSTRUMENTATION_CODE: -1
+INSTRUMENTATION_STATUS: stream=PASS 1: ARCHIVE_RESTART_READY file
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: shortMsg=Process crashed.
+INSTRUMENTATION_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS 1: External force-stop/new-process restore recovery passed at file; originals=1, no partial records, existing name retained, repeat recovery idempotent
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+PASS: 1 scanner check groups; synthetic data only.
+
+INSTRUMENTATION_CODE: -1
+INSTRUMENTATION_STATUS: stream=PASS 1: ARCHIVE_RESTART_READY transaction
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: shortMsg=Process crashed.
+INSTRUMENTATION_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS 1: External force-stop/new-process restore recovery passed at transaction; originals=1, no partial records, existing name retained, repeat recovery idempotent
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+PASS: 1 scanner check groups; synthetic data only.
+
+INSTRUMENTATION_CODE: -1
+INSTRUMENTATION_STATUS: stream=PASS 1: ARCHIVE_RESTART_READY committed
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: shortMsg=Process crashed.
+INSTRUMENTATION_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS 1: External force-stop/new-process restore recovery passed at committed; originals=2, no partial records, existing name retained, repeat recovery idempotent
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+PASS: 1 scanner check groups; synthetic data only.
+
+INSTRUMENTATION_CODE: -1

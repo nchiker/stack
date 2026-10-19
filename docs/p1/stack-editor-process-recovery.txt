@@ -1,0 +1,21 @@
+One actual process-stop case, synthetic isolated child context only.
+
+PREPARE
+INSTRUMENTATION_STATUS: stream=PASS 1: Stack order restart fixture durably committed: reordered hidden/custom categories plus explicit name/notes/filing/originals, ready for Checks process stop
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+PASS: 1 scanner check groups; synthetic data only.
+
+INSTRUMENTATION_CODE: -1
+
+HOST ACTION: adb shell am force-stop org.stackdocs.app.checks
+
+RESUME
+INSTRUMENTATION_STATUS: stream=PASS 1: Actual Checks process-stop/relaunch: saved category order, names/notes/filing/decisions, OCR and original/draft/recovery fingerprints all match
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+PASS: 1 scanner check groups; synthetic data only.
+
+INSTRUMENTATION_CODE: -1

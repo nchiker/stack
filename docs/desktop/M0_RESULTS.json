@@ -1,0 +1,599 @@
+{
+  "milestone": "M0",
+  "status": "delivered with qualified shutdown stability evidence",
+  "date": "2026-10-17",
+  "git_base": "3a23d5e",
+  "toolchain": {
+    "rustc": "1.99.0 (b940084d7 2026-09-28)",
+    "cargo": "1.99.0 (5f94df478 2026-08-27)"
+  },
+  "toolkit_revision": "dbc62f2d899cdbfbe43d170689ddc0290db663f4",
+  "engine": {
+    "build": "chromium/8100",
+    "archive_sha256": "1c1894a12d4d96ee01400c3874444126254180c5c7d2ab628576b67f8120320a",
+    "library_sha256": "b8784cbd652ad2993332b7695e2c80f3a797f877fc47d9be97b66bca9639539e",
+    "wrapper": "pdfium-render 0.9.4",
+    "bindings_feature": "pdfium_7881"
+  },
+  "cargo_checks": {
+    "fmt": "pass",
+    "check_locked_offline": "pass",
+    "clippy_all_targets_deny_warnings": "pass",
+    "build_locked_offline": "pass",
+    "workspace_tests_include_ignored": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "extra_rejections": {
+    "corrupt_engine_before_install": "pass",
+    "existing_fixture_no_overwrite": "pass"
+  },
+  "fixture_manifest": {
+    "fixture_version": 1,
+    "license": "CC0-1.0",
+    "description": "Independently authored Stack synthetic PDF and four-corner image fixtures",
+    "files": [
+      {
+        "name": "two-pages.pdf",
+        "sha256": "316000f28775b19901932f8c60ddbbf6c5ac469938ac643a255feb15fb5e8271"
+      },
+      {
+        "name": "oriented.jpg",
+        "sha256": "511a26e5ddaf8a3263c4c8e10c667d13b9406c2d47ad52f524ead6b7deb334eb"
+      },
+      {
+        "name": "corners.png",
+        "sha256": "351dc1c55d55faf5890c457ec4669cff22d3bed3e57cc47bec85056910dd6daa"
+      },
+      {
+        "name": "corners.webp",
+        "sha256": "f315002b0bd47a1b3d333214df793000b081399e72ea18dd9a1be1080d6260e1"
+      }
+    ],
+    "expectations": {
+      "pdf_pages": 2,
+      "pdf_page_1": "portrait, red top-left marker",
+      "pdf_page_2": "landscape, blue top-left marker",
+      "jpeg_orientation": 6,
+      "jpeg_display": "360x640, green top-left",
+      "png_webp_display": "640x360, red top-left"
+    }
+  },
+  "headless_render": {
+    "milestone": "M0",
+    "fixture_version": 1,
+    "originals_unchanged": true,
+    "results": [
+      {
+        "fixture": "two-pages.pdf",
+        "page": 1,
+        "page_count": 2,
+        "width": 600,
+        "height": 776,
+        "rendered_sha256": "59c8423e5caccdf0e71f5a7d0ca6f520a135b4036a39bd801161bd5f230dd99a"
+      },
+      {
+        "fixture": "two-pages.pdf",
+        "page": 2,
+        "page_count": 2,
+        "width": 600,
+        "height": 464,
+        "rendered_sha256": "156631ff72b9ee045c92573f52bdfdfb6c7702a1a4c661cd111d1e085c8a8b92"
+      },
+      {
+        "fixture": "oriented.jpg",
+        "page": 1,
+        "page_count": 1,
+        "width": 360,
+        "height": 640,
+        "rendered_sha256": "2c7f85636c7cf2169262638faaa01e8b1413a4ae094ab9cb9678d225b9b180fe"
+      },
+      {
+        "fixture": "corners.png",
+        "page": 1,
+        "page_count": 1,
+        "width": 600,
+        "height": 338,
+        "rendered_sha256": "bb0aaca9535cde626eb010a2bd67ff70d98bbcdc9cec23d3f6fd7862f65ba240"
+      },
+      {
+        "fixture": "corners.webp",
+        "page": 1,
+        "page_count": 1,
+        "width": 600,
+        "height": 338,
+        "rendered_sha256": "bb0aaca9535cde626eb010a2bd67ff70d98bbcdc9cec23d3f6fd7862f65ba240"
+      }
+    ]
+  },
+  "small_fixture_measurement": {
+    "elapsed_seconds": 0.54,
+    "peak_rss_kib": 16264,
+    "cpu": "Intel Core i7-10610U",
+    "logical_cpus": 8,
+    "platform": "Linux x86_64",
+    "scope": "one small synthetic headless five-preview run before worker cleanup; not a large-library budget"
+  },
+  "native_runtime": {
+    "binary_sha256": "8b94885b30f12004fa7ee624989c45a5e7f02c4857cd25c88e96cb5720497a8e",
+    "engine_sha256": "b8784cbd652ad2993332b7695e2c80f3a797f877fc47d9be97b66bca9639539e",
+    "synthetic_only": true,
+    "cases": [
+      {
+        "name": "light",
+        "theme": "light",
+        "requested_size": "1080x780",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 1080,
+            "height": 780,
+            "sha256": "fa17eb277fdadb6e11d14c7be14b640aa0be1dfe180d0aa3d38e8cd8e53372ba"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "7d97d28815ddf72a751bd934a44efc105a7504b39eaed8975a82409909405ebe"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "b0b51232c6e799c0ffd35881f7b6d2e28dbeae0f65e05644a6bd36e5eeb300db"
+          }
+        ]
+      },
+      {
+        "name": "dark",
+        "theme": "dark",
+        "requested_size": "1080x780",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 1080,
+            "height": 780,
+            "sha256": "fa67d8206c116c36ed35f13305aea29f09308a73b83e25f170b22ff04291ce10"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "52fa79a29987fdb06b9be487a80e1d97d125595690244706c2fdbffbbc359f1f"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "77e952b8e63d53bfc4818e487a76fe5ffc8ee0b7d7334c95d3d954537e6efacd"
+          }
+        ]
+      },
+      {
+        "name": "narrow",
+        "theme": "light",
+        "requested_size": "680x680",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 680,
+            "height": 680,
+            "sha256": "01db1e68cc2124c9f11ba314a43bc622afa3df14ec44ba707721d490da54f433"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 680,
+            "height": 650,
+            "sha256": "86aebd9d622d0c32f7146760be54cf2da79da323f5ecd2c78fef7c3b1af2239f"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 680,
+            "height": 650,
+            "sha256": "0ca357450ded330f6096f31d08644caedd7f19dc36e3cedb8db64c6300fbc7f4"
+          }
+        ]
+      },
+      {
+        "name": "large-text",
+        "theme": "dark",
+        "requested_size": "680x680",
+        "content_text_scale": "2",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 680,
+            "height": 650,
+            "sha256": "93e71bf044b8e3e7edfdf0e8edd595c393571e15c87989b54413d649696579c4"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 680,
+            "height": 650,
+            "sha256": "1ad006d1a547904809e9be2aadd4cc0584f1a82ca591a833c5adb7a7dfee9e0d"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 680,
+            "height": 650,
+            "sha256": "2c93d6d34aaefaae8ca29c8e792a91c2d239410623c13d29ea470587a0b79c8a"
+          }
+        ]
+      },
+      {
+        "name": "shutdown-01",
+        "theme": "light",
+        "requested_size": "1080x780",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 1080,
+            "height": 780,
+            "sha256": "fa17eb277fdadb6e11d14c7be14b640aa0be1dfe180d0aa3d38e8cd8e53372ba"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "7d97d28815ddf72a751bd934a44efc105a7504b39eaed8975a82409909405ebe"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "b0b51232c6e799c0ffd35881f7b6d2e28dbeae0f65e05644a6bd36e5eeb300db"
+          }
+        ]
+      },
+      {
+        "name": "shutdown-02",
+        "theme": "light",
+        "requested_size": "1080x780",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 1080,
+            "height": 780,
+            "sha256": "fa17eb277fdadb6e11d14c7be14b640aa0be1dfe180d0aa3d38e8cd8e53372ba"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "7d97d28815ddf72a751bd934a44efc105a7504b39eaed8975a82409909405ebe"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "b0b51232c6e799c0ffd35881f7b6d2e28dbeae0f65e05644a6bd36e5eeb300db"
+          }
+        ]
+      },
+      {
+        "name": "shutdown-03",
+        "theme": "light",
+        "requested_size": "1080x780",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 1080,
+            "height": 780,
+            "sha256": "fa17eb277fdadb6e11d14c7be14b640aa0be1dfe180d0aa3d38e8cd8e53372ba"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "7d97d28815ddf72a751bd934a44efc105a7504b39eaed8975a82409909405ebe"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "b0b51232c6e799c0ffd35881f7b6d2e28dbeae0f65e05644a6bd36e5eeb300db"
+          }
+        ]
+      },
+      {
+        "name": "shutdown-04",
+        "theme": "light",
+        "requested_size": "1080x780",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 1080,
+            "height": 780,
+            "sha256": "fa17eb277fdadb6e11d14c7be14b640aa0be1dfe180d0aa3d38e8cd8e53372ba"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "7d97d28815ddf72a751bd934a44efc105a7504b39eaed8975a82409909405ebe"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "b0b51232c6e799c0ffd35881f7b6d2e28dbeae0f65e05644a6bd36e5eeb300db"
+          }
+        ]
+      },
+      {
+        "name": "shutdown-05",
+        "theme": "light",
+        "requested_size": "1080x780",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 1080,
+            "height": 780,
+            "sha256": "fa17eb277fdadb6e11d14c7be14b640aa0be1dfe180d0aa3d38e8cd8e53372ba"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "7d97d28815ddf72a751bd934a44efc105a7504b39eaed8975a82409909405ebe"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "b0b51232c6e799c0ffd35881f7b6d2e28dbeae0f65e05644a6bd36e5eeb300db"
+          }
+        ]
+      },
+      {
+        "name": "shutdown-06",
+        "theme": "light",
+        "requested_size": "1080x780",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 1080,
+            "height": 780,
+            "sha256": "fa17eb277fdadb6e11d14c7be14b640aa0be1dfe180d0aa3d38e8cd8e53372ba"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "7d97d28815ddf72a751bd934a44efc105a7504b39eaed8975a82409909405ebe"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "b0b51232c6e799c0ffd35881f7b6d2e28dbeae0f65e05644a6bd36e5eeb300db"
+          }
+        ]
+      },
+      {
+        "name": "shutdown-07",
+        "theme": "light",
+        "requested_size": "1080x780",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 1080,
+            "height": 780,
+            "sha256": "fa17eb277fdadb6e11d14c7be14b640aa0be1dfe180d0aa3d38e8cd8e53372ba"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "7d97d28815ddf72a751bd934a44efc105a7504b39eaed8975a82409909405ebe"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "b0b51232c6e799c0ffd35881f7b6d2e28dbeae0f65e05644a6bd36e5eeb300db"
+          }
+        ]
+      },
+      {
+        "name": "shutdown-08",
+        "theme": "light",
+        "requested_size": "1080x780",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 1080,
+            "height": 780,
+            "sha256": "fa17eb277fdadb6e11d14c7be14b640aa0be1dfe180d0aa3d38e8cd8e53372ba"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "7d97d28815ddf72a751bd934a44efc105a7504b39eaed8975a82409909405ebe"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "b0b51232c6e799c0ffd35881f7b6d2e28dbeae0f65e05644a6bd36e5eeb300db"
+          }
+        ]
+      },
+      {
+        "name": "shutdown-09",
+        "theme": "light",
+        "requested_size": "1080x780",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 1080,
+            "height": 780,
+            "sha256": "fa17eb277fdadb6e11d14c7be14b640aa0be1dfe180d0aa3d38e8cd8e53372ba"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "7d97d28815ddf72a751bd934a44efc105a7504b39eaed8975a82409909405ebe"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "b0b51232c6e799c0ffd35881f7b6d2e28dbeae0f65e05644a6bd36e5eeb300db"
+          }
+        ]
+      },
+      {
+        "name": "shutdown-10",
+        "theme": "light",
+        "requested_size": "1080x780",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 1080,
+            "height": 780,
+            "sha256": "fa17eb277fdadb6e11d14c7be14b640aa0be1dfe180d0aa3d38e8cd8e53372ba"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "7d97d28815ddf72a751bd934a44efc105a7504b39eaed8975a82409909405ebe"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "b0b51232c6e799c0ffd35881f7b6d2e28dbeae0f65e05644a6bd36e5eeb300db"
+          }
+        ]
+      },
+      {
+        "name": "shutdown-11",
+        "theme": "light",
+        "requested_size": "1080x780",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 1080,
+            "height": 780,
+            "sha256": "fa17eb277fdadb6e11d14c7be14b640aa0be1dfe180d0aa3d38e8cd8e53372ba"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "7d97d28815ddf72a751bd934a44efc105a7504b39eaed8975a82409909405ebe"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "b0b51232c6e799c0ffd35881f7b6d2e28dbeae0f65e05644a6bd36e5eeb300db"
+          }
+        ]
+      },
+      {
+        "name": "shutdown-12",
+        "theme": "light",
+        "requested_size": "1080x780",
+        "content_text_scale": "1",
+        "exit_status": 0,
+        "captures": [
+          {
+            "name": "01-report-page-1.png",
+            "width": 1080,
+            "height": 780,
+            "sha256": "fa17eb277fdadb6e11d14c7be14b640aa0be1dfe180d0aa3d38e8cd8e53372ba"
+          },
+          {
+            "name": "02-report-page-2.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "7d97d28815ddf72a751bd934a44efc105a7504b39eaed8975a82409909405ebe"
+          },
+          {
+            "name": "03-oriented-image.png",
+            "width": 1080,
+            "height": 650,
+            "sha256": "b0b51232c6e799c0ffd35881f7b6d2e28dbeae0f65e05644a6bd36e5eeb300db"
+          }
+        ]
+      }
+    ]
+  },
+  "visual_inspection": {
+    "kind": "agent review of actual own-window captures",
+    "cases": [
+      "light/01-report-page-1.png",
+      "dark/02-report-page-2.png",
+      "narrow/03-oriented-image.png",
+      "large-text/02-report-page-2.png"
+    ],
+    "findings": "correct page identity/orientation and wrapped enlarged content controls; narrow enlarged-text preview area is small"
+  },
+  "shutdown_watch": {
+    "prior_failure": "one native SIGSEGV after all three captures before explicit worker teardown",
+    "prior_binary_sha256": "44deea6aa75a7f976f6b374db32e4ddda1390b724d6fe8e6153d866380f83ba2",
+    "change": "drain and join persistent PDF worker before smoke window/runtime teardown and during ordinary process cleanup",
+    "final_native_runs": 16,
+    "final_all_exit_zero": true,
+    "native_root_cause": "unconfirmed",
+    "causal_link_to_change": "unconfirmed"
+  },
+  "not_implemented": [
+    "persistent library",
+    "archive import/export",
+    "saved crop/enhancement/flattening parity",
+    "sync core",
+    "Android sync",
+    "LAN transport"
+  ],
+  "not_verified": [
+    "physical keyboard/mouse workflow",
+    "screen reader",
+    "system text-only settings",
+    "broad file/parser robustness",
+    "large-library resource limits",
+    "universal shutdown stability"
+  ],
+  "preservation": {
+    "android_accessed": false,
+    "personal_documents_used": false,
+    "other_projects_modified": false,
+    "runtime_data": "disposable XDG roots and exact authored fixtures only"
+  }
+}

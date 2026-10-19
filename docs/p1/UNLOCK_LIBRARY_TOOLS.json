@@ -1,0 +1,223 @@
+{
+  "version": "0.8.7-dev",
+  "code": 20,
+  "schema": 8,
+  "archive": 3,
+  "implementation_commit": "b5cc48e",
+  "date": "2026-10-17",
+  "runtime": {
+    "device": "Pixel 4a",
+    "api": 33,
+    "abi": "arm64-v8a",
+    "page_size": 4096
+  },
+  "automated": {
+    "groups": 37,
+    "all_passed": true,
+    "tests": [
+      {
+        "flag": "backupUi",
+        "groups": 2,
+        "passed": true,
+        "evidence": "unlock-backupUi.txt"
+      },
+      {
+        "flag": "lockUi",
+        "groups": 5,
+        "passed": true,
+        "evidence": "unlock-lockUi.txt"
+      },
+      {
+        "flag": "convenience",
+        "groups": 4,
+        "passed": true,
+        "evidence": "unlock-convenience.txt"
+      },
+      {
+        "flag": "backupLayout",
+        "groups": 2,
+        "passed": true,
+        "evidence": "unlock-backupLayout.txt"
+      },
+      {
+        "flag": "p1Only",
+        "groups": 10,
+        "passed": true,
+        "evidence": "unlock-p1Only.txt"
+      },
+      {
+        "flag": "p1Ui",
+        "groups": 5,
+        "passed": true,
+        "evidence": "unlock-p1Ui.txt"
+      },
+      {
+        "flag": "archiveOnly",
+        "groups": 8,
+        "passed": true,
+        "evidence": "unlock-archiveOnly.txt"
+      },
+      {
+        "flag": "navigationOnly",
+        "groups": 1,
+        "passed": true,
+        "evidence": "unlock-navigationOnly.txt"
+      }
+    ],
+    "counts_are_affected_reruns_not_unique_new_tests": true,
+    "initial_fixture_failure": "Second font-size setup raced finishing MainActivity.onPause. Wait for destruction before resetting test preferences; rerun passes.",
+    "native_authentication_claim": false,
+    "system_picker_provider_variety_claim": false
+  },
+  "build": {
+    "offline": true,
+    "normal_package_without_stackChecks": true,
+    "debug": true,
+    "android_test": true,
+    "unsigned_release": true,
+    "lint_errors": 0,
+    "lint_warnings": 14,
+    "bundled_model_and_16_library_four_ABI_static_audits": true,
+    "test_prompt_provider_recipient_classes_absent_from_both_normal_APKs": true
+  },
+  "visuals": [
+    {
+      "name": "unlock-retry-narrow.png",
+      "sha256": "b7e566829a76d1de90a88d600c6ae9584126ec085ba9197f728283e936489f4a",
+      "reviewer": "agent",
+      "content": "synthetic only; image outside Git"
+    },
+    {
+      "name": "unlock-retry-large-text.png",
+      "sha256": "136cfb032ec6d9b010564d21bc3b7903b3b586cbaaecf33cbe5b278fa59eaee3",
+      "reviewer": "agent",
+      "content": "synthetic only; image outside Git"
+    },
+    {
+      "name": "unlock-retry-landscape.png",
+      "sha256": "2c2af881b5f308af58129dfa7079c66961277efe17c9c33b175188c2fe89bbfe",
+      "reviewer": "agent",
+      "content": "synthetic only; image outside Git"
+    },
+    {
+      "name": "documents-name-0.png",
+      "sha256": "7ada6be2f92eeda2e4a02dcbd4f32a0508ddcde4f566fa054c1b0d6dc6e6fa67",
+      "reviewer": "agent",
+      "content": "synthetic only; image outside Git"
+    },
+    {
+      "name": "documents-name-1.png",
+      "sha256": "e36845de35fb405d4bd53d3725b749f2bf106e6db2e2d793be9032792f72b833",
+      "reviewer": "agent",
+      "content": "synthetic only; image outside Git"
+    },
+    {
+      "name": "document-sort-1.png",
+      "sha256": "403a49545795c56c1c10884e62e1360856004b05c2f35e5e9cea847b4e58f72d",
+      "reviewer": "agent",
+      "content": "synthetic only; image outside Git"
+    },
+    {
+      "name": "backup-idle.png",
+      "sha256": "538c11a190b3b463c2bec31da29235d63f6f569a70d226d21426d8541ce0a572",
+      "reviewer": "agent",
+      "content": "synthetic only; image outside Git"
+    },
+    {
+      "name": "backup-idle-large-text.png",
+      "sha256": "0a7751081499ae2555757817a1c7d10518700abeb5f7dd1540530cd02e56c72c",
+      "reviewer": "agent",
+      "content": "synthetic only; image outside Git"
+    }
+  ],
+  "preservation": {
+    "version": "0.8.7-dev",
+    "code": 20,
+    "schema": 8,
+    "archive": 3,
+    "implementation_commits": [
+      "b5cc48e"
+    ],
+    "before": {
+      "docs": "143",
+      "pages": "230",
+      "stacks": "17",
+      "memberships": "216",
+      "metadata_sha256": "78f70eb03f282c91f01322d044e3cf56c3f76610ccdd457a5582d709af877972",
+      "p1_authoritative_drafts_sha256": "3ebd3759195022eeeb913d938ce3b4de5954ed53036edf150eb6f165f35c19b9",
+      "stack_order_sha256": "2648d1633dd2c4c45c1189b23e001609277e5800108ab90f58e5b2d35b452f1d",
+      "saved_ocr_sha256": "6429f3df7994da61d22f2764ae5e08a07c45ac700bf258b2a193a99b0239d609",
+      "originals_draft_recovery_sha256": "4ad818641d16cc647ce0d36b38db8a44eff0ff77d0fc9d6225882b244f274b68",
+      "photos_opt_in": "false",
+      "lock_enabled": "true",
+      "notifications_opt_in": "false",
+      "succeeded": "230"
+    },
+    "after": {
+      "docs": "143",
+      "pages": "230",
+      "stacks": "17",
+      "memberships": "216",
+      "metadata_sha256": "78f70eb03f282c91f01322d044e3cf56c3f76610ccdd457a5582d709af877972",
+      "p1_authoritative_drafts_sha256": "3ebd3759195022eeeb913d938ce3b4de5954ed53036edf150eb6f165f35c19b9",
+      "stack_order_sha256": "2648d1633dd2c4c45c1189b23e001609277e5800108ab90f58e5b2d35b452f1d",
+      "saved_ocr_sha256": "6429f3df7994da61d22f2764ae5e08a07c45ac700bf258b2a193a99b0239d609",
+      "originals_draft_recovery_sha256": "4ad818641d16cc647ce0d36b38db8a44eff0ff77d0fc9d6225882b244f274b68",
+      "photos_opt_in": "false",
+      "lock_enabled": "true",
+      "notifications_opt_in": "false",
+      "succeeded": "230"
+    },
+    "comparison": {
+      "existing_rows_exact": true,
+      "metadata_revisions_explained": true,
+      "automatic_details_added": 0,
+      "automatic_organization_tags_added": 0,
+      "automatic_organization_relations_added": 0,
+      "preexisting_rows_checked": {
+        "documents": 143,
+        "details": 809,
+        "tags": 21,
+        "document_tags": 23,
+        "editor_drafts": 0,
+        "photo_history": 0,
+        "operations": 3,
+        "operation_items": 9,
+        "restore_commits": 1
+      }
+    },
+    "prior_ocr_rows_checked": 230,
+    "queued_ocr_rows_changed": 0,
+    "previously_completed_ocr_rows_exact": true,
+    "all_aggregates_exact": true,
+    "apk_sha256": "d5e18ac24de008542153ff98710e0c76fa82c91b4641abaad870debe1d22656d",
+    "apk_bytes": 31425546,
+    "signer_sha256": "db7352c8df2d3643ae9dc119ffd73ee26a700808d53efad3cf60a753e620eeab",
+    "canonical_install": "adb install -r; Success",
+    "canonical_built_without_stackChecks": true,
+    "database_replaced": false,
+    "personal_library_test_mutations": false,
+    "new_photo_lock_notification_consent": false,
+    "canonical_test_apk_removed": true,
+    "reopened": true,
+    "installed_apk_matches_build": true
+  },
+  "primary_phone": {
+    "folder": "/home/charlie.day/Downloads/Stack-0.8.7",
+    "apk": "Stack-0.8.7.apk",
+    "archive": "Google-Stack-Migration-final.stackbackup",
+    "archive_bytes": 198485169,
+    "copy_checksums_verified": true,
+    "directory_mode": "0700",
+    "file_mode": "0600",
+    "contains_later_Stack_edits": false,
+    "personal_backup_created_as_test": false,
+    "agent_installed_or_restored_primary_phone": false
+  },
+  "pending_user_checks": [
+    "Native direct-prompt fingerprint/screen-lock/cancel/retry/background flow",
+    "Actual primary-phone install and chosen one-time restore"
+  ],
+  "earlier_H1_H8": "Completed, user-reported; not reopened",
+  "acceptance": "No blanket P0/P1/Google/quality/universal platform parity claim; prior frozen evaluation and evidence limits retained"
+}

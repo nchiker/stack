@@ -1,0 +1,22 @@
+[package]
+name = "stack-render"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+stack-core.workspace = true
+stack-archive.workspace = true
+image.workspace = true
+flate2.workspace = true
+pdfium-render.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+libloading = "=0.8.9"
+
+[dev-dependencies]
+tempfile.workspace = true

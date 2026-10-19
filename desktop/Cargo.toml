@@ -1,0 +1,81 @@
+[workspace]
+members = ["crates/stack-core", "crates/stack-archive", "crates/stack-render", "crates/stack-cli", "crates/stack-desktop", "crates/stack-sync", "crates/stack-transport"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0-dev"
+edition = "2024"
+rust-version = "1.99"
+license = "Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+stack-sync = { path = "crates/stack-sync" }
+stack-core = { path = "crates/stack-core" }
+stack-archive = { path = "crates/stack-archive" }
+stack-render = { path = "crates/stack-render" }
+stack-transport = { path = "crates/stack-transport" }
+rustls = { version = "=0.23.46", default-features = false, features = ["std", "ring", "tls12"] }
+image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
+flate2 = "=1.1.10"
+pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881", "image_025", "thread_safe"] }
+thiserror = "=2.0.21"
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+sha2 = "=0.10.9"
+libcosmic = { git = "https://github.com/pop-os/libcosmic", rev = "dbc62f2d899cdbfbe43d170689ddc0290db663f4", default-features = false, features = ["winit", "wayland", "tokio", "xdg-portal", "a11y"] }
+iced-accessibility = { package = "iced_accessibility", git = "https://github.com/pop-os/libcosmic", rev = "dbc62f2d899cdbfbe43d170689ddc0290db663f4" }
+iced-tiny-skia = { package = "iced_tiny_skia", git = "https://github.com/pop-os/libcosmic", rev = "dbc62f2d899cdbfbe43d170689ddc0290db663f4" }
+iced-winit = { package = "iced_winit", git = "https://github.com/pop-os/libcosmic", rev = "dbc62f2d899cdbfbe43d170689ddc0290db663f4" }
+tokio = { version = "=1.53.3", features = ["rt", "time", "sync"] }
+rusqlite = { version = "=0.40.2", features = ["bundled"] }
+uuid = { version = "=1.28.0", features = ["v4", "v5"] }
+rustix = { version = "=1.1.5", features = ["fs"] }
+tempfile = "=3.27.0"
+
+[profile.dev]
+debug = 0
+incremental = false
+
+[profile.test]
+debug = 0
+incremental = false
+
+# Keep native UI development builds quick to compile while running the pixel
+# processing loops at practical speed. These overrides also apply in tests.
+[profile.dev.package.stack-render]
+opt-level = 2
+
+[profile.dev.package.image]
+opt-level = 2
+
+[profile.test.package.stack-render]
+opt-level = 2
+
+[profile.test.package.image]
+opt-level = 2
+
+# First-frame native text layout includes font discovery and shaping. Keep these
+# CPU loops optimized in debug/test builds, just like page/image processing.
+[profile.dev.package.cosmic-text]
+opt-level = 2
+[profile.test.package.cosmic-text]
+opt-level = 2
+[profile.dev.package.fontdb]
+opt-level = 2
+[profile.test.package.fontdb]
+opt-level = 2
+[profile.dev.package.swash]
+opt-level = 2
+[profile.test.package.swash]
+opt-level = 2
+[profile.dev.package.iced_graphics]
+opt-level = 2
+[profile.test.package.iced_graphics]
+opt-level = 2
+
+# Scoped native adapter and owned handle fixes; upstream source/license hashes in platform/.
+[patch."https://github.com/pop-os/libcosmic"]
+iced_winit = { path = "platform/libcosmic-iced/winit" }
+iced_runtime = { path = "platform/libcosmic-iced/runtime" }
+iced_widget = { path = "platform/libcosmic-iced/widget" }

@@ -1,0 +1,1390 @@
+{
+  "rules": "local-phrases-1",
+  "device": "Pixel 4a",
+  "api": 33,
+  "provenance": "Independently authored, fictional printed-English text; no personal/reference content. Not camera documents. Rules frozen before held-out examples; same author, no external blind evaluation.",
+  "post_document_max_pss_kib": 56438,
+  "documents": [
+    {
+      "id": "t-bill",
+      "split": "tuning",
+      "labels": [
+        "bills"
+      ],
+      "rule_text": {
+        "title": "Cedar Energy \u00b7 Bill",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due"
+        }
+      },
+      "ocr": {
+        "title": "Cedar Energy \u00b7 Bill",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due"
+        }
+      },
+      "rule_ms": 1.891459,
+      "proposal_snapshot_analysis_commit_ms": 9.204272,
+      "ocr_ms": 310,
+      "characters": 62,
+      "pages": 1
+    },
+    {
+      "id": "t-bank",
+      "split": "tuning",
+      "labels": [
+        "banking"
+      ],
+      "rule_text": {
+        "title": "Atlas Bank \u00b7 Account statement",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "banking": "Account or bank statement with statement details"
+        }
+      },
+      "ocr": {
+        "title": "Atlas Bank \u00b7 Account statement",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "banking": "Account or bank statement with statement details"
+        }
+      },
+      "rule_ms": 1.295989,
+      "proposal_snapshot_analysis_commit_ms": 8.044324,
+      "ocr_ms": 335,
+      "characters": 61,
+      "pages": 1
+    },
+    {
+      "id": "t-id",
+      "split": "tuning",
+      "labels": [
+        "ids"
+      ],
+      "rule_text": {
+        "title": "Identity Card \u00b7 Identity document",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "ids": "Identity document with identifying fields"
+        }
+      },
+      "ocr": {
+        "title": "Identity Card \u00b7 Identity document",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "ids": "Identity document with identifying fields"
+        }
+      },
+      "rule_ms": 1.256667,
+      "proposal_snapshot_analysis_commit_ms": 5.642292,
+      "ocr_ms": 264,
+      "characters": 59,
+      "pages": 1
+    },
+    {
+      "id": "t-house",
+      "split": "tuning",
+      "labels": [
+        "house"
+      ],
+      "rule_text": {
+        "title": "Rental agreement",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "house": "Housing agreement, property or household service details"
+        }
+      },
+      "ocr": {
+        "title": "Rental agreement",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "house": "Housing agreement, property or household service details"
+        }
+      },
+      "rule_ms": 1.168489,
+      "proposal_snapshot_analysis_commit_ms": 12.230314,
+      "ocr_ms": 277,
+      "characters": 62,
+      "pages": 1
+    },
+    {
+      "id": "t-medical",
+      "split": "tuning",
+      "labels": [
+        "medical"
+      ],
+      "rule_text": {
+        "title": "Cedar Clinic \u00b7 Medical document",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "medical": "Medical care document with patient or treatment details"
+        }
+      },
+      "ocr": {
+        "title": "Cedar Clinic \u00b7 Medical document",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "medical": "Medical care document with patient or treatment details"
+        }
+      },
+      "rule_ms": 1.172031,
+      "proposal_snapshot_analysis_commit_ms": 10.959897,
+      "ocr_ms": 296,
+      "characters": 71,
+      "pages": 1
+    },
+    {
+      "id": "t-receipt",
+      "split": "tuning",
+      "labels": [
+        "receipts"
+      ],
+      "rule_text": {
+        "title": "Cedar Market \u00b7 Receipt",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "receipts": "Receipt with a purchase total or payment"
+        }
+      },
+      "ocr": {
+        "title": "Cedar Market \u00b7 Receipt",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "receipts": "Receipt with a purchase total or payment"
+        }
+      },
+      "rule_ms": 1.695886,
+      "proposal_snapshot_analysis_commit_ms": 5.100104,
+      "ocr_ms": 264,
+      "characters": 56,
+      "pages": 1
+    },
+    {
+      "id": "h-bill1",
+      "split": "held-out",
+      "labels": [
+        "bills"
+      ],
+      "rule_text": {
+        "title": "Aster Broadband \u00b7 Bill",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due"
+        }
+      },
+      "ocr": {
+        "title": "Aster Broadband \u00b7 Bill",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due"
+        }
+      },
+      "rule_ms": 1.139635,
+      "proposal_snapshot_analysis_commit_ms": 5.502344,
+      "ocr_ms": 350,
+      "characters": 57,
+      "pages": 1
+    },
+    {
+      "id": "h-bill2",
+      "split": "held-out",
+      "labels": [
+        "bills"
+      ],
+      "rule_text": {
+        "title": "Harbor Utilities \u00b7 Bill",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due"
+        }
+      },
+      "ocr": {
+        "title": "Harbor Utilities \u00b7 Bill",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due"
+        }
+      },
+      "rule_ms": 1.228542,
+      "proposal_snapshot_analysis_commit_ms": 5.465938,
+      "ocr_ms": 342,
+      "characters": 52,
+      "pages": 1
+    },
+    {
+      "id": "h-bill3",
+      "split": "held-out",
+      "labels": [
+        "bills"
+      ],
+      "rule_text": {
+        "title": "Tutor Invoice",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due"
+        }
+      },
+      "ocr": {
+        "title": "Tutor Invoice",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due"
+        }
+      },
+      "rule_ms": 1.144479,
+      "proposal_snapshot_analysis_commit_ms": 5.786876,
+      "ocr_ms": 258,
+      "characters": 49,
+      "pages": 1
+    },
+    {
+      "id": "h-bank1",
+      "split": "held-out",
+      "labels": [
+        "banking"
+      ],
+      "rule_text": {
+        "title": "Juniper Credit Union \u00b7 Account statement",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "banking": "Account or bank statement with statement details"
+        }
+      },
+      "ocr": {
+        "title": "Juniper Credit Union \u00b7 Account statement",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "banking": "Account or bank statement with statement details"
+        }
+      },
+      "rule_ms": 1.180833,
+      "proposal_snapshot_analysis_commit_ms": 5.47,
+      "ocr_ms": 298,
+      "characters": 80,
+      "pages": 1
+    },
+    {
+      "id": "h-bank2",
+      "split": "held-out",
+      "labels": [
+        "banking"
+      ],
+      "rule_text": {
+        "title": "Card Services \u00b7 Account statement",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "banking": "Account or bank statement with statement details"
+        }
+      },
+      "ocr": {
+        "title": "Card Services \u00b7 Account statement",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "banking": "Account or bank statement with statement details"
+        }
+      },
+      "rule_ms": 1.168438,
+      "proposal_snapshot_analysis_commit_ms": 8.169897,
+      "ocr_ms": 382,
+      "characters": 69,
+      "pages": 1
+    },
+    {
+      "id": "h-bank3",
+      "split": "held-out",
+      "labels": [
+        "banking"
+      ],
+      "rule_text": {
+        "title": "Finch Financial \u00b7 Account statement",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "banking": "Account or bank statement with statement details"
+        }
+      },
+      "ocr": {
+        "title": "Finch Financial \u00b7 Account statement",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "banking": "Account or bank statement with statement details"
+        }
+      },
+      "rule_ms": 3.608125,
+      "proposal_snapshot_analysis_commit_ms": 6.038646,
+      "ocr_ms": 337,
+      "characters": 72,
+      "pages": 1
+    },
+    {
+      "id": "h-id1",
+      "split": "held-out",
+      "labels": [
+        "ids"
+      ],
+      "rule_text": {
+        "title": "Passport",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "ids": "Identity document with identifying fields"
+        }
+      },
+      "ocr": {
+        "title": "Passport",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "ids": "Identity document with identifying fields"
+        }
+      },
+      "rule_ms": 1.113282,
+      "proposal_snapshot_analysis_commit_ms": 7.093438,
+      "ocr_ms": 361,
+      "characters": 49,
+      "pages": 1
+    },
+    {
+      "id": "h-id2",
+      "split": "held-out",
+      "labels": [
+        "ids"
+      ],
+      "rule_text": {
+        "title": "Driver License",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "ids": "Identity document with identifying fields"
+        }
+      },
+      "ocr": {
+        "title": "Driver License",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "ids": "Identity document with identifying fields"
+        }
+      },
+      "rule_ms": 3.316355,
+      "proposal_snapshot_analysis_commit_ms": 5.29198,
+      "ocr_ms": 298,
+      "characters": 47,
+      "pages": 1
+    },
+    {
+      "id": "h-id3",
+      "split": "held-out",
+      "labels": [
+        "ids"
+      ],
+      "rule_text": {
+        "title": "Birth Certificate",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "ids": "Identity document with identifying fields"
+        }
+      },
+      "ocr": {
+        "title": "Birth Certificate",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "ids": "Identity document with identifying fields"
+        }
+      },
+      "rule_ms": 1.149011,
+      "proposal_snapshot_analysis_commit_ms": 8.192605,
+      "ocr_ms": 250,
+      "characters": 45,
+      "pages": 1
+    },
+    {
+      "id": "h-house1",
+      "split": "held-out",
+      "labels": [
+        "house"
+      ],
+      "rule_text": {
+        "title": "Home inspection",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "house": "Housing agreement, property or household service details"
+        }
+      },
+      "ocr": {
+        "title": "Home inspection",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "house": "Housing agreement, property or household service details"
+        }
+      },
+      "rule_ms": 1.245677,
+      "proposal_snapshot_analysis_commit_ms": 6.041094,
+      "ocr_ms": 282,
+      "characters": 65,
+      "pages": 1
+    },
+    {
+      "id": "h-house2",
+      "split": "held-out",
+      "labels": [
+        "house"
+      ],
+      "rule_text": {
+        "title": "Home Insurance \u00b7 Housing document",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "house": "Housing agreement, property or household service details"
+        }
+      },
+      "ocr": {
+        "title": "Home Insurance \u00b7 Housing document",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "house": "Housing agreement, property or household service details"
+        }
+      },
+      "rule_ms": 1.136146,
+      "proposal_snapshot_analysis_commit_ms": 5.557605,
+      "ocr_ms": 295,
+      "characters": 58,
+      "pages": 1
+    },
+    {
+      "id": "h-house3",
+      "split": "held-out",
+      "labels": [
+        "house",
+        "banking"
+      ],
+      "rule_text": {
+        "title": "Mortgage statement",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "house": "Housing agreement, property or household service details"
+        }
+      },
+      "ocr": {
+        "title": "Mortgage statement",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "house": "Housing agreement, property or household service details"
+        }
+      },
+      "rule_ms": 1.12776,
+      "proposal_snapshot_analysis_commit_ms": 5.556042,
+      "ocr_ms": 363,
+      "characters": 65,
+      "pages": 1
+    },
+    {
+      "id": "h-med1",
+      "split": "held-out",
+      "labels": [
+        "medical"
+      ],
+      "rule_text": {
+        "title": "Aster Hospital \u00b7 Medical document",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "medical": "Medical care document with patient or treatment details"
+        }
+      },
+      "ocr": {
+        "title": "Aster Hospital \u00b7 Medical document",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "medical": "Medical care document with patient or treatment details"
+        }
+      },
+      "rule_ms": 1.169219,
+      "proposal_snapshot_analysis_commit_ms": 5.530001,
+      "ocr_ms": 366,
+      "characters": 57,
+      "pages": 1
+    },
+    {
+      "id": "h-med2",
+      "split": "held-out",
+      "labels": [
+        "medical"
+      ],
+      "rule_text": {
+        "title": "Prescription",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "medical": "Medical care document with patient or treatment details"
+        }
+      },
+      "ocr": {
+        "title": "Prescription",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "medical": "Medical care document with patient or treatment details"
+        }
+      },
+      "rule_ms": 1.134688,
+      "proposal_snapshot_analysis_commit_ms": 5.673021,
+      "ocr_ms": 237,
+      "characters": 36,
+      "pages": 1
+    },
+    {
+      "id": "h-med3",
+      "split": "held-out",
+      "labels": [
+        "medical"
+      ],
+      "rule_text": {
+        "title": "Clinical Test Report \u00b7 Medical document",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "medical": "Medical care document with patient or treatment details"
+        }
+      },
+      "ocr": {
+        "title": "Clinical Test Report \u00b7 Medical document",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "medical": "Medical care document with patient or treatment details"
+        }
+      },
+      "rule_ms": 1.170625,
+      "proposal_snapshot_analysis_commit_ms": 5.577813,
+      "ocr_ms": 301,
+      "characters": 59,
+      "pages": 1
+    },
+    {
+      "id": "h-receipt1",
+      "split": "held-out",
+      "labels": [
+        "receipts"
+      ],
+      "rule_text": {
+        "title": "Willow Books \u00b7 Receipt",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "receipts": "Receipt with a purchase total or payment"
+        }
+      },
+      "ocr": {
+        "title": "Willow Books \u00b7 Receipt",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "receipts": "Receipt with a purchase total or payment"
+        }
+      },
+      "rule_ms": 1.132917,
+      "proposal_snapshot_analysis_commit_ms": 12.548283,
+      "ocr_ms": 259,
+      "characters": 47,
+      "pages": 1
+    },
+    {
+      "id": "h-receipt2",
+      "split": "held-out",
+      "labels": [
+        "receipts"
+      ],
+      "rule_text": {
+        "title": "Orchard Cafe \u00b7 Receipt",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "receipts": "Receipt with a purchase total or payment"
+        }
+      },
+      "ocr": {
+        "title": "Orchard Cafe \u00b7 Receipt",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "receipts": "Receipt with a purchase total or payment"
+        }
+      },
+      "rule_ms": 1.170157,
+      "proposal_snapshot_analysis_commit_ms": 5.383959,
+      "ocr_ms": 250,
+      "characters": 37,
+      "pages": 1
+    },
+    {
+      "id": "h-receipt3",
+      "split": "held-out",
+      "labels": [
+        "receipts"
+      ],
+      "rule_text": {
+        "title": "Museum Shop \u00b7 Receipt",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "receipts": "Receipt with a purchase total or payment"
+        }
+      },
+      "ocr": {
+        "title": "Museum Shop \u00b7 Receipt",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "receipts": "Receipt with a purchase total or payment"
+        }
+      },
+      "rule_ms": 1.225,
+      "proposal_snapshot_analysis_commit_ms": 5.700365,
+      "ocr_ms": 333,
+      "characters": 41,
+      "pages": 1
+    },
+    {
+      "id": "h-multi1",
+      "split": "held-out",
+      "labels": [
+        "bills",
+        "house"
+      ],
+      "rule_text": {
+        "title": "Cedar Water \u00b7 Bill",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due",
+          "house": "Housing agreement, property or household service details"
+        }
+      },
+      "ocr": {
+        "title": "Cedar Water \u00b7 Bill",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due",
+          "house": "Housing agreement, property or household service details"
+        }
+      },
+      "rule_ms": 1.211042,
+      "proposal_snapshot_analysis_commit_ms": 5.860469,
+      "ocr_ms": 305,
+      "characters": 85,
+      "pages": 1
+    },
+    {
+      "id": "h-multi2",
+      "split": "held-out",
+      "labels": [
+        "medical",
+        "bills"
+      ],
+      "rule_text": {
+        "title": "Birch Clinic \u00b7 Medical document",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due",
+          "medical": "Medical care document with patient or treatment details"
+        }
+      },
+      "ocr": {
+        "title": "Birch Clinic \u00b7 Medical document",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due",
+          "medical": "Medical care document with patient or treatment details"
+        }
+      },
+      "rule_ms": 1.231563,
+      "proposal_snapshot_analysis_commit_ms": 5.65849,
+      "ocr_ms": 357,
+      "characters": 105,
+      "pages": 1
+    },
+    {
+      "id": "h-multi3",
+      "split": "held-out",
+      "labels": [
+        "medical",
+        "receipts"
+      ],
+      "rule_text": {
+        "title": "Fern Pharmacy \u00b7 Receipt",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "medical": "Medical care document with patient or treatment details",
+          "receipts": "Receipt with a purchase total or payment"
+        }
+      },
+      "ocr": {
+        "title": "Fern Pharmacy \u00b7 Receipt",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "medical": "Medical care document with patient or treatment details",
+          "receipts": "Receipt with a purchase total or payment"
+        }
+      },
+      "rule_ms": 1.483958,
+      "proposal_snapshot_analysis_commit_ms": 5.629219,
+      "ocr_ms": 281,
+      "characters": 66,
+      "pages": 1
+    },
+    {
+      "id": "h-multi4",
+      "split": "held-out",
+      "labels": [
+        "banking",
+        "bills"
+      ],
+      "rule_text": {
+        "title": "Aster Bank \u00b7 Account statement",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due",
+          "banking": "Account or bank statement with statement details"
+        }
+      },
+      "ocr": {
+        "title": "Aster Bank \u00b7 Account statement",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due",
+          "banking": "Account or bank statement with statement details"
+        }
+      },
+      "rule_ms": 1.213073,
+      "proposal_snapshot_analysis_commit_ms": 5.490573,
+      "ocr_ms": 346,
+      "characters": 95,
+      "pages": 1
+    },
+    {
+      "id": "h-later1",
+      "split": "held-out",
+      "labels": [
+        "bills"
+      ],
+      "rule_text": {
+        "title": "Harbor Services \u00b7 Bill",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due"
+        }
+      },
+      "ocr": {
+        "title": "Harbor Services \u00b7 Bill",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due"
+        }
+      },
+      "rule_ms": 1.217969,
+      "proposal_snapshot_analysis_commit_ms": 5.631823,
+      "ocr_ms": 473,
+      "characters": 59,
+      "pages": 2
+    },
+    {
+      "id": "h-later2",
+      "split": "held-out",
+      "labels": [
+        "medical"
+      ],
+      "rule_text": {
+        "title": "Laboratory report \u00b7 Medical document",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "medical": "Medical care document with patient or treatment details"
+        }
+      },
+      "ocr": {
+        "title": "Laboratory report \u00b7 Medical document",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "medical": "Medical care document with patient or treatment details"
+        }
+      },
+      "rule_ms": 1.152448,
+      "proposal_snapshot_analysis_commit_ms": 9.020626,
+      "ocr_ms": 750,
+      "characters": 69,
+      "pages": 2
+    },
+    {
+      "id": "h-negative1",
+      "split": "held-out",
+      "labels": [],
+      "rule_text": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "ocr": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "rule_ms": 2.035834,
+      "proposal_snapshot_analysis_commit_ms": 5.0875,
+      "ocr_ms": 301,
+      "characters": 48,
+      "pages": 1
+    },
+    {
+      "id": "h-negative2",
+      "split": "held-out",
+      "labels": [],
+      "rule_text": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "ocr": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "rule_ms": 0.754166,
+      "proposal_snapshot_analysis_commit_ms": 11.430418,
+      "ocr_ms": 268,
+      "characters": 49,
+      "pages": 1
+    },
+    {
+      "id": "h-negative3",
+      "split": "held-out",
+      "labels": [],
+      "rule_text": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "ocr": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "rule_ms": 0.953802,
+      "proposal_snapshot_analysis_commit_ms": 9.70099,
+      "ocr_ms": 254,
+      "characters": 40,
+      "pages": 1
+    },
+    {
+      "id": "h-negative4",
+      "split": "held-out",
+      "labels": [],
+      "rule_text": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "ocr": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "rule_ms": 0.470521,
+      "proposal_snapshot_analysis_commit_ms": 13.58422,
+      "ocr_ms": 436,
+      "characters": 52,
+      "pages": 1
+    },
+    {
+      "id": "h-negative5",
+      "split": "held-out",
+      "labels": [],
+      "rule_text": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "ocr": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "rule_ms": 1.676563,
+      "proposal_snapshot_analysis_commit_ms": 5.169688,
+      "ocr_ms": 277,
+      "characters": 40,
+      "pages": 1
+    },
+    {
+      "id": "h-blank",
+      "split": "held-out",
+      "labels": [],
+      "rule_text": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "ocr": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "rule_ms": 0.678646,
+      "proposal_snapshot_analysis_commit_ms": 5.312657,
+      "ocr_ms": 185,
+      "characters": 0,
+      "pages": 1
+    },
+    {
+      "id": "h-poor",
+      "split": "held-out",
+      "labels": [],
+      "rule_text": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "ocr": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "rule_ms": 0.627761,
+      "proposal_snapshot_analysis_commit_ms": 5.175313,
+      "ocr_ms": 213,
+      "characters": 17,
+      "pages": 1
+    },
+    {
+      "id": "h-ambiguous",
+      "split": "held-out",
+      "labels": [],
+      "rule_text": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "ocr": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "rule_ms": 0.733698,
+      "proposal_snapshot_analysis_commit_ms": 101.750167,
+      "ocr_ms": 237,
+      "characters": 33,
+      "pages": 1
+    },
+    {
+      "id": "h-negation",
+      "split": "held-out",
+      "labels": [],
+      "rule_text": {
+        "title": "This is not an invoice",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due"
+        }
+      },
+      "ocr": {
+        "title": "This is not an invoice",
+        "partial": false,
+        "truncated": false,
+        "stacks": {
+          "bills": "Invoice or bill with a payment deadline or amount due"
+        }
+      },
+      "rule_ms": 1.318906,
+      "proposal_snapshot_analysis_commit_ms": 5.340834,
+      "ocr_ms": 268,
+      "characters": 51,
+      "pages": 1
+    },
+    {
+      "id": "h-receipt-missing",
+      "split": "held-out",
+      "labels": [
+        "receipts"
+      ],
+      "rule_text": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "ocr": {
+        "title": "",
+        "partial": false,
+        "truncated": false,
+        "stacks": {}
+      },
+      "rule_ms": 0.705105,
+      "proposal_snapshot_analysis_commit_ms": 14.079793,
+      "ocr_ms": 492,
+      "characters": 61,
+      "pages": 1
+    }
+  ],
+  "metrics": {
+    "all": {
+      "rule_text": {
+        "documents": 40,
+        "tp": 34,
+        "fp": 1,
+        "fn": 2,
+        "precision_pct": 97.143,
+        "recall_pct": 94.444,
+        "coverage_pct": 77.5,
+        "abstention_pct": 22.5,
+        "eligible_coverage_pct": 96.774,
+        "negative_false_positive_documents": 1,
+        "negative_documents": 9,
+        "per_category": {
+          "bills": {
+            "tp": 8,
+            "fp": 1,
+            "fn": 0
+          },
+          "banking": {
+            "tp": 5,
+            "fp": 0,
+            "fn": 1
+          },
+          "ids": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0
+          },
+          "house": {
+            "tp": 5,
+            "fp": 0,
+            "fn": 0
+          },
+          "medical": {
+            "tp": 7,
+            "fp": 0,
+            "fn": 0
+          },
+          "receipts": {
+            "tp": 5,
+            "fp": 0,
+            "fn": 1
+          }
+        }
+      },
+      "ocr": {
+        "documents": 40,
+        "tp": 34,
+        "fp": 1,
+        "fn": 2,
+        "precision_pct": 97.143,
+        "recall_pct": 94.444,
+        "coverage_pct": 77.5,
+        "abstention_pct": 22.5,
+        "eligible_coverage_pct": 96.774,
+        "negative_false_positive_documents": 1,
+        "negative_documents": 9,
+        "per_category": {
+          "bills": {
+            "tp": 8,
+            "fp": 1,
+            "fn": 0
+          },
+          "banking": {
+            "tp": 5,
+            "fp": 0,
+            "fn": 1
+          },
+          "ids": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0
+          },
+          "house": {
+            "tp": 5,
+            "fp": 0,
+            "fn": 0
+          },
+          "medical": {
+            "tp": 7,
+            "fp": 0,
+            "fn": 0
+          },
+          "receipts": {
+            "tp": 5,
+            "fp": 0,
+            "fn": 1
+          }
+        }
+      }
+    },
+    "tuning": {
+      "rule_text": {
+        "documents": 6,
+        "tp": 6,
+        "fp": 0,
+        "fn": 0,
+        "precision_pct": 100.0,
+        "recall_pct": 100.0,
+        "coverage_pct": 100.0,
+        "abstention_pct": 0.0,
+        "eligible_coverage_pct": 100.0,
+        "negative_false_positive_documents": 0,
+        "negative_documents": 0,
+        "per_category": {
+          "bills": {
+            "tp": 1,
+            "fp": 0,
+            "fn": 0
+          },
+          "banking": {
+            "tp": 1,
+            "fp": 0,
+            "fn": 0
+          },
+          "ids": {
+            "tp": 1,
+            "fp": 0,
+            "fn": 0
+          },
+          "house": {
+            "tp": 1,
+            "fp": 0,
+            "fn": 0
+          },
+          "medical": {
+            "tp": 1,
+            "fp": 0,
+            "fn": 0
+          },
+          "receipts": {
+            "tp": 1,
+            "fp": 0,
+            "fn": 0
+          }
+        }
+      },
+      "ocr": {
+        "documents": 6,
+        "tp": 6,
+        "fp": 0,
+        "fn": 0,
+        "precision_pct": 100.0,
+        "recall_pct": 100.0,
+        "coverage_pct": 100.0,
+        "abstention_pct": 0.0,
+        "eligible_coverage_pct": 100.0,
+        "negative_false_positive_documents": 0,
+        "negative_documents": 0,
+        "per_category": {
+          "bills": {
+            "tp": 1,
+            "fp": 0,
+            "fn": 0
+          },
+          "banking": {
+            "tp": 1,
+            "fp": 0,
+            "fn": 0
+          },
+          "ids": {
+            "tp": 1,
+            "fp": 0,
+            "fn": 0
+          },
+          "house": {
+            "tp": 1,
+            "fp": 0,
+            "fn": 0
+          },
+          "medical": {
+            "tp": 1,
+            "fp": 0,
+            "fn": 0
+          },
+          "receipts": {
+            "tp": 1,
+            "fp": 0,
+            "fn": 0
+          }
+        }
+      }
+    },
+    "held-out": {
+      "rule_text": {
+        "documents": 34,
+        "tp": 28,
+        "fp": 1,
+        "fn": 2,
+        "precision_pct": 96.552,
+        "recall_pct": 93.333,
+        "coverage_pct": 73.529,
+        "abstention_pct": 26.471,
+        "eligible_coverage_pct": 96.0,
+        "negative_false_positive_documents": 1,
+        "negative_documents": 9,
+        "per_category": {
+          "bills": {
+            "tp": 7,
+            "fp": 1,
+            "fn": 0
+          },
+          "banking": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 1
+          },
+          "ids": {
+            "tp": 3,
+            "fp": 0,
+            "fn": 0
+          },
+          "house": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0
+          },
+          "medical": {
+            "tp": 6,
+            "fp": 0,
+            "fn": 0
+          },
+          "receipts": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 1
+          }
+        }
+      },
+      "ocr": {
+        "documents": 34,
+        "tp": 28,
+        "fp": 1,
+        "fn": 2,
+        "precision_pct": 96.552,
+        "recall_pct": 93.333,
+        "coverage_pct": 73.529,
+        "abstention_pct": 26.471,
+        "eligible_coverage_pct": 96.0,
+        "negative_false_positive_documents": 1,
+        "negative_documents": 9,
+        "per_category": {
+          "bills": {
+            "tp": 7,
+            "fp": 1,
+            "fn": 0
+          },
+          "banking": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 1
+          },
+          "ids": {
+            "tp": 3,
+            "fp": 0,
+            "fn": 0
+          },
+          "house": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 0
+          },
+          "medical": {
+            "tp": 6,
+            "fp": 0,
+            "fn": 0
+          },
+          "receipts": {
+            "tp": 4,
+            "fp": 0,
+            "fn": 1
+          }
+        }
+      }
+    }
+  },
+  "timings_ms": {
+    "rule_ms": {
+      "p50": 1.170157,
+      "p95": 2.035834,
+      "max": 3.608125
+    },
+    "proposal_snapshot_analysis_commit_ms": {
+      "p50": 5.65849,
+      "p95": 13.58422,
+      "max": 101.750167
+    },
+    "ocr_ms": {
+      "p50": 298,
+      "p95": 473,
+      "max": 750
+    }
+  },
+  "memory": {
+    "external_total_pss_samples": 39,
+    "external_max_total_pss_kib": 123437,
+    "interval_seconds": 0.25,
+    "caveat": "Sampled total process including instrumentation, fixture rendering and real OCR; command overhead adds to interval. Not an instantaneous maximum or isolated rules allocation."
+  },
+  "corpus_sha256": "d6f6edddddc5a5439cd45fa660f06d7c960da87615ae2d5d2e1c575d7b592a62"
+}

@@ -1,0 +1,31 @@
+<resources>
+    <string name="app_name">Stack</string>
+    <string name="your_stacks">Your stacks</string>
+    <string name="library_error_retry">Couldn\'t load the library. Tap here to retry.</string>
+    <string name="saving_document">Saving your document…</string>
+    <string name="page_position">%1$d / %2$d</string>
+    <string name="document_metadata">%1$s · Added %2$s</string>
+    <string name="camera_access_needed">Camera access is needed to scan. Imports work without camera access.</string>
+    <string name="allow_camera">Allow camera</string>
+    <string name="capture_page">Capture page</string>
+    <string name="keeping_scan_page">Keeping your page on this device…</string>
+    <string name="retry_camera">Retry camera</string>
+    <string name="light_off">Light off</string>
+    <string name="hold_steady">Hold steady…</string>
+    <string name="saving_scan">Saving…</string>
+    <string name="save_scan">Save scan</string>
+    <plurals name="page_count">
+        <item quantity="one">%d page</item>
+        <item quantity="other">%d pages</item>
+    </plurals>
+    <string name="flatten_page">Flatten</string>
+    <string name="flatten_page_enabled">Flatten ✓</string>
+    <string name="stack_home">Home</string>
+    <string name="stack_load_error">Couldn\'t load stacks. Reopen this screen to retry.</string>
+    <string name="stack_save_error">Change wasn\'t saved. Review the stacks and try again.</string>
+    <string name="unlock_stack">Unlock Stack</string>
+    <string name="unlock_retry_message">Unlock was canceled or unavailable. Try again or check your Android screen lock.</string>
+    <string name="unlock_try_again">Try again</string>
+    <string name="unlock_security_settings">Android security settings</string>
+    <string name="unlock_close">Close Stack</string>
+</resources>

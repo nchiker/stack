@@ -1,0 +1,159 @@
+{
+  "rules": "local-phrases-5",
+  "reviewer": "Implementation agent; author of fixtures/rules, not user or independent blind panel",
+  "rubric": "Independently authored fictional English text, CC0-1.0. No personal/reference documents. Frozen before final verification; not blind external labels. Rubric frozen in p0-final-corpus.json: 2 useful unchanged, 1 small edit, 0 unhelpful; no proposal assessed separately.",
+  "documents": [
+    {
+      "id": "t-reminder",
+      "split": "tuning",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Safe abstention; saved default/manual name remains."
+    },
+    {
+      "id": "t-sale",
+      "split": "tuning",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Safe abstention; saved default/manual name remains."
+    },
+    {
+      "id": "t-till",
+      "split": "tuning",
+      "proposed_title": "Elm Shop \u00b7 Receipt",
+      "grade": "useful_unchanged",
+      "reason": "Supported issuer/type heading."
+    },
+    {
+      "id": "t-loan",
+      "split": "tuning",
+      "proposed_title": "Mortgage statement",
+      "grade": "useful_unchanged",
+      "reason": "Supported issuer/type heading."
+    },
+    {
+      "id": "e-health-ad",
+      "split": "evaluation",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Safe abstention; saved default/manual name remains."
+    },
+    {
+      "id": "e-health-real",
+      "split": "evaluation",
+      "proposed_title": "Willow Clinic \u00b7 Medical document",
+      "grade": "useful_unchanged",
+      "reason": "Supported issuer/type heading."
+    },
+    {
+      "id": "e-checklist",
+      "split": "evaluation",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Safe abstention; saved default/manual name remains."
+    },
+    {
+      "id": "e-sale-real",
+      "split": "evaluation",
+      "proposed_title": "Dune Pharmacy \u00b7 Medical document",
+      "grade": "small_edit",
+      "reason": "Specific prescription/mortgage type would be more useful than the broad category label."
+    },
+    {
+      "id": "e-shop",
+      "split": "evaluation",
+      "proposed_title": "Bracken Books \u00b7 Receipt",
+      "grade": "useful_unchanged",
+      "reason": "Supported issuer/type heading."
+    },
+    {
+      "id": "e-prices",
+      "split": "evaluation",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Safe abstention; saved default/manual name remains."
+    },
+    {
+      "id": "e-mortgage",
+      "split": "evaluation",
+      "proposed_title": "Brook Lending \u00b7 Account statement",
+      "grade": "small_edit",
+      "reason": "Specific prescription/mortgage type would be more useful than the broad category label."
+    },
+    {
+      "id": "e-later",
+      "split": "evaluation",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Safe abstention; saved default/manual name remains."
+    },
+    {
+      "id": "e-blank",
+      "split": "evaluation",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Safe abstention; saved default/manual name remains."
+    },
+    {
+      "id": "e-ocr-noise",
+      "split": "evaluation",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Safe abstention; saved default/manual name remains."
+    },
+    {
+      "id": "e-contact",
+      "split": "evaluation",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Safe abstention; saved default/manual name remains."
+    },
+    {
+      "id": "e-id",
+      "split": "evaluation",
+      "proposed_title": "Passport",
+      "grade": "useful_unchanged",
+      "reason": "Supported issuer/type heading."
+    },
+    {
+      "id": "e-negation",
+      "split": "evaluation",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Safe abstention; saved default/manual name remains."
+    },
+    {
+      "id": "e-receipt",
+      "split": "evaluation",
+      "proposed_title": "Juniper Market \u00b7 Receipt",
+      "grade": "useful_unchanged",
+      "reason": "Supported issuer/type heading."
+    }
+  ],
+  "metrics": {
+    "all": {
+      "useful_unchanged": 6,
+      "small_edit": 2,
+      "unhelpful": 0,
+      "no_proposal": 10,
+      "proposals": 8,
+      "correction_or_dismissal_pct": 25.0
+    },
+    "evaluation": {
+      "useful_unchanged": 4,
+      "small_edit": 2,
+      "unhelpful": 0,
+      "no_proposal": 8,
+      "proposals": 6,
+      "correction_or_dismissal_pct": 33.333
+    },
+    "tuning": {
+      "useful_unchanged": 2,
+      "small_edit": 0,
+      "unhelpful": 0,
+      "no_proposal": 2,
+      "proposals": 2,
+      "correction_or_dismissal_pct": 0.0
+    }
+  }
+}

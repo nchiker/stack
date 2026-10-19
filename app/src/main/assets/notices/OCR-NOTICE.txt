@@ -1,0 +1,19 @@
+Stack bundles Tesseract4Android 4.9.0 standard (Apache-2.0), by Adaptech
+s.r.o., Robert Pösel; wrapper lineage includes tess-two and Tesseract Tools
+for Android. It contains Tesseract 5.5.1 (Apache-2.0), Leptonica 1.85.0
+(BSD-style), libpng 1.6.48 (libpng license), and IJG libjpeg 9f.
+This software is based in part on the work of the Independent JPEG Group.
+Full upstream license/notice texts are included alongside this notice.
+
+English language data is from tesseract-ocr/tessdata_fast (Apache-2.0),
+commit 87416418657359cb625c412a48b6e1d6d41c29bd. See ocr/manifest.json.
+
+The AAR was built upstream with NDK 27.2.12479018. C++ runtime code is
+linked statically (no libc++_shared.so dependency); LLVM runtime licenses
+with exceptions are included. Android system libraries, including zlib,
+are dynamically linked and supplied by Android, not bundled by Stack.
+No OpenMP, Play Services, cloud OCR, or downloaded-at-runtime model is used.
+
+Source: https://github.com/adaptech-cz/Tesseract4Android/tree/4.9.0
+Binary: https://jitpack.io/cz/adaptech/tesseract4android/tesseract4android/4.9.0/tesseract4android-4.9.0.aar
+Model: https://github.com/tesseract-ocr/tessdata_fast/tree/87416418657359cb625c412a48b6e1d6d41c29bd

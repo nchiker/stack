@@ -1,0 +1,409 @@
+{
+  "reviewer": "Implementation agent, not user or independent human panel",
+  "rule_version": "local-phrases-2",
+  "rubric": {
+    "useful_unchanged": "Short readable supported heading/entity and document type; would use without editing. Generic supported type can qualify when no reliable entity is available.",
+    "small_edit": "Useful meaning and source, but needs a minor wording correction.",
+    "unhelpful": "Misleading type/heading or unsupported context; substantial correction or dismissal needed.",
+    "no_proposal": "Abstention; existing name retained. Scored separately for title coverage, including useful negative abstentions."
+  },
+  "documents": [
+    {
+      "id": "t-bill",
+      "split": "regression",
+      "proposed_title": "Cedar Energy \u00b7 Bill",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "t-bank",
+      "split": "regression",
+      "proposed_title": "Atlas Bank \u00b7 Account statement",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "t-id",
+      "split": "regression",
+      "proposed_title": "Identity Card \u00b7 Identity document",
+      "grade": "small_edit",
+      "reason": "Remove redundant Identity document after Identity Card."
+    },
+    {
+      "id": "t-house",
+      "split": "regression",
+      "proposed_title": "Rental agreement",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "t-medical",
+      "split": "regression",
+      "proposed_title": "Cedar Clinic \u00b7 Medical document",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "t-receipt",
+      "split": "regression",
+      "proposed_title": "Cedar Market \u00b7 Receipt",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-bill1",
+      "split": "regression",
+      "proposed_title": "Aster Broadband \u00b7 Bill",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-bill2",
+      "split": "regression",
+      "proposed_title": "Harbor Utilities \u00b7 Bill",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-bill3",
+      "split": "regression",
+      "proposed_title": "Tutor Invoice",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-bank1",
+      "split": "regression",
+      "proposed_title": "Juniper Credit Union \u00b7 Account statement",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-bank2",
+      "split": "regression",
+      "proposed_title": "Card Services \u00b7 Account statement",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-bank3",
+      "split": "regression",
+      "proposed_title": "Finch Financial \u00b7 Account statement",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-id1",
+      "split": "regression",
+      "proposed_title": "Passport",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-id2",
+      "split": "regression",
+      "proposed_title": "Driver License",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-id3",
+      "split": "regression",
+      "proposed_title": "Birth Certificate",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-house1",
+      "split": "regression",
+      "proposed_title": "Home inspection",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-house2",
+      "split": "regression",
+      "proposed_title": "Home Insurance \u00b7 Housing document",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-house3",
+      "split": "regression",
+      "proposed_title": "Mortgage statement",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-med1",
+      "split": "regression",
+      "proposed_title": "Aster Hospital \u00b7 Medical document",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-med2",
+      "split": "regression",
+      "proposed_title": "Prescription",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-med3",
+      "split": "regression",
+      "proposed_title": "Clinical Test Report \u00b7 Medical document",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-receipt1",
+      "split": "regression",
+      "proposed_title": "Willow Books \u00b7 Receipt",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-receipt2",
+      "split": "regression",
+      "proposed_title": "Orchard Cafe \u00b7 Receipt",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-receipt3",
+      "split": "regression",
+      "proposed_title": "Museum Shop \u00b7 Receipt",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-multi1",
+      "split": "regression",
+      "proposed_title": "Cedar Water \u00b7 Bill",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-multi2",
+      "split": "regression",
+      "proposed_title": "Birch Clinic \u00b7 Medical document",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-multi3",
+      "split": "regression",
+      "proposed_title": "Fern Pharmacy \u00b7 Receipt",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-multi4",
+      "split": "regression",
+      "proposed_title": "Aster Bank \u00b7 Account statement",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-later1",
+      "split": "regression",
+      "proposed_title": "Harbor Services \u00b7 Bill",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-later2",
+      "split": "regression",
+      "proposed_title": "Laboratory report \u00b7 Medical document",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "h-negative1",
+      "split": "regression",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Appropriate abstention for unsupported or ambiguous text."
+    },
+    {
+      "id": "h-negative2",
+      "split": "regression",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Appropriate abstention for unsupported or ambiguous text."
+    },
+    {
+      "id": "h-negative3",
+      "split": "regression",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Appropriate abstention for unsupported or ambiguous text."
+    },
+    {
+      "id": "h-negative4",
+      "split": "regression",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Appropriate abstention for unsupported or ambiguous text."
+    },
+    {
+      "id": "h-negative5",
+      "split": "regression",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Appropriate abstention for unsupported or ambiguous text."
+    },
+    {
+      "id": "h-blank",
+      "split": "regression",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Appropriate abstention for unsupported or ambiguous text."
+    },
+    {
+      "id": "h-poor",
+      "split": "regression",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Appropriate abstention for unsupported or ambiguous text."
+    },
+    {
+      "id": "h-ambiguous",
+      "split": "regression",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Appropriate abstention for unsupported or ambiguous text."
+    },
+    {
+      "id": "h-negation",
+      "split": "regression",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Appropriate abstention for unsupported or ambiguous text."
+    },
+    {
+      "id": "h-receipt-missing",
+      "split": "regression",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "No title proposal: generic purchase wording lacks the explicit receipt cue."
+    },
+    {
+      "id": "v2-invoice",
+      "split": "held-out",
+      "proposed_title": "Northstar Repairs \u00b7 Bill",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "v2-negation",
+      "split": "held-out",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Appropriate abstention for unsupported or ambiguous text."
+    },
+    {
+      "id": "v2-negative-bill",
+      "split": "held-out",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Appropriate abstention for unsupported or ambiguous text."
+    },
+    {
+      "id": "v2-identity",
+      "split": "held-out",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Appropriate abstention for unsupported or ambiguous text."
+    },
+    {
+      "id": "v2-bank",
+      "split": "held-out",
+      "proposed_title": "Meadow Savings \u00b7 Account statement",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "v2-house",
+      "split": "held-out",
+      "proposed_title": "Pine Apartments \u00b7 Housing document",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "v2-medical",
+      "split": "held-out",
+      "proposed_title": "Seaside Clinic \u00b7 Medical document",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "v2-receipt",
+      "split": "held-out",
+      "proposed_title": "Harbor Bakery \u00b7 Receipt",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "v2-multi",
+      "split": "held-out",
+      "proposed_title": "Aspen Gas \u00b7 Bill",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "v2-ambiguous",
+      "split": "held-out",
+      "proposed_title": "Friday tasks \u00b7 Medical document",
+      "grade": "unhelpful",
+      "reason": "A task list mentioning prescription/dosage is not a medical document."
+    },
+    {
+      "id": "v2-paid-invoice",
+      "split": "held-out",
+      "proposed_title": "Spruce Consulting \u00b7 Bill",
+      "grade": "useful_unchanged",
+      "reason": "Supported readable heading/type."
+    },
+    {
+      "id": "v2-general",
+      "split": "held-out",
+      "proposed_title": "",
+      "grade": "no_proposal",
+      "reason": "Appropriate abstention for unsupported or ambiguous text."
+    }
+  ],
+  "summary": {
+    "all": {
+      "documents": 52,
+      "offered": 38,
+      "grades": {
+        "useful_unchanged": 36,
+        "small_edit": 1,
+        "no_proposal": 14,
+        "unhelpful": 1
+      },
+      "offered_correction_or_dismissal_pct": 5.263
+    },
+    "regression": {
+      "documents": 40,
+      "offered": 30,
+      "grades": {
+        "useful_unchanged": 29,
+        "small_edit": 1,
+        "no_proposal": 10
+      },
+      "offered_correction_or_dismissal_pct": 3.333
+    },
+    "held-out": {
+      "documents": 12,
+      "offered": 8,
+      "grades": {
+        "useful_unchanged": 7,
+        "no_proposal": 4,
+        "unhelpful": 1
+      },
+      "offered_correction_or_dismissal_pct": 12.5
+    }
+  }
+}

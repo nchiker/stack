@@ -1,0 +1,10 @@
+INSTRUMENTATION_STATUS: stream=PASS 1: Production backup screen at 320 dp / 1.0x text: circular Stack icons, action rows, readable scope/protection, reviewed commit/cancel and error layout fit; screenshot contents synthetic only
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS 2: Production backup screen at 320 dp / 2.0x text: circular Stack icons, action rows, readable scope/protection, reviewed commit/cancel and error layout fit; screenshot contents synthetic only
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+PASS: 2 scanner check groups; synthetic data only.
+
+INSTRUMENTATION_CODE: -1

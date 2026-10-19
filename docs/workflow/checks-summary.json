@@ -1,0 +1,99 @@
+{
+  "build": "0.6.1-dev",
+  "code": 10,
+  "schema": 5,
+  "rules": "local-phrases-4",
+  "device": "Pixel 4a / Android 13 / API 33 / arm64 / 4 KiB",
+  "checks": {
+    "naming_counterexamples": {
+      "result": "pass",
+      "groups": 1,
+      "observations": [
+        "Address/contact/city/postal/split-line and generic-Invoice counterexamples prefer actual veterinary issuer + Bill; address-only name abstention retains categories; no later-page heading invention"
+      ]
+    },
+    "suggestion_state_machine": {
+      "result": "pass",
+      "groups": 7,
+      "observations": [
+        "Real repository proposals stay advisory; independent accept, manual Starred preservation, FTS/filter/reopen and idempotence",
+        "Held-analysis and stale-Apply races: rename, empty refile, edit, removal, retry, changed text, stack/document deletion, newer generation; late success/failure rejected",
+        "Edit/dismiss, explicit empty filing, OCR/suggestion retries and restart retain field choices for unchanged evidence",
+        "Interrupted proposal recovery, failed/manual retry and empty-text fallback",
+        "Rule-version commit/Apply rejection, failed-OCR partial state, 32K/page and 256K/document bounds with preserved page slots, negation and manual-only Starred",
+        "New untouched defaults, durable draft title/explicit empty choice across append/edit/remove/reopen, idempotent save and delayed-keystroke discard safety",
+        "Real multipage Tesseract \u2192 proposals \u2192 edited name/accepted filing \u2192 title/body/stack search and stable later-page context after reopen"
+      ]
+    },
+    "storage_rollback": {
+      "result": "pass",
+      "groups": 3,
+      "observations": [
+        "Commit failures at document/page/membership insertion roll back rows and copied files; existing metadata/originals and draft bytes preserved; deleted-stack filing is actionable and atomic",
+        "Failed-save retry is idempotent; restart reclaims only uncommitted staging/destinations and preserves draft/originals",
+        "Unavailable isolated staging storage refuses ingestion; repair/new repository reopens existing documents and recovery draft"
+      ]
+    },
+    "provider_grants": {
+      "result": "pass",
+      "groups": 2,
+      "observations": [
+        "Real external content provider: valid/unnamed two-page imports; denied/interrupted/unsupported inputs roll back cleanly; private-copy preview and byte-identical PDF export",
+        "Actual separate-UID export recipient: no-grant/revoked denial, read-only grant, matching bytes/hash, metadata, malformed token and expired-file handling"
+      ]
+    },
+    "editors_filing_large_text": {
+      "result": "pass",
+      "groups": 3,
+      "observations": [
+        "Production name editor: blank/201-character validation retains input; injected storage failure keeps current name and typed text; retry commits; duplicate stack remains editable and Cancel preserves state",
+        "Production stack picker: deleted invisible initial ID removed only by explicit Save, explicit empty choice, hidden Banking selectable/announced as checkbox, name and filing persist on reopen",
+        "Production suggestion controls at 320 dp width, 1x/2x text and activity recreation: all six actions fit without horizontal clipping, retain 48 dp touch height and field-specific accessibility labels; no handset font settings changed"
+      ]
+    },
+    "saved_document_review": {
+      "result": "pass",
+      "groups": 1,
+      "observations": [
+        "Production review UI in isolated debug host: failure/retry, title edit/save, filing accept, separate dismissal and filing-editor Cancel preserve choices"
+      ]
+    },
+    "long_document_workers": {
+      "result": "pass",
+      "groups": 1,
+      "observations": [
+        "LONG_WORKFLOW_JSON {\"device\":\"Pixel 4a\",\"api\":33,\"rules\":\"local-phrases-4\",\"pages\":6,\"authored_characters\":6647,\"source_bytes\":189285,\"both_workers_ms\":9172,\"io_ping_ms\":1,\"ui_ping_ms\":1,\"post_workflow_pss_kib\":65166}"
+      ]
+    }
+  },
+  "offline_build_lint": {
+    "result": "pass",
+    "errors": 0,
+    "warnings": 6
+  },
+  "implementation_commit": "4afbefa",
+  "preservation": {
+    "documents": 7,
+    "pages": 13,
+    "stacks": 8,
+    "memberships": 10,
+    "ocr_succeeded": 13,
+    "metadata_before_and_after_sha256": "aea67eb08ae7510137b2877e6fa1ce3a225a5808d093b4dcefc996b680ac7cbc",
+    "originals_draft_recovery_before_and_after_sha256": "112fa9c76b32ff6f20fd8c15e48a0ff240a12fbab66f27bab26d60a6f00620d0",
+    "synthetic_storage_and_test_package_removed": true,
+    "canonical_reopened": true,
+    "file_hash_matches_after_cleanup": true
+  },
+  "user_reported_followup": {
+    "date": "2026-10-16",
+    "result": "pass",
+    "report": "all worked",
+    "requested_steps": [
+      "Fresh bill scan/import: useful practice/bill name rather than address/contact information",
+      "Edit/save proposed name and accept suggested stacks independently",
+      "Close/reopen: saved name and stacks persist; saved-name search succeeds",
+      "Explicitly empty filing, save and reopen: remains unfiled and in All documents"
+    ],
+    "limits": "User report; private proposed/saved name and contents not recorded. Dismissal not requested. Broad corpus/platform acceptance remains open."
+  }
+}

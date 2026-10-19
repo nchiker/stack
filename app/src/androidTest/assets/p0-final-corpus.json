@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "provenance": "Independently authored fictional English text, CC0-1.0. No personal/reference documents. Frozen before final verification; not blind external labels.",
+  "rubric": "Exact multi-label set; source and rendered OCR measured separately. Titles: 0 unhelpful, 1 edit needed, 2 useful unchanged; agent reviewer, no user acceptance. Blank/no-issuer may abstain.",
+  "documents": [
+    {
+      "id": "t-reminder",
+      "split": "tuning",
+      "pages": [
+        "Clinic reminder\nRemember to ask about prescription dosage"
+      ],
+      "labels": []
+    },
+    {
+      "id": "t-sale",
+      "split": "tuning",
+      "pages": [
+        "Orchard Clinic\nSpecial offers for prescription dosage"
+      ],
+      "labels": []
+    },
+    {
+      "id": "t-till",
+      "split": "tuning",
+      "pages": [
+        "Elm Shop\nThank you for your purchase\nSubtotal 12\nTotal 13\nCash 20"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    },
+    {
+      "id": "t-loan",
+      "split": "tuning",
+      "pages": [
+        "Mortgage statement\nLoan number 99\nPrincipal 100\nInterest 20\nProperty address"
+      ],
+      "labels": [
+        "banking",
+        "house"
+      ]
+    },
+    {
+      "id": "e-health-ad",
+      "split": "evaluation",
+      "pages": [
+        "River Hospital\nMarketing newsletter\nAsk about treatment and prescription dosage"
+      ],
+      "labels": []
+    },
+    {
+      "id": "e-health-real",
+      "split": "evaluation",
+      "pages": [
+        "Willow Clinic\nPatient name Fictional\nDiagnosis seasonal allergy\nTreatment rest"
+      ],
+      "labels": [
+        "medical"
+      ]
+    },
+    {
+      "id": "e-checklist",
+      "split": "evaluation",
+      "pages": [
+        "To do\nCall hospital\nAsk about prescription dosage\nBuy tea"
+      ],
+      "labels": []
+    },
+    {
+      "id": "e-sale-real",
+      "split": "evaluation",
+      "pages": [
+        "Dune Pharmacy\nPrescription\nDosage once daily\nPatient name Fictional\nSpecial offers"
+      ],
+      "labels": [
+        "medical"
+      ]
+    },
+    {
+      "id": "e-shop",
+      "split": "evaluation",
+      "pages": [
+        "Bracken Books\nThank you for shopping\nSubtotal 18\nTotal 20\nVisa 20"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    },
+    {
+      "id": "e-prices",
+      "split": "evaluation",
+      "pages": [
+        "Workshop budget\nSubtotal 18\nTotal 20\nCash reserve"
+      ],
+      "labels": []
+    },
+    {
+      "id": "e-mortgage",
+      "split": "evaluation",
+      "pages": [
+        "Brook Lending\nMortgage statement\nPrincipal 210\nInterest 8\nEscrow 5\nProperty address"
+      ],
+      "labels": [
+        "banking",
+        "house"
+      ]
+    },
+    {
+      "id": "e-later",
+      "split": "evaluation",
+      "pages": [
+        "Cover sheet",
+        "Birch Utilities\nElectricity bill\nAmount due 18\nMeter 91\nService address"
+      ],
+      "labels": [
+        "bills",
+        "house"
+      ]
+    },
+    {
+      "id": "e-blank",
+      "split": "evaluation",
+      "pages": [
+        ""
+      ],
+      "labels": []
+    },
+    {
+      "id": "e-ocr-noise",
+      "split": "evaluation",
+      "pages": [
+        ".. . 1 x x !!"
+      ],
+      "labels": []
+    },
+    {
+      "id": "e-contact",
+      "split": "evaluation",
+      "pages": [
+        "15 Ash Street\nFax 555-010-1111\nAmount due 15"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "e-id",
+      "split": "evaluation",
+      "pages": [
+        "Passport\nGiven name Fictional\nDate of birth\nNationality"
+      ],
+      "labels": [
+        "ids"
+      ]
+    },
+    {
+      "id": "e-negation",
+      "split": "evaluation",
+      "pages": [
+        "Not an invoice\nAmount due is a bookkeeping phrase"
+      ],
+      "labels": []
+    },
+    {
+      "id": "e-receipt",
+      "split": "evaluation",
+      "pages": [
+        "Juniper Market\nSales receipt\nTotal 8\nCash 10"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    }
+  ]
+}

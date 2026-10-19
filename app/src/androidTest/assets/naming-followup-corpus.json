@@ -1,0 +1,854 @@
+{
+  "provenance": "Independently authored fictional English text. First 52 are v2 regressions; 24 naming regressions reflect a structural user-reported failure without private content, including metadata-header cases reviewed during rule authoring. Eight separated evaluation examples; no tuning after their measured results. Same author, not external blind evaluation; generated PDFs are not camera documents.",
+  "documents": [
+    {
+      "id": "t-bill",
+      "split": "prior-regression",
+      "pages": [
+        "Cedar Energy\nUtility bill\nAmount due 45.00\nDue date 2026-01-31"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "t-bank",
+      "split": "prior-regression",
+      "pages": [
+        "Atlas Bank\nBank statement\nOpening balance 100.00\nTransactions"
+      ],
+      "labels": [
+        "banking"
+      ]
+    },
+    {
+      "id": "t-id",
+      "split": "prior-regression",
+      "pages": [
+        "Identity Card\nGiven name Synthetic\nDate of birth 1990-01-01"
+      ],
+      "labels": [
+        "ids"
+      ]
+    },
+    {
+      "id": "t-house",
+      "split": "prior-regression",
+      "pages": [
+        "Rental agreement\nTenant Example\nLandlord Cedar\nPremises Unit A"
+      ],
+      "labels": [
+        "house"
+      ]
+    },
+    {
+      "id": "t-medical",
+      "split": "prior-regression",
+      "pages": [
+        "Cedar Clinic\nPatient name Example\nDiagnosis routine\nTreatment follow up"
+      ],
+      "labels": [
+        "medical"
+      ]
+    },
+    {
+      "id": "t-receipt",
+      "split": "prior-regression",
+      "pages": [
+        "Cedar Market\nSales receipt\nSubtotal 8.00\nTotal 9.00\nCash"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    },
+    {
+      "id": "h-bill1",
+      "split": "prior-regression",
+      "pages": [
+        "Aster Broadband\nInvoice\nInvoice total 70.00\nPay by June 5"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "h-bill2",
+      "split": "prior-regression",
+      "pages": [
+        "Harbor Utilities\nAmount due 29.00\nPayment due July 7"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "h-bill3",
+      "split": "prior-regression",
+      "pages": [
+        "Tutor Invoice\nBalance due 80.00\nDue date August 1"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "h-bank1",
+      "split": "prior-regression",
+      "pages": [
+        "Juniper Credit Union\nSavings account\nClosing balance 150.00\nStatement period May"
+      ],
+      "labels": [
+        "banking"
+      ]
+    },
+    {
+      "id": "h-bank2",
+      "split": "prior-regression",
+      "pages": [
+        "Card Services\nCredit card statement\nAvailable credit 900\nTransactions"
+      ],
+      "labels": [
+        "banking"
+      ]
+    },
+    {
+      "id": "h-bank3",
+      "split": "prior-regression",
+      "pages": [
+        "Finch Financial\nAccount statement\nAccount number 0000\nClosing balance 99"
+      ],
+      "labels": [
+        "banking"
+      ]
+    },
+    {
+      "id": "h-id1",
+      "split": "prior-regression",
+      "pages": [
+        "Passport\nNationality Example\nGiven name Fictional"
+      ],
+      "labels": [
+        "ids"
+      ]
+    },
+    {
+      "id": "h-id2",
+      "split": "prior-regression",
+      "pages": [
+        "Driver License\nLicense number DEMO\nExpires 2030"
+      ],
+      "labels": [
+        "ids"
+      ]
+    },
+    {
+      "id": "h-id3",
+      "split": "prior-regression",
+      "pages": [
+        "Birth Certificate\nPlace of birth Example City"
+      ],
+      "labels": [
+        "ids"
+      ]
+    },
+    {
+      "id": "h-house1",
+      "split": "prior-regression",
+      "pages": [
+        "Home inspection\nInspection report\nProperty address 1 Example Road"
+      ],
+      "labels": [
+        "house"
+      ]
+    },
+    {
+      "id": "h-house2",
+      "split": "prior-regression",
+      "pages": [
+        "Home Insurance\nPolicy number DEMO\nProperty address Example"
+      ],
+      "labels": [
+        "house"
+      ]
+    },
+    {
+      "id": "h-house3",
+      "split": "prior-regression",
+      "pages": [
+        "Mortgage statement\nMortgage balance 1000\nProperty address Example"
+      ],
+      "labels": [
+        "house",
+        "banking"
+      ]
+    },
+    {
+      "id": "h-med1",
+      "split": "prior-regression",
+      "pages": [
+        "Aster Hospital\nPatient name Example\nDate of service May 5"
+      ],
+      "labels": [
+        "medical"
+      ]
+    },
+    {
+      "id": "h-med2",
+      "split": "prior-regression",
+      "pages": [
+        "Prescription\nDosage one tablet daily"
+      ],
+      "labels": [
+        "medical"
+      ]
+    },
+    {
+      "id": "h-med3",
+      "split": "prior-regression",
+      "pages": [
+        "Clinical Test Report\nLaboratory results\nTest results normal"
+      ],
+      "labels": [
+        "medical"
+      ]
+    },
+    {
+      "id": "h-receipt1",
+      "split": "prior-regression",
+      "pages": [
+        "Willow Books\nPurchase receipt\nAmount paid 12.00"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    },
+    {
+      "id": "h-receipt2",
+      "split": "prior-regression",
+      "pages": [
+        "Orchard Cafe\nReceipt\nTotal 10.00\nVisa"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    },
+    {
+      "id": "h-receipt3",
+      "split": "prior-regression",
+      "pages": [
+        "Museum Shop\nTransaction receipt\nPaid 5.00"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    },
+    {
+      "id": "h-multi1",
+      "split": "prior-regression",
+      "pages": [
+        "Cedar Water\nWater bill\nService address Example\nMeter 12\nAmount due 31\nDue date June 2"
+      ],
+      "labels": [
+        "bills",
+        "house"
+      ]
+    },
+    {
+      "id": "h-multi2",
+      "split": "prior-regression",
+      "pages": [
+        "Birch Clinic\nMedical invoice\nPatient name Example\nDate of service June 1\nAmount due 20\nPayment due July 1"
+      ],
+      "labels": [
+        "medical",
+        "bills"
+      ]
+    },
+    {
+      "id": "h-multi3",
+      "split": "prior-regression",
+      "pages": [
+        "Fern Pharmacy\nPrescription\nDosage daily\nSales receipt\nTotal 9\nCash"
+      ],
+      "labels": [
+        "medical",
+        "receipts"
+      ]
+    },
+    {
+      "id": "h-multi4",
+      "split": "prior-regression",
+      "pages": [
+        "Aster Bank\nCredit card statement\nAccount number DEMO\nTransactions\nAmount due 60\nDue date July 1"
+      ],
+      "labels": [
+        "banking",
+        "bills"
+      ]
+    },
+    {
+      "id": "h-later1",
+      "split": "prior-regression",
+      "pages": [
+        "Harbor Services",
+        "Invoice\nInvoice total 100\nPayment due May 5"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "h-later2",
+      "split": "prior-regression",
+      "pages": [
+        "Laboratory report",
+        "Patient name Example\nLaboratory\nTest results normal"
+      ],
+      "labels": [
+        "medical"
+      ]
+    },
+    {
+      "id": "h-negative1",
+      "split": "prior-regression",
+      "pages": [
+        "Meeting notes\nAsk the bank about payment options"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-negative2",
+      "split": "prior-regression",
+      "pages": [
+        "Travel diary\nThe house near the hospital was blue"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-negative3",
+      "split": "prior-regression",
+      "pages": [
+        "Address list\n1 Example Road\nExample City"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-negative4",
+      "split": "prior-regression",
+      "pages": [
+        "Vocabulary exercise\nReceipt total\nInvoice amount due"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-negative5",
+      "split": "prior-regression",
+      "pages": [
+        "Example only\nPassport\nDate of birth 1990"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-blank",
+      "split": "prior-regression",
+      "pages": [
+        ""
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-poor",
+      "split": "prior-regression",
+      "pages": [
+        "1l| %^ 09 ? ? nnn"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-ambiguous",
+      "split": "prior-regression",
+      "pages": [
+        "Payment record\nTotal 30\nThank you"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-negation",
+      "split": "prior-regression",
+      "pages": [
+        "This is not an invoice\nNo amount due\nA garden essay"
+      ],
+      "labels": []
+    },
+    {
+      "id": "h-receipt-missing",
+      "split": "prior-regression",
+      "pages": [
+        "Spruce Store\nThank you for shopping\nSubtotal 4\nTotal 5\nCash 5"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    },
+    {
+      "id": "v2-invoice",
+      "split": "prior-regression",
+      "pages": [
+        "Northstar Repairs\nInvoice\nInvoice total 120\nPayment due September 1"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "v2-negation",
+      "split": "prior-regression",
+      "pages": [
+        "This is not an invoice\nAmount due is a phrase used in bookkeeping\nLesson notes"
+      ],
+      "labels": []
+    },
+    {
+      "id": "v2-negative-bill",
+      "split": "prior-regression",
+      "pages": [
+        "This is not a bill\nAn amount due is explained below\nTeaching notes"
+      ],
+      "labels": []
+    },
+    {
+      "id": "v2-identity",
+      "split": "prior-regression",
+      "pages": [
+        "Sample document\nDriver License\nDate of birth 2000"
+      ],
+      "labels": []
+    },
+    {
+      "id": "v2-bank",
+      "split": "prior-regression",
+      "pages": [
+        "Meadow Savings\nBank statement\nStatement period July\nClosing balance 210"
+      ],
+      "labels": [
+        "banking"
+      ]
+    },
+    {
+      "id": "v2-house",
+      "split": "prior-regression",
+      "pages": [
+        "Pine Apartments\nLease agreement\nTenant Fictional\nLandlord Example"
+      ],
+      "labels": [
+        "house"
+      ]
+    },
+    {
+      "id": "v2-medical",
+      "split": "prior-regression",
+      "pages": [
+        "Seaside Clinic\nPatient name Fictional\nTreatment checkup"
+      ],
+      "labels": [
+        "medical"
+      ]
+    },
+    {
+      "id": "v2-receipt",
+      "split": "prior-regression",
+      "pages": [
+        "Harbor Bakery\nReceipt\nCash\nTotal 7"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    },
+    {
+      "id": "v2-multi",
+      "split": "prior-regression",
+      "pages": [
+        "Aspen Gas\nGas bill",
+        "Service address Example Lane\nMeter 2\nAmount due 33\nDue date May 7"
+      ],
+      "labels": [
+        "house",
+        "bills"
+      ]
+    },
+    {
+      "id": "v2-ambiguous",
+      "split": "prior-regression",
+      "pages": [
+        "Friday tasks\nPick up a prescription\nAsk about dosage\nRemember lunch"
+      ],
+      "labels": []
+    },
+    {
+      "id": "v2-paid-invoice",
+      "split": "prior-regression",
+      "pages": [
+        "Spruce Consulting\nInvoice\nInvoice total 50\nPaid in full"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "v2-general",
+      "split": "prior-regression",
+      "pages": [
+        "A Guide to Gardens\nHouse plants need light and water"
+      ],
+      "labels": []
+    },
+    {
+      "id": "address-1",
+      "split": "address-regression",
+      "pages": [
+        "42 Cedar Street\nMaple Veterinary Clinic\nMedical invoice\nPatient name Synthetic\nAmount due 25\nDue date May 2"
+      ],
+      "labels": [
+        "bills",
+        "medical"
+      ],
+      "expected_name": "Maple Veterinary Clinic \u00b7 Bill"
+    },
+    {
+      "id": "address-2",
+      "split": "address-regression",
+      "pages": [
+        "42\nCedar Street\nMaple Veterinary Clinic\nMedical invoice\nPatient name Synthetic\nAmount due 25\nDue date May 2"
+      ],
+      "labels": [
+        "bills",
+        "medical"
+      ],
+      "expected_name": "Maple Veterinary Clinic \u00b7 Bill"
+    },
+    {
+      "id": "address-3",
+      "split": "address-regression",
+      "pages": [
+        "Cedar St.\nSuite 2\nMaple Veterinary Clinic\nMedical invoice\nPatient name Synthetic\nAmount due 25\nDue date May 2"
+      ],
+      "labels": [
+        "bills",
+        "medical"
+      ],
+      "expected_name": "Maple Veterinary Clinic \u00b7 Bill"
+    },
+    {
+      "id": "address-4",
+      "split": "address-regression",
+      "pages": [
+        "Pineville, NY\nMaple Veterinary Clinic\nMedical invoice\nPatient name Synthetic\nAmount due 25\nDue date May 2"
+      ],
+      "labels": [
+        "bills",
+        "medical"
+      ],
+      "expected_name": "Maple Veterinary Clinic \u00b7 Bill"
+    },
+    {
+      "id": "address-5",
+      "split": "address-regression",
+      "pages": [
+        "Tel (555) 010-1234\nMaple Veterinary Clinic\nMedical invoice\nPatient name Synthetic\nAmount due 25\nDue date May 2"
+      ],
+      "labels": [
+        "bills",
+        "medical"
+      ],
+      "expected_name": "Maple Veterinary Clinic \u00b7 Bill"
+    },
+    {
+      "id": "address-6",
+      "split": "address-regression",
+      "pages": [
+        "contact@example.invalid\nMaple Veterinary Clinic\nMedical invoice\nPatient name Synthetic\nAmount due 25\nDue date May 2"
+      ],
+      "labels": [
+        "bills",
+        "medical"
+      ],
+      "expected_name": "Maple Veterinary Clinic \u00b7 Bill"
+    },
+    {
+      "id": "address-7",
+      "split": "address-regression",
+      "pages": [
+        "PO Box 40\nMaple Veterinary Clinic\nMedical invoice\nPatient name Synthetic\nAmount due 25\nDue date May 2"
+      ],
+      "labels": [
+        "bills",
+        "medical"
+      ],
+      "expected_name": "Maple Veterinary Clinic \u00b7 Bill"
+    },
+    {
+      "id": "address-8",
+      "split": "address-regression",
+      "pages": [
+        "London SW1A 1AA\nMaple Veterinary Clinic\nMedical invoice\nPatient name Synthetic\nAmount due 25\nDue date May 2"
+      ],
+      "labels": [
+        "bills",
+        "medical"
+      ],
+      "expected_name": "Maple Veterinary Clinic \u00b7 Bill"
+    },
+    {
+      "id": "address-9",
+      "split": "address-regression",
+      "pages": [
+        "Toronto ON M5V 2T6\nMaple Veterinary Clinic\nMedical invoice\nPatient name Synthetic\nAmount due 25\nDue date May 2"
+      ],
+      "labels": [
+        "bills",
+        "medical"
+      ],
+      "expected_name": "Maple Veterinary Clinic \u00b7 Bill"
+    },
+    {
+      "id": "address-10",
+      "split": "address-regression",
+      "pages": [
+        "INVOICE\n42 Cedar Street\nMaple Veterinary Clinic\nMedical invoice\nPatient name Synthetic\nAmount due 25\nDue date May 2"
+      ],
+      "labels": [
+        "bills",
+        "medical"
+      ],
+      "expected_name": "Maple Veterinary Clinic \u00b7 Bill"
+    },
+    {
+      "id": "address-no-issuer",
+      "split": "address-regression",
+      "pages": [
+        "42 Cedar Street\nPineville, NY\nTel (555) 010-1234\nAmount due 25\nDue date May 2"
+      ],
+      "labels": [
+        "bills"
+      ],
+      "expected_name": ""
+    },
+    {
+      "id": "address-generic",
+      "split": "address-regression",
+      "pages": [
+        "42 Cedar Street\nInvoice\nAmount due 25"
+      ],
+      "labels": [
+        "bills"
+      ],
+      "expected_name": "Invoice"
+    },
+    {
+      "id": "v3-new-vet",
+      "split": "naming-regression",
+      "pages": [
+        "18 Birch Rd.\nWillow Animal Hospital\nInvoice\nPatient name Example\nAmount due 45"
+      ],
+      "labels": [
+        "bills",
+        "medical"
+      ],
+      "expected_name": "Willow Animal Hospital \u00b7 Bill"
+    },
+    {
+      "id": "v3-new-vet-logo",
+      "split": "naming-regression",
+      "pages": [
+        "8 Brook Lane\nTreetop Veterinary Care\nInvoice total 60"
+      ],
+      "labels": [
+        "bills"
+      ],
+      "expected_name": "Treetop Veterinary Care \u00b7 Bill"
+    },
+    {
+      "id": "v3-new-store",
+      "split": "naming-regression",
+      "pages": [
+        "46 Hillside Ave\nAster Hardware\nReceipt\nTotal 8\nCash"
+      ],
+      "labels": [
+        "receipts"
+      ],
+      "expected_name": "Aster Hardware \u00b7 Receipt"
+    },
+    {
+      "id": "v3-new-bank",
+      "split": "naming-regression",
+      "pages": [
+        "Riverbank, MA\nJuniper Credit Union\nAccount statement\nClosing balance 12"
+      ],
+      "labels": [
+        "banking"
+      ],
+      "expected_name": "Juniper Credit Union \u00b7 Account statement"
+    },
+    {
+      "id": "v3-new-no-issuer",
+      "split": "naming-regression",
+      "pages": [
+        "91 Elm Drive\nUnit 4\nAmount due 22\nDue date June 1"
+      ],
+      "labels": [
+        "bills"
+      ],
+      "expected_name": ""
+    },
+    {
+      "id": "v3-new-letter",
+      "split": "naming-regression",
+      "pages": [
+        "Your pet deserves the best\nThank you\nPatient care notes\nCall us anytime"
+      ],
+      "labels": [],
+      "expected_name": ""
+    },
+    {
+      "id": "v3-new-clinic-number",
+      "split": "naming-regression",
+      "pages": [
+        "24 Hour Animal Hospital\nMedical invoice\nPatient name Example\nAmount due 20"
+      ],
+      "labels": [
+        "medical",
+        "bills"
+      ]
+    },
+    {
+      "id": "v3-new-account",
+      "split": "naming-regression",
+      "pages": [
+        "63 Oak Way\nFinch Finance\nAccount statement\nOpening balance 10"
+      ],
+      "labels": [
+        "banking"
+      ],
+      "expected_name": "Finch Finance \u00b7 Account statement"
+    },
+    {
+      "id": "v3-new-identity",
+      "split": "naming-regression",
+      "pages": [
+        "Passport\nNationality Example\nGiven name Fictional"
+      ],
+      "labels": [
+        "ids"
+      ],
+      "expected_name": "Passport"
+    },
+    {
+      "id": "v3-new-housing",
+      "split": "naming-regression",
+      "pages": [
+        "7 Orchard Place\nRental agreement\nTenant Example\nLandlord Fictional"
+      ],
+      "labels": [
+        "house"
+      ],
+      "expected_name": "Rental agreement"
+    },
+    {
+      "id": "v3-new-marketing",
+      "split": "naming-regression",
+      "pages": [
+        "Friendly Animal Hospital\nPlease ask about prescription dosage\nSpecial offers this week"
+      ],
+      "labels": []
+    },
+    {
+      "id": "v3-new-general",
+      "split": "naming-regression",
+      "pages": [
+        "Office contacts\n24 Garden Road\nPineville, MA\nTel (555) 555-0134"
+      ],
+      "labels": [],
+      "expected_name": ""
+    },
+    {
+      "id": "held-v3-vet",
+      "split": "fresh-followup",
+      "pages": [
+        "93 Walnut Avenue\nOak Hill Veterinary Center\nInvoice\nPatient name Example\nAmount due 55"
+      ],
+      "labels": [
+        "medical",
+        "bills"
+      ]
+    },
+    {
+      "id": "held-v3-contact",
+      "split": "fresh-followup",
+      "pages": [
+        "Fax 555-010-7777\nHorizon Vet Services\nInvoice total 14"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "held-v3-only-address",
+      "split": "fresh-followup",
+      "pages": [
+        "Elm Lane\nSuite Seven\nInvoice total 9"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "held-v3-store",
+      "split": "fresh-followup",
+      "pages": [
+        "38 Spring Court\nHarbor Pet Supplies\nSales receipt\nTotal 8\nCash"
+      ],
+      "labels": [
+        "receipts"
+      ]
+    },
+    {
+      "id": "held-v3-split",
+      "split": "fresh-followup",
+      "pages": [
+        "88\nRiver Road\nMeadow Animal Clinic\nMedical invoice\nPatient name Example\nAmount due 8"
+      ],
+      "labels": [
+        "medical",
+        "bills"
+      ]
+    },
+    {
+      "id": "held-v3-id",
+      "split": "fresh-followup",
+      "pages": [
+        "NATIONALITY Example\nPassport\nGiven name Synthetic"
+      ],
+      "labels": [
+        "ids"
+      ]
+    },
+    {
+      "id": "held-v3-street-brand",
+      "split": "fresh-followup",
+      "pages": [
+        "Orchard Street\nInvoice\nAmount due 6"
+      ],
+      "labels": [
+        "bills"
+      ]
+    },
+    {
+      "id": "held-v3-note",
+      "split": "fresh-followup",
+      "pages": [
+        "Notes for Monday\nCall hospital about prescription dosage\nBring water"
+      ],
+      "labels": []
+    }
+  ]
+}

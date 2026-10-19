@@ -1,0 +1,60 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'org.stackdocs.app'
+    compileSdk 36
+    buildToolsVersion '36.0.0'
+
+    defaultConfig {
+        applicationId providers.gradleProperty('stackChecks').isPresent() ? 'org.stackdocs.app.checks' : 'org.stackdocs.app'
+        manifestPlaceholders = [appLabel: providers.gradleProperty('stackChecks').isPresent() ? 'Stack Checks' : '@string/app_name']
+        minSdk 24
+        targetSdk 36
+        versionCode 22
+        versionName '0.8.9-dev'
+        testInstrumentationRunner providers.gradleProperty('preservationProbe').isPresent() ? 'org.stackdocs.app.PreservationRunner' : 'org.stackdocs.app.ScannerChecks'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // Standard single-threaded, bundled native engine; no runtime downloads.
+    implementation('cz.adaptech.tesseract4android:tesseract4android:4.9.0') {
+        exclude group: 'androidx.annotation'
+    }
+    // Maintained image metadata parsing, including orientation on older Android versions.
+    implementation('androidx.exifinterface:exifinterface:1.4.2') {
+        exclude group: 'androidx.annotation'
+    }
+    // EXIF annotations are compile-time metadata; their Kotlin tooling stays out of the APK.
+    compileOnly 'androidx.annotation:annotation-jvm:1.8.1'
+}
+
+tasks.register('verifyOcrDependency') {
+    group = 'verification'
+    description = 'Verify the independently acquired bundled OCR binary and English model.'
+    doLast {
+        def artifact = configurations.debugRuntimeClasspath.resolvedConfiguration.resolvedArtifacts.find {
+            it.moduleVersion.id.group == 'cz.adaptech.tesseract4android'
+        }
+        if (artifact == null) throw new GradleException('Missing bundled OCR dependency')
+        def actual = java.security.MessageDigest.getInstance('SHA-256').digest(artifact.file.bytes).encodeHex().toString()
+        if (actual != 'bce5d6413a1a5ae3d7240033fbbc851ba3217d0a08d9769400e17a077f42cb2a') {
+            throw new GradleException('OCR artifact SHA-256 mismatch')
+        }
+        def expectedModel = '7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2'
+        def model = file('src/main/assets/ocr/eng.traineddata')
+        def manifest = new groovy.json.JsonSlurper().parse(file('src/main/assets/ocr/manifest.json'))
+        def modelHash = java.security.MessageDigest.getInstance('SHA-256').digest(model.bytes).encodeHex().toString()
+        if (modelHash != expectedModel || manifest.model_sha256 != expectedModel || model.length() != manifest.model_bytes) {
+            throw new GradleException('Bundled English OCR model/manifest mismatch')
+        }
+    }
+}
+tasks.named('preBuild').configure { dependsOn 'verifyOcrDependency' }

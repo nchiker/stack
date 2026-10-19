@@ -1,0 +1,32 @@
+# Original reference material is local inspection input, never project source.
+/Reference/
+/reference/
+/refrence/
+/Refrence/
+
+# APK archives and reverse-engineering output must stay outside version control.
+*.apk
+*.apkm
+*.xapk
+*.dex
+*.smali
+*.jobf
+/jadx/
+/apktool/
+/decompiled/
+/.audit/
+
+# Local Android tools, machine settings, and generated build output.
+.gradle/
+.android/
+**/build/
+/local.properties
+/.idea/
+*.iml
+/captures/
+/.tools/
+*.jks
+*.keystore
+
+# Optional offline consolidation-tool bytecode.
+/tools/__pycache__/

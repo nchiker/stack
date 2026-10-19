@@ -1,0 +1,17 @@
+{
+  "canonical_package": "org.stackdocs.app",
+  "update": "adb install -r; schema 5 to 6",
+  "before": "Preservation docs=6 pages=12 stacks=9 memberships=8 metadata_sha256=30fa5a6f9107782c458a9f5ceba60faa7fda351146fffbf27ec3fd3c60415d72 originals_draft_recovery_sha256=16d6621f0db69b7d4eae119b079d3dced8ac6074233e65408b4785e9becdfda3 succeeded=12",
+  "after": "Preservation docs=6 pages=12 stacks=9 memberships=8 metadata_sha256=30fa5a6f9107782c458a9f5ceba60faa7fda351146fffbf27ec3fd3c60415d72 originals_draft_recovery_sha256=16d6621f0db69b7d4eae119b079d3dced8ac6074233e65408b4785e9becdfda3 succeeded=12",
+  "identical": true,
+  "privacy": "Aggregate-only in-device hashes; no personal document/text/database/backup exported",
+  "fingerprint_scope": "Document metadata plus title/filing provenance/revisions, choice history, page edits/order, stacks/memberships, original/draft/consolidation-recovery file names/lengths/bytes",
+  "ui_update": {
+    "version": "0.7.1-dev",
+    "code": 12,
+    "schema": 6,
+    "before": "Preservation docs=6 pages=12 stacks=9 memberships=8 metadata_sha256=30fa5a6f9107782c458a9f5ceba60faa7fda351146fffbf27ec3fd3c60415d72 originals_draft_recovery_sha256=16d6621f0db69b7d4eae119b079d3dced8ac6074233e65408b4785e9becdfda3 succeeded=12",
+    "after": "Preservation docs=6 pages=12 stacks=9 memberships=8 metadata_sha256=30fa5a6f9107782c458a9f5ceba60faa7fda351146fffbf27ec3fd3c60415d72 originals_draft_recovery_sha256=16d6621f0db69b7d4eae119b079d3dced8ac6074233e65408b4785e9becdfda3 succeeded=12",
+    "identical": true
+  }
+}

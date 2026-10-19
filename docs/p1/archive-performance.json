@@ -1,0 +1,17 @@
+{
+  "device": "Pixel 4a",
+  "api": 33,
+  "pages": 12,
+  "render_edge": 3200,
+  "source_bytes": 193731,
+  "edited_pdf_bytes": 1169575,
+  "backup_bytes": 201201,
+  "edited_export_ms": 10662,
+  "snapshot_ms": 13,
+  "archive_write_ms": 39,
+  "restore_ms": 165,
+  "ui_ping_ms": 2,
+  "io_ping_during_archive_ms": 1,
+  "sampled_peak_pss_kib": 242801,
+  "sampling_caveat": "100 ms plus Debug.getPss overhead, whole instrumentation process; not instantaneous peak or controlled baseline"
+}

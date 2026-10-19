@@ -1,0 +1,1554 @@
+{
+  "milestone": "M2",
+  "status": "ui_refinement_native_visual_comparison_verified_user_m2_acceptance_pending",
+  "source_base": "1e309fe",
+  "M2.1": {
+    "status": "delivered_qualified",
+    "rust_tests": 23,
+    "native_states_report": "/tmp/stack-m2-browser-states/report.json",
+    "native_delivery_report": "/tmp/stack-m2-browser-delivery/report.json",
+    "automation": "application message injection; own-window native captures",
+    "private_inputs_used": false,
+    "checks": {
+      "fmt": true,
+      "check_locked_offline": true,
+      "clippy_all_targets_deny_warnings": true,
+      "build_locked_offline": true,
+      "tests_include_native": true
+    },
+    "native_delivery": {
+      "synthetic_only": true,
+      "input": "authored M0/M1 fixture version 1",
+      "interaction": "application message injection; native own-window captures",
+      "binary_sha256": "40a04caddab0a0ddfeada29bbd8a572bdb1eb58e68924bc742f45b1ac8d2bee3",
+      "cases": [
+        {
+          "name": "first",
+          "exit_status": 0,
+          "saved_rows_ids_order_journal_hashes_unchanged": true,
+          "captures": {
+            "01-saved-pdf.png": "54d4d20a6fe5b770218a5c1c95c495417f3dac2b53a46495171492096551dd9c",
+            "02-saved-later-page.png": "2ef589c144716327cb57d650e9d2e35b1c4941a51789484e76d45f86275e19d7",
+            "03-saved-image.png": "7998fafbce01b5835439ccac81c78a5716b86ac12293fa128cc001497bb0cce2",
+            "04-saved-transform.png": "5ce1ada8c5bd1dcde99565a61a525eba78364c186d84f72d746b1fe90443bcc2"
+          }
+        },
+        {
+          "name": "reopen",
+          "exit_status": 0,
+          "saved_rows_ids_order_journal_hashes_unchanged": true,
+          "captures": {
+            "01-saved-pdf.png": "f9570fbe3b627eed0a8b2e093a8ad52403bef605a4ea23cc3d2d145fec06a8a2",
+            "02-saved-later-page.png": "9eb8c2313e541370446e3c5335f743a78b8e6178c1f214cfa87dc2a1bf80ffbc",
+            "03-saved-image.png": "e439965fe5c29d8e115673a47db2a17502ce90657e7c5452c9ef0350e72cfdfb",
+            "04-saved-transform.png": "a43001da902d9d2e95b900a933df1cbac740d69cf7cbebb408c2786d0d320881"
+          }
+        },
+        {
+          "name": "empty",
+          "exit_status": 0,
+          "native_state_capture": true
+        },
+        {
+          "name": "busy",
+          "exit_status": 0,
+          "native_state_capture": true
+        },
+        {
+          "name": "error",
+          "exit_status": 0,
+          "native_state_capture": true
+        }
+      ]
+    }
+  },
+  "next": "Requested UI refinement and native/browser visual comparison are complete. User may continue the broader M2 interaction review; existing platform qualifications remain.",
+  "retained_failures": [
+    {
+      "path": "/tmp/stack-m2-browser-native",
+      "outcome": "SIGSEGV after four captures before explicit PDF-worker shutdown fix; native root cause unconfirmed"
+    }
+  ],
+  "unfinished": [
+    "Final user visual/interface review: actual chooser, keyboard/focus, layouts/full scaling, live frames/shutdown and documented platform qualifications"
+  ],
+  "M2.2": {
+    "status": "delivered_qualified",
+    "source_base": "b96aea6",
+    "rust_tests": 26,
+    "host": {
+      "synthetic_only": true,
+      "fixture_version": 1,
+      "production_java_sha256": {
+        "PageEnhancement.java": "4e0428a465c8be8288f8c3b739cc6be4d9ca6131c9dda604d8ae30c84b972f5a",
+        "PageFlattening.java": "59c9cd138adcaeed6c4f16db8e7d722132ae2af746fbd9dcfe34a4c184e86667"
+      },
+      "black_white_rgba_equal": true,
+      "black_white_rgba_sha256": "a038160e1e23f1b97c8cd39d091c784beacc134fa0528fe395783da8ed61d38e",
+      "models": {
+        "bowed": {
+          "quadratic": 0.09745762497186661,
+          "linear": -0.0008333333535119891
+        },
+        "straight": null,
+        "slanted": null
+      },
+      "model_absolute_tolerance": 1e-06,
+      "limits": [
+        "host pixel adapter; authored fixtures only",
+        "no Android Canvas/Bitmap runtime",
+        "no resampling golden; no Android mesh rasterization proof"
+      ]
+    },
+    "native": {
+      "synthetic_only": true,
+      "input": "authored M0/M1 fixture version 1",
+      "interaction": "application message injection; native own-window captures",
+      "binary_sha256": "95381fbd5d70ed69ccaf9795314dfad645f989c61a9187ccbbcde50de30c64e2",
+      "cases": [
+        {
+          "name": "first",
+          "exit_status": 0,
+          "saved_rows_ids_order_journal_hashes_unchanged": true,
+          "captures": {
+            "01-saved-pdf.png": "e5e0e3f1402e83182a7d2762779468b7e39364615aacba5db003986332ddaf46",
+            "02-saved-later-page.png": "1c76391fc17a7c0fc4102014e81c7f87d69746cab2e3b86025642cdf754597ea",
+            "03-saved-image.png": "7998fafbce01b5835439ccac81c78a5716b86ac12293fa128cc001497bb0cce2",
+            "04-saved-transform.png": "84420a92d6ceb58ec0f2c684263e5b21bcdc84585f7053d0974f8d7dc8f60065"
+          }
+        },
+        {
+          "name": "reopen",
+          "exit_status": 0,
+          "saved_rows_ids_order_journal_hashes_unchanged": true,
+          "captures": {
+            "01-saved-pdf.png": "ee2cdcb8b5bc73089f23e527232f7a87e6cbebf2757c3d3bbfd85e84136216ef",
+            "02-saved-later-page.png": "c6d23a69651db45ed67ecc4faee43ce7fce77135549bfdc3c3079d4d7807a1e6",
+            "03-saved-image.png": "e439965fe5c29d8e115673a47db2a17502ce90657e7c5452c9ef0350e72cfdfb",
+            "04-saved-transform.png": "8e03cd3324b84ebd4034d536b7247a3912fb9a5a768cc1979364a0747ecc89a3"
+          }
+        },
+        {
+          "name": "empty",
+          "exit_status": 0,
+          "native_state_capture": true
+        },
+        {
+          "name": "busy",
+          "exit_status": 0,
+          "native_state_capture": true
+        },
+        {
+          "name": "error",
+          "exit_status": 0,
+          "native_state_capture": true
+        }
+      ]
+    },
+    "limits": [
+      "Host production Java enhancement/model proof; no Android Canvas/device bitmap parity",
+      "Perspective/mesh CPU bilinear sampling tested with independent geometry/baselines"
+    ]
+  },
+  "M2.3": {
+    "status": "delivered_qualified",
+    "source_base": "2808131",
+    "rust_tests": 30,
+    "native": {
+      "synthetic_only": true,
+      "interaction": "application message injection; native window",
+      "binary_sha256": "e3727f4e9015122fd6dfa5262bd4194921a86c980834b99d21f8a2c5a0ed6b80",
+      "later_page_search": true,
+      "journaled_actions": [
+        "stack.create",
+        "stack.rename",
+        "stack.color",
+        "stack.visibility",
+        "stack.order",
+        "stack.delete",
+        "stack.color",
+        "stack.visibility"
+      ],
+      "document_rows_original_hashes_unchanged": true,
+      "catalog_and_sort_survive_restart": true,
+      "native_captures": 6,
+      "limits": [
+        "not keyboard/pointer or accessibility acceptance"
+      ]
+    },
+    "process_stop_cases_passed": 13,
+    "java_interop": {
+      "version_chains": 3,
+      "differential_cases": 21,
+      "host_currency_codes": 233,
+      "all_passed": true
+    },
+    "retained_harness_failure": "Inactive starter-row baseline assertion corrected; /tmp/stack-m2-catalog-native"
+  },
+  "M2.4": {
+    "status": "engineering_verified_final_user_interface_review_pending",
+    "source_base": "20b613d",
+    "rust_tests": 32,
+    "early_native_saved_data": {
+      "synthetic_only": true,
+      "interaction": "application message injection; stale token deliberately injected",
+      "binary_sha256": "820b2cc1556733ad70944968ce5938c1c8bf3003f5c12ee2542415cfbfb31210",
+      "invalid_stale_drafts_retained": true,
+      "notes_exact_multiline_unicode_trailing_newline": true,
+      "exact_amount_and_source_preserved": true,
+      "multiple_then_empty_filing_journaled": true,
+      "saved_pdf_subset_uses_physical_page_1": true,
+      "deletion_retains_originals": true,
+      "journaled_actions": [
+        "document.rename",
+        "document.notes",
+        "document.filing",
+        "document.filing",
+        "document.detail.save",
+        "document.detail.remove",
+        "document.page.appearance",
+        "document.page.order",
+        "document.page.order",
+        "document.delete"
+      ],
+      "restart_exact_saved_document_equal": true,
+      "native_captures": 6,
+      "limits": [
+        "not physical keyboard/pointer or accessibility acceptance"
+      ]
+    },
+    "native_visual_passed": true,
+    "fresh_frame_failure": "/tmp/stack-m2-editor-frame-diagnostic/editor.log",
+    "activation_acknowledged": false,
+    "draw_count_before_after": [
+      2,
+      2
+    ],
+    "logind_locked_hint": false,
+    "notes": "Historical failed frames retained; subsequent inspected native notes and ten journaled saves/restart pass; no physical input acceptance",
+    "latest_activation_acknowledged": true,
+    "latest_draw_count_before_after": [
+      2,
+      2
+    ],
+    "latest_capture_failure": "/tmp/stack-m2-editor-configure/editor.log",
+    "visible_editor_report": "/tmp/stack-m2-editor-protocol"
+  },
+  "M2.5": {
+    "status": "engineering_verified_final_user_interface_review_pending",
+    "source_base": "4cc6168",
+    "rust_tests": 36,
+    "native_dialog_acceptance": false,
+    "controller": "headless application message handlers; injected picker results",
+    "m1_process_stops": {
+      "directory": "/tmp/stack-m2-transfer-stops",
+      "passed": 13
+    },
+    "m1_java": {
+      "directory": "/tmp/stack-m2-transfer-java",
+      "roundtrips": 3,
+      "differential_cases": 21,
+      "host_currency_codes": 233,
+      "all_passed": true
+    },
+    "headless_native_portal_protocol_acceptance": true
+  },
+  "M2.6": {
+    "status": "engineering_verified_final_user_interface_review_pending",
+    "source_base": "6d663c1",
+    "rust_tests": 38,
+    "untouched_pdf_byte_identical": true,
+    "saved_reorder_subset_appearance_scan_and_images_inspected": true,
+    "rendered_pdf_selectable_text": false,
+    "output_limit_bytes": 8589934592,
+    "longest_edge_pixels": 3200,
+    "compression": "lossless Flate; already locked flate2 1.1.10",
+    "publication": "private validation then no-replace rename",
+    "native_portal_acceptance": false,
+    "m1_process_stops_passed": 13,
+    "m1_java_chains_cases_currency_codes": [
+      3,
+      21,
+      233
+    ],
+    "headless_native_portal_protocol_acceptance": true
+  },
+  "M2.7": {
+    "status": "engineering_closeout_passed_final_user_review_pending",
+    "source_base": "207c66b",
+    "rust_tests": 47,
+    "final_checks_report": "/tmp/stack-ui-refinement/acceptance-checks/report.json",
+    "checks": {
+      "fmt": true,
+      "check": true,
+      "clippy": true,
+      "build": true,
+      "test": true
+    },
+    "headless_workflow": {
+      "interaction": "headless application handlers; native captures omitted by test driver",
+      "source_artifacts": "/tmp/.tmpinAcY4",
+      "documents": 9,
+      "pages": 11,
+      "java_graph_equal": true,
+      "rust_restore_graph_equal": true,
+      "source_originals_unchanged": true,
+      "source_originals_verified_by": "native application test and Rust/host archive validation",
+      "native_gui_workflow_passed": false
+    },
+    "application_maximum_counts": {
+      "scope": "headless application handlers/workers; injected picker; no native layout or physical input claim",
+      "documents": 1000,
+      "pages": 10000,
+      "visible_rows_per_page": 50,
+      "empty_initial_browse_ms": 27,
+      "cancel_after_processed_bytes": 70917,
+      "cancel_dispatch_us": 14,
+      "cancel_cleanup_ms": 28,
+      "stage_review_ms": 12925,
+      "commit_browse_ms": 16047,
+      "first_results_page_layout_draw_ms": 143,
+      "results_page_scroll_draw_ms": 0,
+      "debounced_search_ms": 3319,
+      "executor_max_tick_gap_us": 148170,
+      "process_peak_rss_kib": 429368
+    },
+    "native_portal_keyboard_layout_acceptance": false,
+    "display_awake_clarification": "user confirmed awake and actively using desktop; no root-cause inference",
+    "nested_compositor": "isolated attempt stalled; stopped only own process; client connection-reset diagnostic retained",
+    "native_workflow_historical_failure": {
+      "status": "failed_fresh_draw",
+      "report": "/tmp/stack-m2-workflow-native/report.json",
+      "active_documents_after_four_imports": 9,
+      "journal_events_including_baseline": 6,
+      "remaining_operations": 0,
+      "activation_acknowledged": true,
+      "draw_count_before_after": [
+        2,
+        2
+      ]
+    },
+    "native_workflow": {
+      "status": "passed",
+      "report": "/tmp/stack-m2-wgpu-workflow/report.json",
+      "earlier_pass": "/tmp/stack-m2-workflow-visible/report.json",
+      "forced_software_same_binary_pass": "/tmp/stack-m2-cpu-same-build/report.json",
+      "interaction": "message/picker-result injection; own-window captures; physical input and portal selection excluded",
+      "captures": 5,
+      "restart_exact_document_equal": true,
+      "java_export_graph_equal": true,
+      "current_source_native_retest": "Deferred to user final review; historical captured binary/source only"
+    },
+    "native_layouts": {
+      "report": "/tmp/stack-m2-layouts-gpu/report.json",
+      "cases_passed": 4,
+      "captures_per_case": 5,
+      "actual_dimensions": [
+        [
+          1080,
+          780
+        ],
+        [
+          680,
+          680
+        ]
+      ],
+      "native_enlarged_fonts_passed": false,
+      "scale_change_reverted_to_content_only": true,
+      "reverted_scale_path_native_retest": false
+    },
+    "accessibility": "private AT-SPI probe exposes pinned adapter placeholder; full input/screenreader acceptance pending",
+    "renderer": "default pinned wgpu with tiny-skia fallback; same binary passes both; intermittent frame root cause unconfirmed",
+    "historical_terminal_verification": {
+      "report": "/tmp/stack-m2-terminal-checks/report.json",
+      "display_environment_removed": true,
+      "tests_passed": 39,
+      "tests_failed": 0,
+      "tests_ignored": 0,
+      "checks": [
+        "fmt",
+        "check",
+        "clippy -D warnings",
+        "build",
+        "software-only check",
+        "python harness syntax"
+      ],
+      "application_maximum_counts": {
+        "scope": "headless application handlers/workers; injected picker; no native layout or physical input claim",
+        "documents": 1000,
+        "pages": 10000,
+        "stage_review_ms": 14412,
+        "commit_browse_ms": 15609,
+        "debounced_search_ms": 2345,
+        "executor_max_tick_gap_us": 12960,
+        "process_peak_rss_kib": 425000
+      }
+    },
+    "current_terminal_verification": {
+      "report": "/tmp/stack-ui-refinement/acceptance-checks/report.json",
+      "source_base": "574bbec",
+      "source_sha256_all_current": true,
+      "display_environment_removed": true,
+      "tests": {
+        "passed": 47,
+        "failed": 0,
+        "ignored": 0
+      },
+      "checks": {
+        "fmt": {
+          "command": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "exit_code": 0,
+          "seconds": 0.366
+        },
+        "check": {
+          "command": [
+            "cargo",
+            "check",
+            "--workspace",
+            "--locked",
+            "--offline"
+          ],
+          "exit_code": 0,
+          "seconds": 1.217
+        },
+        "clippy": {
+          "command": [
+            "cargo",
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--locked",
+            "--offline",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 0,
+          "seconds": 1.87
+        },
+        "build": {
+          "command": [
+            "cargo",
+            "build",
+            "--workspace",
+            "--locked",
+            "--offline"
+          ],
+          "exit_code": 0,
+          "seconds": 5.779
+        },
+        "test": {
+          "command": [
+            "cargo",
+            "test",
+            "--workspace",
+            "--locked",
+            "--offline",
+            "--",
+            "--include-ignored",
+            "--nocapture"
+          ],
+          "exit_code": 0,
+          "seconds": 120.523
+        },
+        "counts": {
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "stack-desktop",
+            "--locked",
+            "--offline",
+            "application_maximum_counts_import_search_and_worker_responsiveness",
+            "--",
+            "--include-ignored",
+            "--nocapture"
+          ],
+          "exit_code": 0,
+          "seconds": 43.768
+        },
+        "software": {
+          "command": [
+            "cargo",
+            "check",
+            "-p",
+            "stack-desktop",
+            "--no-default-features",
+            "--locked",
+            "--offline"
+          ],
+          "exit_code": 0,
+          "seconds": 1.067
+        },
+        "portal_protocol": {
+          "command": [
+            "/usr/bin/python3",
+            "/home/charlie.day/Projects/Stack/desktop/tools/test_m2_portal_protocol.py",
+            "--output",
+            "/tmp/stack-ui-refinement/acceptance-checks/portal"
+          ],
+          "exit_code": 0,
+          "seconds": 29.084
+        }
+      },
+      "binary_sha256": {
+        "stack-desktop": "65ac4e7b64dca216a13ecd787979c09cd4287f87e51be0130b6806ac82b82d33",
+        "stack-cli": "e3d66908bcadd72a50c92cf566a566779efec0690580e507a28603dc82a84a96"
+      }
+    },
+    "historical_application_maximum_counts": {
+      "scope": "headless application handlers/workers; injected picker; no native layout or physical input claim",
+      "documents": 1000,
+      "pages": 10000,
+      "stage_review_ms": 10037,
+      "commit_browse_ms": 9987,
+      "debounced_search_ms": 1595,
+      "executor_max_tick_gap_us": 7973,
+      "process_peak_rss_kib": 428764
+    },
+    "performance_targets": {
+      "empty_initial_browse_ms": {
+        "actual": 27,
+        "maximum": 500,
+        "met": true
+      },
+      "cancel_dispatch_us": {
+        "actual": 14,
+        "maximum": 1000,
+        "met": true
+      },
+      "cancel_cleanup_ms": {
+        "actual": 28,
+        "maximum": 1000,
+        "met": true
+      },
+      "stage_review_ms": {
+        "actual": 12925,
+        "maximum": 30000,
+        "met": true
+      },
+      "commit_browse_ms": {
+        "actual": 16047,
+        "maximum": 30000,
+        "met": true
+      },
+      "first_results_page_layout_draw_ms": {
+        "actual": 143,
+        "maximum": 150,
+        "met": true
+      },
+      "results_page_scroll_draw_ms": {
+        "actual": 0,
+        "maximum": 50,
+        "met": true
+      },
+      "debounced_search_ms": {
+        "actual": 3319,
+        "maximum": 5000,
+        "met": true
+      },
+      "executor_max_tick_gap_us": {
+        "actual": 148170,
+        "maximum": 150000,
+        "met": true
+      },
+      "process_peak_rss_kib": {
+        "actual": 429368,
+        "maximum": 524288,
+        "met": true
+      }
+    },
+    "workspace_maximum_counts_process": {
+      "scope": "headless application handlers/workers; injected picker; no native layout or physical input claim",
+      "documents": 1000,
+      "pages": 10000,
+      "visible_rows_per_page": 50,
+      "empty_initial_browse_ms": 15,
+      "cancel_after_processed_bytes": 70917,
+      "cancel_dispatch_us": 11,
+      "cancel_cleanup_ms": 23,
+      "stage_review_ms": 13062,
+      "commit_browse_ms": 16451,
+      "first_results_page_layout_draw_ms": 80,
+      "results_page_scroll_draw_ms": 0,
+      "debounced_search_ms": 3389,
+      "executor_max_tick_gap_us": 84123,
+      "process_peak_rss_kib": 435532
+    },
+    "performance_scope": "Fresh maximum-count test process including authored fixture/graph allocation; host debug headless widgets/executor targets, not native compositor or release frame budgets. Combined workspace-process high-water mark is recorded separately.",
+    "historical_native_portal": {
+      "status": "unfinished_failed_import_path",
+      "last_exercised": "/tmp/stack-m2-portals-traced",
+      "real_cancel_saved_state_unchanged": true,
+      "import_save_roundtrip_passed": false,
+      "latest_path_guards": "compile checked only; no further GUI launches after user request",
+      "saved_documents_after_failure": 5
+    },
+    "native_portal": {
+      "headless_protocol_passed": true,
+      "report": "/tmp/stack-ui-navigation-final/portal/report.json",
+      "real_client_requests": 6,
+      "backend": "private synthetic D-Bus FileChooser",
+      "actual_chooser_ui_acceptance": "deferred to user",
+      "old_gui_harness": "single-path Location field now given individual absolute filenames; revised GUI harness intentionally unrun"
+    },
+    "headless_native_widgets": {
+      "draws": 52,
+      "scope": "actual COSMIC widget tree; pinned software renderer; no window",
+      "sizes": [
+        [
+          1080,
+          780
+        ],
+        [
+          680,
+          680
+        ]
+      ],
+      "scales": [
+        1,
+        2
+      ],
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "search_key_event_and_focus_next": true,
+      "nonblank_notes_rebuilds": true,
+      "widget_accessibility_tree_populated": true,
+      "os_keyboard_or_compositor_tested": false
+    },
+    "ui_scaling": {
+      "implementation": "public pinned COSMIC/Iced daemon with registered scale callback; no per-content multiplier",
+      "full_shell_callback_wired": true,
+      "offscreen_checks_passed": true,
+      "current_native_visual_review": "deferred to user"
+    },
+    "failure_races": [
+      "real transaction failure retains exact draft and retry saves",
+      "unreadable input retries without duplicate success",
+      "post-commit receipt/cleanup retry adds no duplicate or event",
+      "rapid selection/delete rejects delayed real preview; originals retained",
+      "saved PDF reorder rejects old-page preview pixels",
+      "close during preview joins off executor and rejects late messages",
+      "missing engine leaves saved document available; configured preview Retry succeeds"
+    ],
+    "review": {
+      "guide": "docs/desktop/M2_REVIEW.md",
+      "root": "/tmp/stack-m2-user-review",
+      "prepared_without_windows": true,
+      "documents": 5,
+      "paging_documents": 60,
+      "user_runs_launchers": true,
+      "full_acceptance_pending": true
+    },
+    "previous_engineering_verification": {
+      "report": "/tmp/stack-m2-closeout-verified/report.json",
+      "source_base": "8e8856e",
+      "source_sha256_all_current": true,
+      "display_environment_removed": true,
+      "tests": {
+        "passed": 43,
+        "failed": 0,
+        "ignored": 0
+      },
+      "checks": {
+        "fmt": {
+          "command": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "exit_code": 0,
+          "seconds": 0.265
+        },
+        "check": {
+          "command": [
+            "cargo",
+            "check",
+            "--workspace",
+            "--locked",
+            "--offline"
+          ],
+          "exit_code": 0,
+          "seconds": 0.315
+        },
+        "clippy": {
+          "command": [
+            "cargo",
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--locked",
+            "--offline",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 0,
+          "seconds": 0.365
+        },
+        "build": {
+          "command": [
+            "cargo",
+            "build",
+            "--workspace",
+            "--locked",
+            "--offline"
+          ],
+          "exit_code": 0,
+          "seconds": 0.365
+        },
+        "test": {
+          "command": [
+            "cargo",
+            "test",
+            "--workspace",
+            "--locked",
+            "--offline",
+            "--",
+            "--include-ignored",
+            "--nocapture"
+          ],
+          "exit_code": 0,
+          "seconds": 89.741
+        },
+        "counts": {
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "stack-desktop",
+            "--locked",
+            "--offline",
+            "application_maximum_counts_import_search_and_worker_responsiveness",
+            "--",
+            "--include-ignored",
+            "--nocapture"
+          ],
+          "exit_code": 0,
+          "seconds": 34.449
+        },
+        "software": {
+          "command": [
+            "cargo",
+            "check",
+            "-p",
+            "stack-desktop",
+            "--no-default-features",
+            "--locked",
+            "--offline"
+          ],
+          "exit_code": 0,
+          "seconds": 0.315
+        },
+        "portal_protocol": {
+          "command": [
+            "/usr/bin/python3",
+            "/home/charlie.day/Projects/Stack/desktop/tools/test_m2_portal_protocol.py",
+            "--output",
+            "/tmp/stack-m2-closeout-verified/portal"
+          ],
+          "exit_code": 0,
+          "seconds": 26.13
+        }
+      },
+      "binary_sha256": {
+        "stack-cli": "cd19cd855cf19eac728f5c7dcbd4629f2602df9b5c476449f69696b8ae619c31",
+        "stack-desktop": "e14ef25a08f85b1f273ff6dbbae2db00650f49c1cb0e68c6c9140d698af41ae1"
+      }
+    },
+    "previous_application_maximum_counts": {
+      "scope": "headless application handlers/workers; injected picker; no native layout or physical input claim",
+      "documents": 1000,
+      "pages": 10000,
+      "visible_rows_per_page": 50,
+      "empty_initial_browse_ms": 26,
+      "cancel_after_processed_bytes": 70917,
+      "cancel_dispatch_us": 7,
+      "cancel_cleanup_ms": 19,
+      "stage_review_ms": 11647,
+      "commit_browse_ms": 13584,
+      "first_results_page_layout_draw_ms": 87,
+      "results_page_scroll_draw_ms": 0,
+      "debounced_search_ms": 1671,
+      "executor_max_tick_gap_us": 90503,
+      "process_peak_rss_kib": 429196
+    },
+    "navigation_terminal_verification": {
+      "report": "/tmp/stack-ui-navigation-final/report.json",
+      "source_base": "fd9dde7",
+      "source_sha256_all_current": true,
+      "display_environment_removed": true,
+      "tests": {
+        "passed": 44,
+        "failed": 0,
+        "ignored": 0
+      },
+      "checks": {
+        "fmt": {
+          "command": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "exit_code": 0,
+          "seconds": 0.315
+        },
+        "check": {
+          "command": [
+            "cargo",
+            "check",
+            "--workspace",
+            "--locked",
+            "--offline"
+          ],
+          "exit_code": 0,
+          "seconds": 0.966
+        },
+        "clippy": {
+          "command": [
+            "cargo",
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--locked",
+            "--offline",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 0,
+          "seconds": 1.668
+        },
+        "build": {
+          "command": [
+            "cargo",
+            "build",
+            "--workspace",
+            "--locked",
+            "--offline"
+          ],
+          "exit_code": 0,
+          "seconds": 6.082
+        },
+        "test": {
+          "command": [
+            "cargo",
+            "test",
+            "--workspace",
+            "--locked",
+            "--offline",
+            "--",
+            "--include-ignored",
+            "--nocapture"
+          ],
+          "exit_code": 0,
+          "seconds": 116.856
+        },
+        "counts": {
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "stack-desktop",
+            "--locked",
+            "--offline",
+            "application_maximum_counts_import_search_and_worker_responsiveness",
+            "--",
+            "--include-ignored",
+            "--nocapture"
+          ],
+          "exit_code": 0,
+          "seconds": 35.248
+        },
+        "software": {
+          "command": [
+            "cargo",
+            "check",
+            "-p",
+            "stack-desktop",
+            "--no-default-features",
+            "--locked",
+            "--offline"
+          ],
+          "exit_code": 0,
+          "seconds": 0.966
+        },
+        "portal_protocol": {
+          "command": [
+            "/usr/bin/python3",
+            "/home/charlie.day/Projects/Stack/desktop/tools/test_m2_portal_protocol.py",
+            "--output",
+            "/tmp/stack-ui-navigation-final/portal"
+          ],
+          "exit_code": 0,
+          "seconds": 31.933
+        }
+      },
+      "binary_sha256": {
+        "stack-cli": "cd19cd855cf19eac728f5c7dcbd4629f2602df9b5c476449f69696b8ae619c31",
+        "stack-desktop": "b08c4978881495b8941ebbef1938ec26223d78d2fd1723d7e97e29a8aa96b2f7"
+      }
+    },
+    "mockup_terminal_verification": {
+      "report": "/tmp/stack-mockup-workspace-final-checks/report.json",
+      "source_base": "18df1f8",
+      "source_sha256_all_current": true,
+      "display_environment_removed": true,
+      "tests": {
+        "passed": 45,
+        "failed": 0,
+        "ignored": 0
+      },
+      "checks": {
+        "fmt": {
+          "command": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "exit_code": 0,
+          "seconds": 0.315
+        },
+        "check": {
+          "command": [
+            "cargo",
+            "check",
+            "--workspace",
+            "--locked",
+            "--offline"
+          ],
+          "exit_code": 0,
+          "seconds": 1.066
+        },
+        "clippy": {
+          "command": [
+            "cargo",
+            "clippy",
+            "--workspace",
+            "--all-targets",
+            "--locked",
+            "--offline",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 0,
+          "seconds": 1.719
+        },
+        "build": {
+          "command": [
+            "cargo",
+            "build",
+            "--workspace",
+            "--locked",
+            "--offline"
+          ],
+          "exit_code": 0,
+          "seconds": 5.683
+        },
+        "test": {
+          "command": [
+            "cargo",
+            "test",
+            "--workspace",
+            "--locked",
+            "--offline",
+            "--",
+            "--include-ignored",
+            "--nocapture"
+          ],
+          "exit_code": 0,
+          "seconds": 113.557
+        },
+        "counts": {
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "stack-desktop",
+            "--locked",
+            "--offline",
+            "application_maximum_counts_import_search_and_worker_responsiveness",
+            "--",
+            "--include-ignored",
+            "--nocapture"
+          ],
+          "exit_code": 0,
+          "seconds": 38.259
+        },
+        "software": {
+          "command": [
+            "cargo",
+            "check",
+            "-p",
+            "stack-desktop",
+            "--no-default-features",
+            "--locked",
+            "--offline"
+          ],
+          "exit_code": 0,
+          "seconds": 1.168
+        },
+        "portal_protocol": {
+          "command": [
+            "/usr/bin/python3",
+            "/home/charlie.day/Projects/Stack/desktop/tools/test_m2_portal_protocol.py",
+            "--output",
+            "/tmp/stack-mockup-workspace-final-checks/portal"
+          ],
+          "exit_code": 0,
+          "seconds": 27.984
+        }
+      },
+      "binary_sha256": {
+        "target/debug/stack-desktop": "d63aa1d0ecf919cdee0bffe703a4895b3065b9caba49add62983c1b15d307d07",
+        "target/debug/stack-cli": "cd19cd855cf19eac728f5c7dcbd4629f2602df9b5c476449f69696b8ae619c31"
+      }
+    }
+  },
+  "testing_preference": "All remaining engineering headless; user performs visual/interface review last",
+  "engineering_source_base": "574bbec",
+  "engineering_complete": true,
+  "full_m2_accepted": false,
+  "interface_review": {
+    "user_report": [
+      "wordy first screen",
+      "no discoverable way back from Manage stacks",
+      "menus move between top and sidebar"
+    ],
+    "document": "docs/desktop/M2_INTERFACE_REVIEW.md",
+    "source_base": "fd9dde7",
+    "first_corrections_implemented": [
+      "fixed header Back and Library actions",
+      "persistent scoped search/Add",
+      "typed sidebar destinations and actual exit from management",
+      "context and recorded scroll restoration",
+      "document loading keeps Back",
+      "background import refresh keeps editor/draft",
+      "scoped save confirmations and conditional recovery/history"
+    ],
+    "broader_proposals_not_implemented": [
+      "Android-like Home and more identifiable document rows",
+      "separate metadata/page editing areas",
+      "dirty-state/detail-draft/quit policy",
+      "visual color picker and fixed-category color consistency"
+    ],
+    "visual_acceptance_pending": true,
+    "offscreen_artifacts": "/tmp/stack-ui-navigation-review",
+    "scope": "Historical first navigation repair; mockup_adaptation describes the current layout."
+  },
+  "mockup_adaptation": {
+    "source_base": "18df1f8",
+    "reference": "Mockup/stack-cosmic-desktop-mockup.html",
+    "reference_sha256": "94874cc6e4c838ae8edf0062ca48ff8c8f44f4cd1100a01fdf2c4addc4f6c481",
+    "reference_modified": false,
+    "native_libcosmic": true,
+    "implemented": [
+      "fixed library sidebar and bottom Backup & restore",
+      "bounded grid/list browser with saved preference",
+      "wide preview beside document information",
+      "Information/Details/Pages editor sections",
+      "narrow preview/information switching preserves draft",
+      "explicit saves and unsaved-change indication",
+      "actual native-widget pointer dispatch and saved rotation regression",
+      "config reopen preserves independent sort/layout"
+    ],
+    "report": "/tmp/stack-mockup-workspace-final-checks/report.json",
+    "offscreen_review": {
+      "path": "/tmp/stack-mockup-workspace-final-review",
+      "window_opened": false,
+      "png_sha256": {
+        "01-documents.png": "92410203708ef6c772aa842f981b0c2747b1f7d2d2eea6bb2c99a08eec9eb731",
+        "02-manage-stacks.png": "8c704eb671b57906b3d9b122d6e51eb3928f2cfaea1bec5b85b297ccf677a4bb",
+        "03-document.png": "ae6a3def36e2c35c7f9c41e01c0051458b1d94ca1b6add763e096e3dc5c1ef13",
+        "04-edit-document.png": "44a7dc7ad3ddbc70322792eb61ac6b991cf7c7f32cdbade9e055dcb206823b4a",
+        "05-library-menu.png": "8c704eb671b57906b3d9b122d6e51eb3928f2cfaea1bec5b85b297ccf677a4bb",
+        "before-Details-1080.png": "9b51eec485cecd1020554d452b9e5806947a774b3f34de9d11e98edc1c829f5e",
+        "before-Documentinformation-680.png": "a0ec6dc31e5251255c7607e0680ad6a733ca34c67e7c68cd0a16584009272fc0",
+        "before-Doneediting-680.png": "522d04c918ff9c25453441065dc3aec205ed02ff559587b70486e75ba329b84d",
+        "before-Editdocument-1080.png": "f42b2c3c4b5bad55de83a0abfc6645413753799bc65a56f704c9b8b1080639bd",
+        "before-Information-1080.png": "c69d901fda654df79c384b686ab5cc6b076510d7cd9298c3fd073c4fb420b076",
+        "before-Listview-1080.png": "f26638612fcc09c0158324e0bb4461a9b7b5d2b86bce5d4a70c267e97cfeaee2",
+        "before-Pages-1080.png": "733c00071cb9442b27437f9df14004124acf250f3cc67963a953cc447be1ee27",
+        "before-Rotatepage-1080.png": "06ac4d8605ad1c68b705f953d7f3ca947d051d3fde2c1c099d281d395db5f868",
+        "before-Showpreview-680.png": "522d04c918ff9c25453441065dc3aec205ed02ff559587b70486e75ba329b84d"
+      }
+    },
+    "remaining_design_differences": [
+      "document icons instead of real page thumbnails",
+      "explicit field saves rather than autosave",
+      "existing Starred stack rather than new star metadata",
+      "single detail draft and process-only draft lifetime",
+      "visual stack-color chooser remains a recommendation"
+    ],
+    "native_windows_opened": false,
+    "visual_acceptance_pending": true,
+    "scope": "Historical initial adaptation; visual_refinement describes current behavior."
+  },
+  "visual_refinement": {
+    "source_base": "574bbec",
+    "scope": "UI-only; read-only tile projection; no schema/original/journal/dependency changes",
+    "reference": "Mockup/stack-cosmic-desktop-mockup.html",
+    "reference_sha256": "94874cc6e4c838ae8edf0062ca48ff8c8f44f4cd1100a01fdf2c4addc4f6c481",
+    "reference_modified": false,
+    "browser_opened": true,
+    "native_app_run": true,
+    "agent_native_visual_comparison_complete": true,
+    "visual_report": {
+      "synthetic_only": true,
+      "manifest_matches_pre_capture_graph": true,
+      "all_original_hashes_unchanged": true,
+      "journal_entries": 16,
+      "expected_seed_journal_entries": 16,
+      "native_window_size": [
+        1080,
+        860
+      ],
+      "browser_window_size": [
+        1080,
+        860
+      ],
+      "native_capture_dir": "/tmp/stack-ui-refinement/native-confirmed",
+      "native_compositor": "COSMIC; actual app window; wgpu",
+      "theme": "installed COSMIC theme copied into isolated config",
+      "interaction": "application route injection; actual native rendering and screenshot readback; no physical input claim",
+      "native_exit_status": 0,
+      "captures": {
+        "01-library.png": "88588f6c2f6c2a405d7a1a9ecdbb558d10591667ffc336d947dae178082b947c",
+        "02-viewer.png": "1a127ede91b68326d740588305d1b98948c5165791c3694388ce372deb2351d3",
+        "03-edit-information.png": "7617efe47a26aa66e72f41b956d4a47bf36fecaf9440929d6d823b63222e4a70",
+        "04-edit-details.png": "223205e7e401aa1dcbcb1fb74fc256939274c30ceb0eb0aa9321b752071b0113",
+        "05-edit-pages.png": "ef1718a5f663fff2b6b4eb3265ffa92ec4051264ad85028d58f93c1dd3c0a602"
+      },
+      "browser_references": {
+        "mockup-library-1080x860.png": "3727e4f5ff52a87019289414f275abf6a4ab05c6cb2ea25bc67ce8819b372389",
+        "mockup-viewer-1080x860.png": "8df06a423296084dcc3101f08d3eaca07be33045e56b41c1a9dc0355438f131b"
+      },
+      "binary_sha256": "65ac4e7b64dca216a13ecd787979c09cd4287f87e51be0130b6806ac82b82d33",
+      "agent_visually_compared": true,
+      "private_material_opened": false,
+      "narrow": {
+        "size": [
+          680,
+          680
+        ],
+        "native_exit_status": 0,
+        "preview_retained_in_information_details_and_pages": true,
+        "captures": {
+          "01-library.png": "dd30633fe95ed0d24d356789a3a8a2be521ce0af83380ea3b9f9fdb28e1caebb",
+          "02-viewer.png": "486e123a546fa1c9adf7e7b5f3e67ad631e0eb1776ec8c027db3b523bf4b3153",
+          "03-edit-information.png": "e78fc9152ce14b9db3db4011df41cc9a76349d6cbfdd5d219bae4ed0a9b3bc38",
+          "04-edit-details.png": "ca3d7a49c504616bec6e0c4fc2ab3b3833675daf3169c9abf0c311134dfbdef8",
+          "05-edit-pages.png": "5f6c10b97789bbe0dd118d20eace9f4b113ac2b0a7e195f7da42d340e6d2754f"
+        }
+      }
+    },
+    "screenshots_zip": "/tmp/stack-ui-refinement/screenshots.zip",
+    "new_regressions": [
+      "saved first-page thumbnail refresh through actual reorder; stale generation rejection; original unchanged",
+      "Gregorian added-date boundaries",
+      "actual scroll dispatch loads newly visible thumbnails with bounded cache",
+      "Back hidden at root and library Add absent in viewer/editor"
+    ],
+    "retained_intermediate_reports": [
+      "/tmp/stack-ui-refinement/final-checks/report.json",
+      "/tmp/stack-ui-refinement/verified-checks/report.json"
+    ],
+    "full_user_m2_acceptance": false
+  },
+  "rendering_text_feedback": {
+    "base": "8cdaf19",
+    "user_feedback": "much, much better; PDF rendering speed and sample body search remain concerns",
+    "report": "/tmp/stack-ui-followup/report.json",
+    "tests": {
+      "passed": 49,
+      "failed": 0,
+      "ignored": 0
+    },
+    "checks": {
+      "fmt": {
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit_code": 0,
+        "seconds": 0.365
+      },
+      "check": {
+        "command": [
+          "cargo",
+          "check",
+          "--workspace",
+          "--locked",
+          "--offline"
+        ],
+        "exit_code": 0,
+        "seconds": 1.117
+      },
+      "clippy": {
+        "command": [
+          "cargo",
+          "clippy",
+          "--workspace",
+          "--all-targets",
+          "--locked",
+          "--offline",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "seconds": 1.668
+      },
+      "build": {
+        "command": [
+          "cargo",
+          "build",
+          "--workspace",
+          "--locked",
+          "--offline"
+        ],
+        "exit_code": 0,
+        "seconds": 5.73
+      },
+      "test": {
+        "command": [
+          "cargo",
+          "test",
+          "--workspace",
+          "--locked",
+          "--offline",
+          "--",
+          "--include-ignored",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "seconds": 84.134
+      },
+      "counts": {
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "stack-desktop",
+          "--locked",
+          "--offline",
+          "application_maximum_counts_import_search_and_worker_responsiveness",
+          "--",
+          "--include-ignored",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "seconds": 40.463
+      },
+      "software": {
+        "command": [
+          "cargo",
+          "check",
+          "-p",
+          "stack-desktop",
+          "--no-default-features",
+          "--locked",
+          "--offline"
+        ],
+        "exit_code": 0,
+        "seconds": 1.066
+      },
+      "portal_protocol": {
+        "command": [
+          "/usr/bin/python3",
+          "/home/charlie.day/Projects/Stack/desktop/tools/test_m2_portal_protocol.py",
+          "--output",
+          "/tmp/stack-ui-followup/final-checks/portal"
+        ],
+        "exit_code": 0,
+        "seconds": 14.301
+      }
+    },
+    "all_fresh_process_performance_targets_met": true,
+    "maximum_counts": {
+      "scope": "headless application handlers/workers; injected picker; no native layout or physical input claim",
+      "documents": 1000,
+      "pages": 10000,
+      "visible_rows_per_page": 50,
+      "empty_initial_browse_ms": 26,
+      "cancel_after_processed_bytes": 70917,
+      "cancel_dispatch_us": 7,
+      "cancel_cleanup_ms": 26,
+      "stage_review_ms": 13104,
+      "commit_browse_ms": 15595,
+      "first_results_page_layout_draw_ms": 140,
+      "results_page_scroll_draw_ms": 0,
+      "debounced_search_ms": 2115,
+      "executor_max_tick_gap_us": 142943,
+      "process_peak_rss_kib": 427624
+    },
+    "preview_cache_observation": {
+      "cold_us": 75188,
+      "cached_us": 91,
+      "identical_arc": true,
+      "appearance_invalidated": true
+    },
+    "cache_scope": "session memory; 100 small thumbnails and 3 full previews; bounded current-result UI projection",
+    "invalidation": "saved page identity/revision/appearance and source path/device/inode/size/mtime; stale UI generations still rejected",
+    "first_render_improvement": "opt-level 2 only for stack-render/image in dev/test; unused initial offscreen row removed",
+    "text_status": "read-only current searchable page count; no OCR body copied to UI",
+    "search_limits": "ordinary desktop import neither runs OCR nor extracts embedded PDF text; existing compatible phone OCR searchable",
+    "source_hashes_match": true,
+    "visual": {
+      "synthetic_only": true,
+      "private_material_opened": false,
+      "manifest_unchanged": true,
+      "originals_unchanged": true,
+      "journal_entries": 16,
+      "native_exit_status": 0,
+      "native_window_size": [
+        1080,
+        860
+      ],
+      "native_backend": "COSMIC/wgpu, own nonce-identified test window",
+      "theme": "installed user COSMIC theme copied to isolated config",
+      "interaction": "route injection and actual native frame readback; no physical input claim",
+      "inspected": [
+        "01-library.png",
+        "02-viewer.png",
+        "03-edit-information.png"
+      ],
+      "captures": {
+        "01-library.png": "88588f6c2f6c2a405d7a1a9ecdbb558d10591667ffc336d947dae178082b947c",
+        "02-viewer.png": "f4cbe1983b0ab19c167e5b3bdc21cafcf4fbc523e08577854be285bb02a7cbe9",
+        "03-edit-information.png": "7617efe47a26aa66e72f41b956d4a47bf36fecaf9440929d6d823b63222e4a70",
+        "04-edit-details.png": "223205e7e401aa1dcbcb1fb74fc256939274c30ceb0eb0aa9321b752071b0113",
+        "05-edit-pages.png": "ef1718a5f663fff2b6b4eb3265ffa92ec4051264ad85028d58f93c1dd3c0a602"
+      },
+      "binary_sha256": "171820cc7054deed6bc3c0f74e5625e239eeb94c3281048d3e6bacf7c7652837",
+      "native_capture_dir": "/tmp/stack-ui-followup/final-native"
+    },
+    "phone_transfer_guide": "docs/STACK_DESKTOP_PHONE_TRANSFER.md",
+    "private_phone_data_opened": false,
+    "sync_implemented": false,
+    "remaining_sync_stages": [
+      "M3 causal merge",
+      "M4 desktop file exchange",
+      "M5 Android exchange",
+      "M6 paired LAN transfer"
+    ],
+    "intermediate_reports": [
+      "/tmp/stack-ui-followup/checks/report.json",
+      "/tmp/stack-ui-followup/optimized-checks/report.json"
+    ],
+    "full_user_m2_interaction_acceptance": false
+  },
+  "import_menu_feedback": {
+    "base": "6dd5ee5",
+    "cause": "modal backup menu intercepts outside clicks; user confirms Escape restores input",
+    "fixes": [
+      "outside-click menu dismissal",
+      "native animated import indicator and phase/status text",
+      "review actions in accessible native flex row with stable commit ID",
+      "no idle review polling"
+    ],
+    "private_inspection_scope": "process metadata, aggregate desktop counts and staging-marker existence only",
+    "private_archive_opened_or_import_repeated": false,
+    "regression": "full-shell outside menu press, intervening progress tick and release; real commit gated before publication; repeated commit ignored; saved count verified",
+    "expected_original_failure": "/tmp/stack-import-feedback/original-modal-regression.log",
+    "headless_checks": {
+      "fmt": {
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit_code": 0,
+        "seconds": 0.365
+      },
+      "check": {
+        "command": [
+          "cargo",
+          "check",
+          "--workspace",
+          "--locked",
+          "--offline"
+        ],
+        "exit_code": 0,
+        "seconds": 1.568
+      },
+      "clippy": {
+        "command": [
+          "cargo",
+          "clippy",
+          "--workspace",
+          "--all-targets",
+          "--locked",
+          "--offline",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "seconds": 1.818
+      },
+      "build": {
+        "command": [
+          "cargo",
+          "build",
+          "--workspace",
+          "--locked",
+          "--offline"
+        ],
+        "exit_code": 0,
+        "seconds": 6.63
+      },
+      "test": {
+        "command": [
+          "cargo",
+          "test",
+          "--workspace",
+          "--locked",
+          "--offline",
+          "--",
+          "--include-ignored",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "seconds": 87.139
+      },
+      "counts": {
+        "command": [
+          "cargo",
+          "test",
+          "-p",
+          "stack-desktop",
+          "--locked",
+          "--offline",
+          "application_maximum_counts_import_search_and_worker_responsiveness",
+          "--",
+          "--include-ignored",
+          "--nocapture"
+        ],
+        "exit_code": 0,
+        "seconds": 43.743
+      },
+      "software": {
+        "command": [
+          "cargo",
+          "check",
+          "-p",
+          "stack-desktop",
+          "--no-default-features",
+          "--locked",
+          "--offline"
+        ],
+        "exit_code": 0,
+        "seconds": 1.267
+      },
+      "portal_protocol": {
+        "command": [
+          "/usr/bin/python3",
+          "/home/charlie.day/Projects/Stack/desktop/tools/test_m2_portal_protocol.py",
+          "--output",
+          "/tmp/stack-import-feedback/final-checks/portal"
+        ],
+        "exit_code": 0,
+        "seconds": 16.751
+      }
+    },
+    "tests": {
+      "passed": 50,
+      "failed": 0,
+      "ignored": 0
+    },
+    "performance_acceptance": "unmet; do not substitute the previous revision pass",
+    "performance_targets": {
+      "empty_initial_browse_ms": {
+        "actual": 25,
+        "maximum": 500,
+        "met": true
+      },
+      "cancel_dispatch_us": {
+        "actual": 28,
+        "maximum": 1000,
+        "met": true
+      },
+      "cancel_cleanup_ms": {
+        "actual": 23,
+        "maximum": 1000,
+        "met": true
+      },
+      "stage_review_ms": {
+        "actual": 15222,
+        "maximum": 30000,
+        "met": true
+      },
+      "commit_browse_ms": {
+        "actual": 16758,
+        "maximum": 30000,
+        "met": true
+      },
+      "first_results_page_layout_draw_ms": {
+        "actual": 171,
+        "maximum": 150,
+        "met": false
+      },
+      "results_page_scroll_draw_ms": {
+        "actual": 0,
+        "maximum": 50,
+        "met": true
+      },
+      "debounced_search_ms": {
+        "actual": 2457,
+        "maximum": 5000,
+        "met": true
+      },
+      "executor_max_tick_gap_us": {
+        "actual": 178312,
+        "maximum": 150000,
+        "met": false
+      },
+      "process_peak_rss_kib": {
+        "actual": 429700,
+        "maximum": 524288,
+        "met": true
+      }
+    },
+    "report": "/tmp/stack-import-feedback/final-checks/report.json",
+    "source_hashes_match": true,
+    "headless_busy_widget_captures": "/tmp/stack-import-feedback/widget-captures",
+    "earlier_native_workflow_report": "/tmp/stack-import-feedback/native-workflow/report.json",
+    "native_workflow_binary_current": true,
+    "native_workflow_scope": "older synthetic color/Unicode fixtures; completed/closed before renewed headless-only instruction; no new readable-PDF appearance claim",
+    "future_agent_tests": "headless; user questions/review only at end",
+    "remaining_playbook": "docs/STACK_DESKTOP_REMAINING_PLAYBOOK.md",
+    "kickoff_prompt": "docs/STACK_DESKTOP_REMAINING_START_PROMPT.md",
+    "later_stages_implemented_by_this_increment": false
+  },
+  "remaining_r1_r2_closeout": {
+    "status": "engineering_delivered_native_user_acceptance_pending",
+    "results": "REMAINING_RESULTS.json",
+    "evidence": "REMAINING_EVIDENCE.md",
+    "full_workspace_tests": 64,
+    "additional_core_guard_regression": true,
+    "fresh_performance_targets_met": 10,
+    "first_results_page_layout_draw_ms": 122,
+    "executor_max_tick_gap_us": 124739,
+    "process_peak_rss_kib": 430832,
+    "private_portal_requests_passed": 6,
+    "m1_sigkill_cases_passed": 13,
+    "offline_English_text_real_repository_worker_UI_search": true,
+    "native_user_acceptance": false,
+    "android_or_LAN_sync_claim": false
+  }
+}

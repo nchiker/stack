@@ -1,0 +1,7 @@
+INSTRUMENTATION_STATUS: stream=PASS 1: Production All documents/query survives activity finish/relaunch; deleted stack filter falls back to live library instead of hiding documents
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+PASS: 1 scanner check groups; synthetic data only.
+
+INSTRUMENTATION_CODE: -1

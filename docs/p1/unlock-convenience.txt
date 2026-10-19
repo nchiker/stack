@@ -1,0 +1,16 @@
+INSTRUMENTATION_STATUS: stream=PASS 1: Fixed SQL Newest/Name ordering: case-insensitive names, deterministic ties, newest default/invalid mode fallback, query/stack composition; isolated synthetic documents
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS 2: Production sort chooser, visible Name indicator and actual document rows; persistent selection through recreation; Home Recent remains newest at 320 dp / 1x text; synthetic view captures
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS 3: Production sort chooser, visible Name indicator and actual document rows; persistent selection through recreation; Home Recent remains newest at 320 dp / 2x text; synthetic view captures
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: stream=PASS 4: Successful local backup date persists across instrumentation process restart and is displayed when Backup & restore reopens
+
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+PASS: 4 scanner check groups; synthetic data only.
+
+INSTRUMENTATION_CODE: -1

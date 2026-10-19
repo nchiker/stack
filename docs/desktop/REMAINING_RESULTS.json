@@ -1,0 +1,273 @@
+{
+  "checkpoint": "R1/R2 engineering plus experimental R3/R4 foundation",
+  "status": "engineering_checks_passed_user_and_later_stage_gates_open",
+  "source_base": "fe07fad4d12a7ef87acda958a09273215c058b65",
+  "full_workspace_tests": {
+    "passed": 64,
+    "failed": 0,
+    "ignored": 0
+  },
+  "headless": true,
+  "private_inputs_used": false,
+  "native_or_primary_phone_acceptance": false,
+  "checks": {
+    "fmt": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.415
+    },
+    "check": {
+      "command": [
+        "cargo",
+        "check",
+        "--workspace",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "seconds": 1.167
+    },
+    "clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 2.018
+    },
+    "build": {
+      "command": [
+        "cargo",
+        "build",
+        "--workspace",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "seconds": 7.586
+    },
+    "test": {
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked",
+        "--offline",
+        "--",
+        "--include-ignored",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 116.939
+    },
+    "counts": {
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "stack-desktop",
+        "--locked",
+        "--offline",
+        "application_maximum_counts_import_search_and_worker_responsiveness",
+        "--",
+        "--include-ignored",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "seconds": 44.621
+    },
+    "software": {
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "stack-desktop",
+        "--no-default-features",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "seconds": 9.338
+    },
+    "portal_protocol": {
+      "command": [
+        "/usr/bin/python3",
+        "/home/charlie.day/Projects/Stack/desktop/tools/test_m2_portal_protocol.py",
+        "--output",
+        "/tmp/stack-remaining-foundation-20261018-final/portal"
+      ],
+      "exit_code": 1,
+      "seconds": 0.165
+    }
+  },
+  "portal_retry": {
+    "headless": true,
+    "backend": "private synthetic D-Bus FileChooser",
+    "requests": [
+      {
+        "method": "OpenFile",
+        "title": "Import documents",
+        "multiple": true,
+        "uri_count": 0,
+        "parented": false
+      },
+      {
+        "method": "OpenFile",
+        "title": "Import documents",
+        "multiple": true,
+        "uri_count": 4,
+        "parented": false
+      },
+      {
+        "method": "SaveFile",
+        "title": "Export full portable library archive",
+        "multiple": false,
+        "uri_count": 1,
+        "parented": false
+      },
+      {
+        "method": "OpenFile",
+        "title": "Review a Stack archive",
+        "multiple": false,
+        "uri_count": 1,
+        "parented": false
+      },
+      {
+        "method": "OpenFile",
+        "title": "Review a Stack archive",
+        "multiple": false,
+        "uri_count": 1,
+        "parented": false
+      },
+      {
+        "method": "SaveFile",
+        "title": "Export saved document as PDF",
+        "multiple": false,
+        "uri_count": 1,
+        "parented": false
+      }
+    ],
+    "failures": [],
+    "application_exit": 0,
+    "status": "passed"
+  },
+  "performance": {
+    "empty_initial_browse_ms": {
+      "actual": 39,
+      "maximum": 500,
+      "met": true
+    },
+    "cancel_dispatch_us": {
+      "actual": 9,
+      "maximum": 1000,
+      "met": true
+    },
+    "cancel_cleanup_ms": {
+      "actual": 24,
+      "maximum": 1000,
+      "met": true
+    },
+    "stage_review_ms": {
+      "actual": 14176,
+      "maximum": 30000,
+      "met": true
+    },
+    "commit_browse_ms": {
+      "actual": 16628,
+      "maximum": 30000,
+      "met": true
+    },
+    "first_results_page_layout_draw_ms": {
+      "actual": 122,
+      "maximum": 150,
+      "met": true
+    },
+    "results_page_scroll_draw_ms": {
+      "actual": 0,
+      "maximum": 50,
+      "met": true
+    },
+    "debounced_search_ms": {
+      "actual": 2168,
+      "maximum": 5000,
+      "met": true
+    },
+    "executor_max_tick_gap_us": {
+      "actual": 124739,
+      "maximum": 150000,
+      "met": true
+    },
+    "process_peak_rss_kib": {
+      "actual": 430832,
+      "maximum": 524288,
+      "met": true
+    }
+  },
+  "performance_scope": "Fresh debug headless process. Earlier workspace RSS is cumulative; native compositor/release timing unmeasured.",
+  "m1_process_stop_cases": 13,
+  "m1_java_scope": "Host production Java metadata validator/writer and digest; Android source decoding, SQLite restore and device runtime excluded.",
+  "java_causal_golden": {
+    "status": "passed",
+    "cases": 5,
+    "android_runtime": false,
+    "source_sha256": {
+      "app/src/main/java/org/stackdocs/app/ArchiveJson.java": "242159452e044606599fc98239d0ea2be05abd3573989674f7ca0f6785cf063a",
+      "app/src/main/java/org/stackdocs/app/SyncProtocol.java": "7eb0506671bbe25ce88ee2aa84b53bf374d66c55db3b1e2dd14fbea768a8efe9",
+      "desktop/tools/java/SyncGolden.java": "e2099ab5f45b767a390456f779dfbbfed51cdc89839827eb25c35b0381cca586"
+    },
+    "golden_sha256": "503509aabb55f04e0f8e08373a48ee421a1702e8b38204685d33e5da92e0c5d5",
+    "qualification": "Host JVM with pinned AOSP JSON classes; no Android database, renderer, lock or lifecycle evidence"
+  },
+  "followup_core_tests": {
+    "passed": 23,
+    "failed": 0,
+    "ignored": 0,
+    "reason": "Added tombstone guard to an invalid provisional sync graph after full suite; normal non-adopted M2 path unchanged",
+    "log": "/tmp/stack-sync-tombstone-recheck.log"
+  },
+  "artifact": "/tmp/stack-desktop-foundation-package-20261018",
+  "artifact_qualification": "Prepared debug package; isolated install/uninstall preserves library; dependency notice gaps and later sync stages prevent final release qualification",
+  "stages": {
+    "R1": "engineering_delivered_user_acceptance_pending",
+    "R2": "implemented_offline_English_real_worker_UI_path_passed",
+    "R3": "experimental_subset_full_mapping_ordering_review_and_recovery_gates_open",
+    "R4": "preliminary_real_files_package_smoke_passed_full_gate_open",
+    "R5": "Java_host_kernel_only_Android_runtime_integration_pending",
+    "R6": "not_implemented",
+    "R7": "pending"
+  },
+  "evidence_root": "/tmp/stack-remaining-foundation-20261018-final",
+  "source_changes_after_full_suite": {
+    "crates/stack-core/src/sync.rs": {
+      "then": "3f88457c59bd4756f9b5016c43e5dc87ad1f7e511733544c8cac6ea34107b540",
+      "now": "ecff4bcabda208754017d38f7d1ada691daccc7c58f1c13e1517b9bf07c372f5"
+    },
+    "tools/install_desktop.py": {
+      "then": "c926b0f4497553aa4f66df5e65cede9cce8c281c8b7d8118db08a2e2699f63bf",
+      "now": "526ba697d159f1cdc6aa9b83193112e9fca8bde4852f5932ed4d40e12b93d8dd"
+    },
+    "tools/package_desktop.py": {
+      "then": "51ca72e5372f4ad887e466a259c531cb36d276acc91040f89987ca5c5bc838d7",
+      "now": "dbb97619aced5a34184091b9258a56b2dd7606941a854016c0feb04ed7ebf33d"
+    }
+  },
+  "unresolved": [
+    "Full native visual/physical keyboard/AT-SPI/chooser observation",
+    "Existing-library reviewed source mappings and complete causal graph semantics/native conflict UI",
+    "Android authoritative journaling/apply/exchange with disposable runtime proof",
+    "Authenticated paired LAN transport",
+    "Release notice/source obligations and integrated release verification"
+  ]
+}

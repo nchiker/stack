@@ -1,0 +1,572 @@
+{
+  "production": {
+    "version": "0.8.3-dev",
+    "code": 16,
+    "schema": 7,
+    "archive": 2,
+    "implementation_commit": "6d788a6",
+    "before": {
+      "docs": "7",
+      "pages": "13",
+      "stacks": "9",
+      "memberships": "11",
+      "metadata_sha256": "5f0212a48f6b36de3310c59bd7324c9bc24a337031a37c9f58fb2bc9bbf518b0",
+      "p1_authoritative_drafts_sha256": "f086921d6bdf26a83b936bb186025780f4eb2cc9d35ee269c57e2c06cb1993e6",
+      "saved_ocr_sha256": "dbfaf11e1bba77286b46602f1015acffbac7495be0cd7cdba24236f98fa451c8",
+      "originals_draft_recovery_sha256": "4d13189cfb71b84715bde9c5d2df1c4408a10654cd00cddf328f7763bee0b51f",
+      "photos_opt_in": "false",
+      "lock_enabled": "false",
+      "notifications_opt_in": "false",
+      "succeeded": "13"
+    },
+    "after": {
+      "docs": "7",
+      "pages": "13",
+      "stacks": "9",
+      "memberships": "11",
+      "metadata_sha256": "5f0212a48f6b36de3310c59bd7324c9bc24a337031a37c9f58fb2bc9bbf518b0",
+      "p1_authoritative_drafts_sha256": "f086921d6bdf26a83b936bb186025780f4eb2cc9d35ee269c57e2c06cb1993e6",
+      "saved_ocr_sha256": "dbfaf11e1bba77286b46602f1015acffbac7495be0cd7cdba24236f98fa451c8",
+      "originals_draft_recovery_sha256": "4d13189cfb71b84715bde9c5d2df1c4408a10654cd00cddf328f7763bee0b51f",
+      "photos_opt_in": "false",
+      "lock_enabled": "false",
+      "notifications_opt_in": "false",
+      "succeeded": "13"
+    },
+    "exact_match": true,
+    "apk_sha256": "116f1ac05811e80bd9ceac91d35ba4c9665f067f6287dfc4cb662adf2a178528",
+    "apk_bytes": 31408470,
+    "signer_sha256": "db7352c8df2d3643ae9dc119ffd73ee26a700808d53efad3cf60a753e620eeab",
+    "canonical_install": "adb install -r; Success",
+    "migration_not_imported": true,
+    "canonical_test_apk_removed": true,
+    "reopened": true,
+    "new_opt_ins_off": true,
+    "installed_apk_matches_build": true,
+    "lint_errors": 0,
+    "lint_warnings": 15,
+    "debug_release_static_audits_passed": true,
+    "build": "Offline debug/test/unsigned release/lint; original ANDROID_USER_HOME; no stackChecks"
+  },
+  "affected_suites": {
+    "p1Ui": 5,
+    "workflowUi": 3,
+    "suggestionUi": 1,
+    "backupLayout": 2,
+    "p1Only": 8,
+    "navigationOnly": 1,
+    "googleMigration": 1,
+    "p1Corpus": 1
+  },
+  "affected_suite_groups": 22,
+  "host_migration_tests": 8,
+  "all_passed": true,
+  "visual_review": {
+    "reviewer": "implementation agent",
+    "scope": "41 current synthetic production View.draw captures at narrow/2x text/landscape, including rename and active-filter/Home. Changed Details/Home/filter/Settings/rename reviewed; unchanged screens retain prior agent review. Images outside Git.",
+    "findings": "Actual suggested labels/values and Add manually are inline beside saved values. Large-text manual action stacks below heading; longer values remain scrollable. Filter/settings badges match, shared icon glyphs readable, Settings concise. No personal screenshot or human acceptance claim."
+  },
+  "failures_repaired": [
+    "First UI run interrupted by original Google Stack foreground interaction; restarted disposable process.",
+    "New dialog capture helper cast a themed context to Activity; fixed density calculation and reran.",
+    "New findDescription helper needed a null content-description guard; repaired; UI passed with bounded monitors/editor-finish sequencing.",
+    "New rendered-OCR labeled-field check initially found 6/8 values: blank OCR separators prevented next-line fields. Bounded whitespace skipping repaired; source/actual OCR checks now find all 8.",
+    "Host preservation wrapper initially omitted -r while expecting raw instrumentation result; stopped before update. Corrected and fresh before/after probes passed.",
+    "Temporary diagnostic host javac version exceeded d8 support; compiled with --release 17.",
+    "One device-command request was not executed because automatic approval review hit a service usage limit; same approval path succeeded after user resume."
+  ],
+  "migration_preparation": {
+    "imported_labels": 105,
+    "unmapped_auxiliary_relations": 43,
+    "outer_whitespace_titles_normalized": 2,
+    "saved_details": 318,
+    "excluded_relations": 53,
+    "removed_details": 1,
+    "empty_source_details_preserved": 1,
+    "documents": 145,
+    "pages": 232,
+    "stacks": 17,
+    "memberships": 218,
+    "notes": 0,
+    "retained_jpeg_files": 232,
+    "manifest_detail_rows": 767,
+    "original_files": 377,
+    "archive_bytes": 198485169
+  },
+  "migration_actual_preparation_audit": {
+    "archive_envelope_and_all_original_hashes": true,
+    "all_source_titles_notes_and_detail_values_compared": true,
+    "current_membership_set_exact": true,
+    "documents": 145,
+    "pages": 232,
+    "stacks": 17,
+    "memberships": 218,
+    "original_files": 377,
+    "archive_bytes": 198485169,
+    "no_library_import_performed": true,
+    "time_zone_phone_confirmed": "America/New_York",
+    "scope": "Actual user-authorized migration preparation audit; no private-data restore test or personal content logs"
+  },
+  "captures": [
+    {
+      "name": "BatchActivity-landscape.png",
+      "pixels": [
+        1650,
+        880
+      ],
+      "sha256": "298803bbe7e182f6292d18dc515254bd0323f156acb6ace0c65655a3439a73f5"
+    },
+    {
+      "name": "BatchActivity-large-text.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "98d155fcc87062c7e6af850eba49bfd8fb18d2bd63f7a331ad4bf6f2db48debd"
+    },
+    {
+      "name": "BatchActivity-narrow.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "3837a90e9a099cc45e3b969f12ff6d3d38525d70ebde4af82b469c144da315c6"
+    },
+    {
+      "name": "MainActivity-landscape.png",
+      "pixels": [
+        1650,
+        880
+      ],
+      "sha256": "0694236c3dacc13337a9dd0e6f3726b19c99e8079789e4422bbcebb6777cb815"
+    },
+    {
+      "name": "MainActivity-large-text.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "f049f42c32d6bb61df4e5a82e96ee29ab635b42c373cd5c9c40b199d17810159"
+    },
+    {
+      "name": "MainActivity-narrow.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "ceb307e9429de1baf06d8f8c5499ba4c3c659343837e1b1d768beb786e7776f9"
+    },
+    {
+      "name": "SettingsActivity-landscape.png",
+      "pixels": [
+        1650,
+        880
+      ],
+      "sha256": "b6738bc34954e69c7e1fbe9c8aabc8d6015c81edf5dd0b4d73144d1320b14423"
+    },
+    {
+      "name": "SettingsActivity-large-text.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "1f20d35969cbe4e71eac74cbddabc9f1a8b309a598d8c3beeefe955c3605a606"
+    },
+    {
+      "name": "SettingsActivity-narrow.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "48ebcb4528b530de26faa06cc359cc15ce4f2ba209f6309dbf12dee7d3c32fc0"
+    },
+    {
+      "name": "detail-editor-landscape.png",
+      "pixels": [
+        1650,
+        880
+      ],
+      "sha256": "b3c7c8f7d43e118446ceda76208cde4efe969c64df071c5a03a66a0e7900ba5e"
+    },
+    {
+      "name": "detail-editor-large-text.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "ff8cf116bea126353fa02fbd491554686a0b43224285d4139bfed944c52ae957"
+    },
+    {
+      "name": "detail-editor-narrow.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "4a2142f665542b4c4a287d0d93de8a82ae994c2e57232d2aebb6f761fe005d7b"
+    },
+    {
+      "name": "details-landscape.png",
+      "pixels": [
+        1650,
+        880
+      ],
+      "sha256": "85aa04334e34deb64e889b86335f7259befe7a2f0cd765405a8cfa3d6daeec25"
+    },
+    {
+      "name": "details-large-text.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "64ad8d2eeeb564c6360514bc45c391871eaa9ff8c23401a40092a1735be328ce"
+    },
+    {
+      "name": "details-narrow.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "6cc16f4eaecd7460bf1d1dbdb100221cc6659df039daad68e94b4b7b42b77999"
+    },
+    {
+      "name": "library-filter-active-narrow.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "295e38ebb85ee0351e8228395ddd415c6e9b1b1023e3b825ceeb4e55d999e263"
+    },
+    {
+      "name": "library-home-narrow.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "ceb307e9429de1baf06d8f8c5499ba4c3c659343837e1b1d768beb786e7776f9"
+    },
+    {
+      "name": "lock-landscape.png",
+      "pixels": [
+        1080,
+        2340
+      ],
+      "sha256": "9f1cf5e95374be1b08a29c52aa4beec231ad23f4e492ca93708db2d4fec57140"
+    },
+    {
+      "name": "lock-large-text.png",
+      "pixels": [
+        1080,
+        2340
+      ],
+      "sha256": "8884ac7e851c7e6499266c9168a7f68c2b1303ed3ad68d18802b8bda344161b1"
+    },
+    {
+      "name": "lock-narrow.png",
+      "pixels": [
+        1080,
+        2340
+      ],
+      "sha256": "9f1cf5e95374be1b08a29c52aa4beec231ad23f4e492ca93708db2d4fec57140"
+    },
+    {
+      "name": "notes-editor-landscape.png",
+      "pixels": [
+        1650,
+        880
+      ],
+      "sha256": "190f69fbd7429146af49edb6e78ea505e09145d5c1e9e1dc69105fdbef6837df"
+    },
+    {
+      "name": "notes-editor-large-text.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "8dbea492140772d5aad1cb002b6b89a762b0e7544e46ee03d4be40c46d36efa7"
+    },
+    {
+      "name": "notes-editor-narrow.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "5f434e9b6eabb01f91ae374651a9301e410bbde01bedc24031765be5212cace0"
+    },
+    {
+      "name": "pdf-chooser-landscape.png",
+      "pixels": [
+        1650,
+        880
+      ],
+      "sha256": "aae0e3b9ef8760053dbedecfd5e65fb0a766e22d97b86ad7313b938f736fc2d8"
+    },
+    {
+      "name": "pdf-chooser-large-text.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "2181620cff01235ee983993ef620ba58ff1b0e132cfbfced0d1527df6d9813b6"
+    },
+    {
+      "name": "pdf-chooser-narrow.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "eabd678b07b13890683397037f94ef5f6bb0e864ab4eba55943763dde928a72f"
+    },
+    {
+      "name": "proposals-landscape.png",
+      "pixels": [
+        1650,
+        880
+      ],
+      "sha256": "c0a5bebd3aa9168c376e9057a764d34239704e4f97cb4b04736493415a82369f"
+    },
+    {
+      "name": "proposals-large-text.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "8c4cff3cc335cc00c8ea8db45661eaadb81c0d74aa0a47b8c042ec3a7dc27645"
+    },
+    {
+      "name": "proposals-narrow.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "b991edc6e1a4f27f1441c5e82623c93d0849b97a0aeaf8bf9e41671fc467c652"
+    },
+    {
+      "name": "rename-landscape.png",
+      "pixels": [
+        1072,
+        696
+      ],
+      "sha256": "97e52c3fa6423f994b3eb76e92ed7d5825a9c8b8dd0ab97633807f33c5c21752"
+    },
+    {
+      "name": "rename-large-text.png",
+      "pixels": [
+        880,
+        976
+      ],
+      "sha256": "5f48295eb1258fc50a8fdde3c6a483ba185a42521fb53840d59468586e3f08f0"
+    },
+    {
+      "name": "rename-narrow.png",
+      "pixels": [
+        836,
+        696
+      ],
+      "sha256": "91efe31793d22e0363b068c3c986739e0f862c8f0405760b187b82a46efdaea1"
+    },
+    {
+      "name": "settings-bottom-landscape.png",
+      "pixels": [
+        1650,
+        880
+      ],
+      "sha256": "97f4b4241dbfb967f1af93f35f50a524f5e8e13d1ba0f2cbcb567f71d102f5ff"
+    },
+    {
+      "name": "settings-bottom-large-text.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "1f20d35969cbe4e71eac74cbddabc9f1a8b309a598d8c3beeefe955c3605a606"
+    },
+    {
+      "name": "settings-bottom-narrow.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "48ebcb4528b530de26faa06cc359cc15ce4f2ba209f6309dbf12dee7d3c32fc0"
+    },
+    {
+      "name": "viewer-reading-landscape.png",
+      "pixels": [
+        1650,
+        880
+      ],
+      "sha256": "1b1a9685c60fec81a2f2bf2976b14e7131a541da722953ea7fbb86a3a6166bd3"
+    },
+    {
+      "name": "viewer-reading-large-text.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "9722afbc387652d29bd2322fa283e988d22ad44411711f571dcfb953bb0ed105"
+    },
+    {
+      "name": "viewer-reading-narrow.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "41eb002a3186dc2925b45efea384ad9f5a1971875ad9f2940b0b75fc7d28d3de"
+    },
+    {
+      "name": "viewer-zoom-landscape.png",
+      "pixels": [
+        1650,
+        880
+      ],
+      "sha256": "73e58d913e3ff6cfd6572fcce4cdc024b0dc6e6c8c5f86396403a1aeab0bf00b"
+    },
+    {
+      "name": "viewer-zoom-large-text.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "35abdffe9fd1a6dc1982f2644f384a7d4cb850bf9ad65703298bbcf55e5483af"
+    },
+    {
+      "name": "viewer-zoom-narrow.png",
+      "pixels": [
+        880,
+        2340
+      ],
+      "sha256": "a49373975f8363648fa7958d4ee5b13a7d7285afe71100affb51dc98a15da3c4"
+    }
+  ],
+  "previous_delivery": {
+    "version": "0.8.2-dev",
+    "code": 15,
+    "schema": 7,
+    "archive": 2,
+    "implementation_commit": "d6102e9",
+    "before": {
+      "docs": "7",
+      "pages": "13",
+      "stacks": "9",
+      "memberships": "10",
+      "metadata_sha256": "4e02a8c06866520d18599523bdd4c54244e6b21abf1db646126fe534d039dead",
+      "p1_authoritative_drafts_sha256": "f086921d6bdf26a83b936bb186025780f4eb2cc9d35ee269c57e2c06cb1993e6",
+      "saved_ocr_sha256": "dbfaf11e1bba77286b46602f1015acffbac7495be0cd7cdba24236f98fa451c8",
+      "originals_draft_recovery_sha256": "4d13189cfb71b84715bde9c5d2df1c4408a10654cd00cddf328f7763bee0b51f",
+      "photos_opt_in": "false",
+      "lock_enabled": "false",
+      "notifications_opt_in": "false",
+      "succeeded": "13"
+    },
+    "after": {
+      "docs": "7",
+      "pages": "13",
+      "stacks": "9",
+      "memberships": "10",
+      "metadata_sha256": "4e02a8c06866520d18599523bdd4c54244e6b21abf1db646126fe534d039dead",
+      "p1_authoritative_drafts_sha256": "f086921d6bdf26a83b936bb186025780f4eb2cc9d35ee269c57e2c06cb1993e6",
+      "saved_ocr_sha256": "dbfaf11e1bba77286b46602f1015acffbac7495be0cd7cdba24236f98fa451c8",
+      "originals_draft_recovery_sha256": "4d13189cfb71b84715bde9c5d2df1c4408a10654cd00cddf328f7763bee0b51f",
+      "photos_opt_in": "false",
+      "lock_enabled": "false",
+      "notifications_opt_in": "false",
+      "succeeded": "13"
+    },
+    "exact_match": true,
+    "apk_sha256": "3044977853713885877948c5d69177a4f17ae564a86b9412bbbd63560a98f2f7",
+    "apk_bytes": 31392082,
+    "signer_sha256": "db7352c8df2d3643ae9dc119ffd73ee26a700808d53efad3cf60a753e620eeab",
+    "canonical_install": "adb install -r; Success",
+    "migration_not_imported": true,
+    "canonical_test_apk_removed": true,
+    "reopened": true,
+    "new_opt_ins_off": true,
+    "lint_errors": 0,
+    "lint_warnings": 15,
+    "debug_release_static_audits_passed": true
+  },
+  "implementation_commits": {
+    "ui": "d6102e9",
+    "badge": "3272309",
+    "migration_converter": "f37c464",
+    "inline_details_and_reconsider": "3fc5907",
+    "labeled_fields": "6d788a6"
+  },
+  "verification_basis": "Final affected core (8) and original-corpus replay (1) passed after bounded OCR-separator repair. Production UI (5) and Google migration (1) passed on rule 4 before the separator-only repair. Unchanged workflowUi/suggestionUi/backupLayout/navigationOnly retain their actual follow-up passes. Historical 91-group/11-process-stop P1 acceptance evidence was not rerun wholesale.",
+  "suite_logs": {
+    "p1Ui": {
+      "groups": 5,
+      "sha256": "6f7c4617245778defe4ccb2eff755f344219e4b86608e5dbbe73a8c96ae5fb83"
+    },
+    "workflowUi": {
+      "groups": 3,
+      "sha256": "810a61be62ac46471a9a20550dd0d4521101d07497aaedadbf96f54d1b821f33"
+    },
+    "suggestionUi": {
+      "groups": 1,
+      "sha256": "97008620e68726e6321dc9d4f0df4fd2b682b9177c09b8ecfdebd71cd7115be1"
+    },
+    "backupLayout": {
+      "groups": 2,
+      "sha256": "4592322ec8bf8063c51dc64b4407a701ce518ecaaa1afb9a90049a849fed0357"
+    },
+    "p1Only": {
+      "groups": 8,
+      "sha256": "e1843e9f4cedea4fe16ad30c7082c41316754beb8a857968419c79798ef09ada"
+    },
+    "navigationOnly": {
+      "groups": 1,
+      "sha256": "e15c3b2ef47e35b25a018fd08b9c0a30eb04aabaa2a98bd830fea69e22224aae"
+    },
+    "googleMigration": {
+      "groups": 1,
+      "sha256": "f4c5df93ff36af7e628d126e905ced1a76f07c7e306e6af54f233aa7af11fd5a"
+    },
+    "p1Corpus": {
+      "groups": 1,
+      "sha256": "093a61df34fd64a71049207747089e8a20d74af4140cc24a768de365affd5a1b"
+    }
+  },
+  "details_regression": {
+    "rules": "local-details-4",
+    "report": "DETAILS_FOLLOWUP_REGRESSION.json",
+    "scope": "Post-feedback replay of original 20 authored cases; original expectations unchanged, not new blind evaluation. New 8-field source/actual-OCR and 6 abstention cases run in core.",
+    "old_field_types": "Original date/amount/organization source and rendered OCR expectations all match.",
+    "original_all_field_score_limit": "One new Invoice # text proposal in e-address is outside the original frozen expected set; original all-field evaluation scoring is 12 true/1 unmatched/0 missed (92.3077% precision), not a quality claim about the expanded contract."
+  },
+  "actual_record_diagnostic": {
+    "scope": "Read-only current selected document and user-opened source record; no personal values/title/screenshots in evidence, no Apply or library mutation; actual runtime observation, not formal acceptance",
+    "source_visible_saved_fields": 6,
+    "all_six_match_authorized_source_backup": true,
+    "before": {
+      "rule": "local-details-2",
+      "saved": 0,
+      "offered": 0,
+      "cached_candidates": 1,
+      "explicit_rejected_amount": 1
+    },
+    "after": {
+      "rule": "local-details-4",
+      "saved": 0,
+      "offered": 4,
+      "dismissed": 1,
+      "candidate_labels": [
+        "Client #",
+        "Invoice #",
+        "Date (role unknown)",
+        "Patient #",
+        "Total"
+      ],
+      "distinct_labeled_due_amounts": 2
+    },
+    "remaining": "Balance due abstains on two conflicting OCR values. Staff name is not proposed on this record. Total remains explicitly dismissed, available only via reconsider. Original migration preserves all six source fields without inferring new values."
+  },
+  "original_apk_resource_inspection": {
+    "scope": "Read-only public ZIP structure; no new decompilation/code or model reuse",
+    "splits": 2,
+    "recognized_model_asset_extensions": 9,
+    "assets": 158,
+    "native_libraries": 9,
+    "limit": "Presence does not establish extraction model identity/parity or runtime service behavior. Earlier reference audit separately records service annotation responses."
+  },
+  "remaining_acceptance": "Single HANDSON_CHECKLIST.md H1-H8, all pending; full P0/P1 acceptance open. Actual 145-document migration still awaits final decision."
+}

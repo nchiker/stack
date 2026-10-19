@@ -1,0 +1,1623 @@
+{
+  "device": "Pixel 4a",
+  "api": "33",
+  "normalization": "Unicode NFC; normalized line endings; collapsed whitespace; case/digits/punctuation preserved; Levenshtein edits weighted by ground-truth length",
+  "all_synthetic": true,
+  "samples": [
+    {
+      "document": 0,
+      "page": 1,
+      "group": "clean",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 1\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 1\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 497,
+      "sampled_pss_kib": 134776,
+      "source_sha256": "348200d16aca7e82b0756cafc4c2a0b170d4c29107a7d18f264c294ef842697b",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 0,
+      "page": 1,
+      "group": "clean",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 1\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 1\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 654,
+      "sampled_pss_kib": 77379,
+      "source_sha256": "348200d16aca7e82b0756cafc4c2a0b170d4c29107a7d18f264c294ef842697b",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 1,
+      "page": 1,
+      "group": "clean",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 2\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 2\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 439,
+      "sampled_pss_kib": 137450,
+      "source_sha256": "a8d0ea3b2d5809ba8d11ce487b8b0b78b8b9e5226605ef70982d5ebf8fe8ff15",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 1,
+      "page": 1,
+      "group": "clean",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 2\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 2\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 553,
+      "sampled_pss_kib": 137623,
+      "source_sha256": "a8d0ea3b2d5809ba8d11ce487b8b0b78b8b9e5226605ef70982d5ebf8fe8ff15",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 2,
+      "page": 1,
+      "group": "clean",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 3\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 3\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 429,
+      "sampled_pss_kib": 139707,
+      "source_sha256": "0722ff4078ed339ac715e4f9085770e4ca5b156062b3f5c6860b3fd7dd39290d",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 2,
+      "page": 1,
+      "group": "clean",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 3\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 3\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 538,
+      "sampled_pss_kib": 146021,
+      "source_sha256": "0722ff4078ed339ac715e4f9085770e4ca5b156062b3f5c6860b3fd7dd39290d",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 3,
+      "page": 1,
+      "group": "clean",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 4\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 4\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 421,
+      "sampled_pss_kib": 146077,
+      "source_sha256": "adb31b12768b141d8bacb76c0489906795e1f212412c52f2c801065521f7ee43",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 3,
+      "page": 1,
+      "group": "clean",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 4\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 4\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 526,
+      "sampled_pss_kib": 147717,
+      "source_sha256": "adb31b12768b141d8bacb76c0489906795e1f212412c52f2c801065521f7ee43",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 4,
+      "page": 1,
+      "group": "clean",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 5\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 5\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 450,
+      "sampled_pss_kib": 148244,
+      "source_sha256": "9d693a62f6d0e15758cd52e7a33259a2e2538c23d81c6b39a96fcdf39ba50426",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 4,
+      "page": 1,
+      "group": "clean",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 5\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 5\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 529,
+      "sampled_pss_kib": 148665,
+      "source_sha256": "9d693a62f6d0e15758cd52e7a33259a2e2538c23d81c6b39a96fcdf39ba50426",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 5,
+      "page": 1,
+      "group": "clean",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 6\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 6\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 466,
+      "sampled_pss_kib": 148717,
+      "source_sha256": "c1c769335396b8adb5db9fd03407f54d25af7a219ffe0d5916b19a3b1d5322dc",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 5,
+      "page": 1,
+      "group": "clean",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 6\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 6\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 524,
+      "sampled_pss_kib": 148985,
+      "source_sha256": "c1c769335396b8adb5db9fd03407f54d25af7a219ffe0d5916b19a3b1d5322dc",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 6,
+      "page": 1,
+      "group": "clean",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 7\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 7\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 433,
+      "sampled_pss_kib": 149113,
+      "source_sha256": "6c9facb7af79f6c48dbb704b4e27c27a6f31e420c5a171bc870734e2a367a235",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 6,
+      "page": 1,
+      "group": "clean",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 7\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 7\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 523,
+      "sampled_pss_kib": 149177,
+      "source_sha256": "6c9facb7af79f6c48dbb704b4e27c27a6f31e420c5a171bc870734e2a367a235",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 7,
+      "page": 1,
+      "group": "clean",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 8\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 8\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 493,
+      "sampled_pss_kib": 150205,
+      "source_sha256": "b652fbb7584ee71345d9fdde8d2a5746226ba54e9abcee3b958fc9cb162422f5",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 7,
+      "page": 1,
+      "group": "clean",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 8\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 8\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 524,
+      "sampled_pss_kib": 150641,
+      "source_sha256": "b652fbb7584ee71345d9fdde8d2a5746226ba54e9abcee3b958fc9cb162422f5",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 8,
+      "page": 1,
+      "group": "clean",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 9\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 9\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 605,
+      "sampled_pss_kib": 150465,
+      "source_sha256": "0b7c2da12b6ff68a18eec3b5ce4e00c51dc60ec2b433a19abb28d187f6eaf581",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 8,
+      "page": 1,
+      "group": "clean",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 9\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 9\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 534,
+      "sampled_pss_kib": 140888,
+      "source_sha256": "0b7c2da12b6ff68a18eec3b5ce4e00c51dc60ec2b433a19abb28d187f6eaf581",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 257,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 9,
+      "page": 1,
+      "group": "clean",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 10\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 10\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 624,
+      "sampled_pss_kib": 152544,
+      "source_sha256": "610036ca0faf6a9bd33f97f4e4a7482093cc89bee2232a5ee3e3ec7597767b23",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 258,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 9,
+      "page": 1,
+      "group": "clean",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 10\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 10\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 893,
+      "sampled_pss_kib": 153301,
+      "source_sha256": "610036ca0faf6a9bd33f97f4e4a7482093cc89bee2232a5ee3e3ec7597767b23",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 258,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 10,
+      "page": 1,
+      "group": "receipt",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1010\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "",
+      "elapsed_ms": 260,
+      "sampled_pss_kib": 165949,
+      "source_sha256": "7fdd8a32537b87d53a4e758ed4226257d4ab8813bbb5f353d88a66be2afbdce9",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 146,
+        "cer": 1.0,
+        "words": 24,
+        "word_errors": 24,
+        "wer": 1.0
+      }
+    },
+    {
+      "document": 10,
+      "page": 1,
+      "group": "receipt",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1010\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "",
+      "elapsed_ms": 284,
+      "sampled_pss_kib": 149136,
+      "source_sha256": "7fdd8a32537b87d53a4e758ed4226257d4ab8813bbb5f353d88a66be2afbdce9",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 146,
+        "cer": 1.0,
+        "words": 24,
+        "word_errors": 24,
+        "wer": 1.0
+      }
+    },
+    {
+      "document": 11,
+      "page": 1,
+      "group": "receipt",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1011\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "SYNTHETIC MARKET\nReceipt number 1011\nDate 2026-10-16\nApples 3.25\n\nBread 4.50\n\nSubtotal 7.75\n\nTax 0.62\n\nTotal 8.37\n\nPaid by card\n\nThank you for shopping.",
+      "elapsed_ms": 411,
+      "sampled_pss_kib": 149008,
+      "source_sha256": "6adcf37c9a27a91cae4adaaf4600add0cc34b4170814058647b606abd1b1a3e0",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 24,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 11,
+      "page": 1,
+      "group": "receipt",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1011\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "SYNTHETIC MARKET\nReceipt number 1011\nDate 2026-10-16\n\nApples 3.25\n\nBread 4.50\n\nSubtotal 7.75\n\nTax 0.62\n\nTotal 8.37\n\nPaid by card\n\nThank you for shopping.",
+      "elapsed_ms": 468,
+      "sampled_pss_kib": 148964,
+      "source_sha256": "6adcf37c9a27a91cae4adaaf4600add0cc34b4170814058647b606abd1b1a3e0",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 24,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 12,
+      "page": 1,
+      "group": "receipt",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1012\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "",
+      "elapsed_ms": 324,
+      "sampled_pss_kib": 148653,
+      "source_sha256": "a1558ba4541044c1132c3de07fe8a643ead055dcda87e41b01af00475c053a69",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 146,
+        "cer": 1.0,
+        "words": 24,
+        "word_errors": 24,
+        "wer": 1.0
+      }
+    },
+    {
+      "document": 12,
+      "page": 1,
+      "group": "receipt",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1012\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "",
+      "elapsed_ms": 282,
+      "sampled_pss_kib": 149197,
+      "source_sha256": "a1558ba4541044c1132c3de07fe8a643ead055dcda87e41b01af00475c053a69",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 146,
+        "cer": 1.0,
+        "words": 24,
+        "word_errors": 24,
+        "wer": 1.0
+      }
+    },
+    {
+      "document": 13,
+      "page": 1,
+      "group": "receipt",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1013\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "SYNTHETIC MARKET\nReceipt number 1013\nDate 2026-10-16\nApples 3.25\n\nBread 4.50\n\nSubtotal 7.75\n\nTax 0.62\n\nTotal 8.37\n\nPaid by card\n\nThank you for shopping.",
+      "elapsed_ms": 399,
+      "sampled_pss_kib": 149260,
+      "source_sha256": "f83e4df36a90eba99c4b939d4773968f573e5cf079c8b3a22d5b089577eb715f",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 24,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 13,
+      "page": 1,
+      "group": "receipt",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1013\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "SYNTHETIC MARKET\nReceipt number 1013\nDate 2026-10-16\n\nApples 3.25\n\nBread 4.50\n\nSubtotal 7.75\n\nTax 0.62\n\nTotal 8.37\n\nPaid by card\n\nThank you for shopping.",
+      "elapsed_ms": 497,
+      "sampled_pss_kib": 149232,
+      "source_sha256": "f83e4df36a90eba99c4b939d4773968f573e5cf079c8b3a22d5b089577eb715f",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 24,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 14,
+      "page": 1,
+      "group": "receipt",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1014\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "",
+      "elapsed_ms": 255,
+      "sampled_pss_kib": 149205,
+      "source_sha256": "643e07c79e9be02ba450c589fe1619bec656aac4900c159320479d60d9e95999",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 146,
+        "cer": 1.0,
+        "words": 24,
+        "word_errors": 24,
+        "wer": 1.0
+      }
+    },
+    {
+      "document": 14,
+      "page": 1,
+      "group": "receipt",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1014\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "",
+      "elapsed_ms": 258,
+      "sampled_pss_kib": 149248,
+      "source_sha256": "643e07c79e9be02ba450c589fe1619bec656aac4900c159320479d60d9e95999",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 146,
+        "cer": 1.0,
+        "words": 24,
+        "word_errors": 24,
+        "wer": 1.0
+      }
+    },
+    {
+      "document": 15,
+      "page": 1,
+      "group": "receipt",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1015\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "SYNTHETIC MARKET\nReceipt number 1015\nDate 2026-10-16\nApples 3.25\n\nBread 4.50\n\nSubtotal 7.75\n\nTax 0.62\n\nTotal 8.37\n\nPaid by card\n\nThank you for shopping.",
+      "elapsed_ms": 343,
+      "sampled_pss_kib": 149313,
+      "source_sha256": "509982af34a2a0ac30c4109e503d08271030c249ae666823817c3938312dead9",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 24,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 15,
+      "page": 1,
+      "group": "receipt",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1015\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "SYNTHETIC MARKET\nReceipt number 1015\nDate 2026-10-16\n\nApples 3.25\n\nBread 4.50\n\nSubtotal 7.75\n\nTax 0.62\n\nTotal 8.37\n\nPaid by card\n\nThank you for shopping.",
+      "elapsed_ms": 406,
+      "sampled_pss_kib": 149941,
+      "source_sha256": "509982af34a2a0ac30c4109e503d08271030c249ae666823817c3938312dead9",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 24,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 16,
+      "page": 1,
+      "group": "receipt",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1016\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "",
+      "elapsed_ms": 195,
+      "sampled_pss_kib": 166052,
+      "source_sha256": "8f3f84afbf5778631e83a7589457fa4a6378ee5de5389b61dc33015d9dc5b01b",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 146,
+        "cer": 1.0,
+        "words": 24,
+        "word_errors": 24,
+        "wer": 1.0
+      }
+    },
+    {
+      "document": 16,
+      "page": 1,
+      "group": "receipt",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1016\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "",
+      "elapsed_ms": 269,
+      "sampled_pss_kib": 149560,
+      "source_sha256": "8f3f84afbf5778631e83a7589457fa4a6378ee5de5389b61dc33015d9dc5b01b",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 146,
+        "cer": 1.0,
+        "words": 24,
+        "word_errors": 24,
+        "wer": 1.0
+      }
+    },
+    {
+      "document": 17,
+      "page": 1,
+      "group": "receipt",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1017\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "SYNTHETIC MARKET\nReceipt number 1017\nDate 2026-10-16\nApples 3.25\n\nBread 4.50\n\nSubtotal 7.75\n\nTax 0.62\n\nTotal 8.37\n\nPaid by card\n\nThank you for shopping.",
+      "elapsed_ms": 315,
+      "sampled_pss_kib": 149065,
+      "source_sha256": "ff53f1a2f4903093454da0bf17e7fdf3db3305b9da6cafe4d3612fee5f7732c8",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 24,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 17,
+      "page": 1,
+      "group": "receipt",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "SYNTHETIC MARKET\nReceipt number 1017\nDate 2026-10-16\nApples 3.25\nBread 4.50\nSubtotal 7.75\nTax 0.62\nTotal 8.37\nPaid by card\nThank you for shopping.",
+      "actual": "SYNTHETIC MARKET\nReceipt number 1017\nDate 2026-10-16\n\nApples 3.25\n\nBread 4.50\n\nSubtotal 7.75\n\nTax 0.62\n\nTotal 8.37\n\nPaid by card\n\nThank you for shopping.",
+      "elapsed_ms": 410,
+      "sampled_pss_kib": 89153,
+      "source_sha256": "ff53f1a2f4903093454da0bf17e7fdf3db3305b9da6cafe4d3612fee5f7732c8",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 146,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 24,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 18,
+      "page": 1,
+      "group": "form",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "SYNTHETIC REGISTRATION\nReference number 42018\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "actual": "SYNTHETIC REGISTRATION\nReference number 42018\n\nName: Sample Person\n\nAccount: DEMO-2718\n\nPostal code: 10001\n\nAmount due: 123.45\n\nDue date: 2026-11-15\n\nPlease keep this form for your records.",
+      "elapsed_ms": 1034,
+      "sampled_pss_kib": 165481,
+      "source_sha256": "731b9c0a3d501abeb19b154194902f1008c94e9e552f27c092108c655eedc337",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 183,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 26,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 18,
+      "page": 1,
+      "group": "form",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "SYNTHETIC REGISTRATION\nReference number 42018\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "actual": "SYNTHETIC REGISTRATION\nReference number 42018\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "elapsed_ms": 1675,
+      "sampled_pss_kib": 152644,
+      "source_sha256": "731b9c0a3d501abeb19b154194902f1008c94e9e552f27c092108c655eedc337",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 183,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 26,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 19,
+      "page": 1,
+      "group": "form",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "SYNTHETIC REGISTRATION\nReference number 42019\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "actual": "7",
+      "elapsed_ms": 432,
+      "sampled_pss_kib": 170913,
+      "source_sha256": "c3280e3cfa1ec51b72754cc78aa0db3b2d6919ec72bbf62448c1781087f93cd8",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 183,
+        "character_errors": 182,
+        "cer": 0.994535519125683,
+        "words": 26,
+        "word_errors": 26,
+        "wer": 1.0
+      }
+    },
+    {
+      "document": 19,
+      "page": 1,
+      "group": "form",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "SYNTHETIC REGISTRATION\nReference number 42019\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "actual": ":",
+      "elapsed_ms": 580,
+      "sampled_pss_kib": 152878,
+      "source_sha256": "c3280e3cfa1ec51b72754cc78aa0db3b2d6919ec72bbf62448c1781087f93cd8",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 183,
+        "character_errors": 182,
+        "cer": 0.994535519125683,
+        "words": 26,
+        "word_errors": 26,
+        "wer": 1.0
+      }
+    },
+    {
+      "document": 20,
+      "page": 1,
+      "group": "form",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "SYNTHETIC REGISTRATION\nReference number 42020\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "actual": "SYNTHETIC REGISTRATION\nReference number 42020\n\nName: Sample Person\n\nAccount: DEMO-2718\n\nPostal code: 10001\n\nAmount due: 123.45\n\nDue date: 2026-11-15\n\nPlease keep this form for your records.",
+      "elapsed_ms": 1080,
+      "sampled_pss_kib": 153146,
+      "source_sha256": "0ff12daaa728c5d1521d9493f8f4ac252030c3aa402f1dcf02a2366999406fa2",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 183,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 26,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 20,
+      "page": 1,
+      "group": "form",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "SYNTHETIC REGISTRATION\nReference number 42020\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "actual": "SYNTHETIC REGISTRATION\nReference number 42020\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "elapsed_ms": 1891,
+      "sampled_pss_kib": 94250,
+      "source_sha256": "0ff12daaa728c5d1521d9493f8f4ac252030c3aa402f1dcf02a2366999406fa2",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 183,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 26,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 21,
+      "page": 1,
+      "group": "form",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "SYNTHETIC REGISTRATION\nReference number 42021\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "actual": "7",
+      "elapsed_ms": 311,
+      "sampled_pss_kib": 94197,
+      "source_sha256": "2b793e0344a9912c8d3802111b4fceff66e76a256a77eb87bddd6efdcbf6e579",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 183,
+        "character_errors": 182,
+        "cer": 0.994535519125683,
+        "words": 26,
+        "word_errors": 26,
+        "wer": 1.0
+      }
+    },
+    {
+      "document": 21,
+      "page": 1,
+      "group": "form",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "SYNTHETIC REGISTRATION\nReference number 42021\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "actual": "7",
+      "elapsed_ms": 469,
+      "sampled_pss_kib": 108242,
+      "source_sha256": "2b793e0344a9912c8d3802111b4fceff66e76a256a77eb87bddd6efdcbf6e579",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 183,
+        "character_errors": 182,
+        "cer": 0.994535519125683,
+        "words": 26,
+        "word_errors": 26,
+        "wer": 1.0
+      }
+    },
+    {
+      "document": 22,
+      "page": 1,
+      "group": "form",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "SYNTHETIC REGISTRATION\nReference number 42022\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "actual": "SYNTHETIC REGISTRATION\nReference number 42022\n\nName: Sample Person\n\nAccount: DEMO-2718\n\nPostal code: 10001\n\nAmount due: 123.45\n\nDue date: 2026-11-15\n\nPlease keep this form for your records.",
+      "elapsed_ms": 1052,
+      "sampled_pss_kib": 151890,
+      "source_sha256": "7535d4d3ec0b4f34581f7b7e75c1209cbf84b0f4faab26f78af216a54bcee691",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 183,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 26,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 22,
+      "page": 1,
+      "group": "form",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "SYNTHETIC REGISTRATION\nReference number 42022\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "actual": "SYNTHETIC REGISTRATION\nReference number 42022\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "elapsed_ms": 1549,
+      "sampled_pss_kib": 152230,
+      "source_sha256": "7535d4d3ec0b4f34581f7b7e75c1209cbf84b0f4faab26f78af216a54bcee691",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 183,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 26,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 23,
+      "page": 1,
+      "group": "form",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "SYNTHETIC REGISTRATION\nReference number 42023\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "actual": "7",
+      "elapsed_ms": 398,
+      "sampled_pss_kib": 171450,
+      "source_sha256": "f07c617d59b56fb2708c125ad1f636eaa09f19d0fb801c030b9ee044a89643df",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 183,
+        "character_errors": 182,
+        "cer": 0.994535519125683,
+        "words": 26,
+        "word_errors": 26,
+        "wer": 1.0
+      }
+    },
+    {
+      "document": 23,
+      "page": 1,
+      "group": "form",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "SYNTHETIC REGISTRATION\nReference number 42023\nName: Sample Person\nAccount: DEMO-2718\nPostal code: 10001\nAmount due: 123.45\nDue date: 2026-11-15\nPlease keep this form for your records.",
+      "actual": "7",
+      "elapsed_ms": 460,
+      "sampled_pss_kib": 154102,
+      "source_sha256": "f07c617d59b56fb2708c125ad1f636eaa09f19d0fb801c030b9ee044a89643df",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 183,
+        "character_errors": 182,
+        "cer": 0.994535519125683,
+        "words": 26,
+        "word_errors": 26,
+        "wer": 1.0
+      }
+    },
+    {
+      "document": 24,
+      "page": 1,
+      "group": "multipage",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 25\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 25\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 658,
+      "sampled_pss_kib": 135453,
+      "source_sha256": "3b8e8113e63e24b1ea00e63411e1b053a7767e4843dcae5bd4f3a604737baaee",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 258,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 24,
+      "page": 1,
+      "group": "multipage",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "PRINTED ENGLISH SPECIMEN\nDocument number 25\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\nPlease retain the original pages for your records.\nThe total amount is 123.45.\nNo account or network connection is required.",
+      "actual": "PRINTED ENGLISH SPECIMEN\n\nDocument number 25\n\nThe quiet cedar garden receives morning light.\nBlue folders contain invoices and letters.\n\nPlease retain the original pages for your records.\nThe total amount is 123.45.\n\nNo account or network connection is required.",
+      "elapsed_ms": 536,
+      "sampled_pss_kib": 135793,
+      "source_sha256": "3b8e8113e63e24b1ea00e63411e1b053a7767e4843dcae5bd4f3a604737baaee",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 258,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 39,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 24,
+      "page": 2,
+      "group": "multipage",
+      "edge": 1600,
+      "width": 1200,
+      "height": 1600,
+      "truth": "ARCHIVE SECOND PAGE\nA quartz lantern marks sentinel0.\nKeep this printed page in the document.\nThe reference amount is 456.78.",
+      "actual": "ARCHIVE SECOND PAGE\n\nA quartz lantern marks sentinel0.\n\nKeep this printed page in the document.\nThe reference amount is 456.78.",
+      "elapsed_ms": 240,
+      "sampled_pss_kib": 136021,
+      "source_sha256": "3b8e8113e63e24b1ea00e63411e1b053a7767e4843dcae5bd4f3a604737baaee",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 125,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 20,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    },
+    {
+      "document": 24,
+      "page": 2,
+      "group": "multipage",
+      "edge": 2400,
+      "width": 1800,
+      "height": 2400,
+      "truth": "ARCHIVE SECOND PAGE\nA quartz lantern marks sentinel0.\nKeep this printed page in the document.\nThe reference amount is 456.78.",
+      "actual": "ARCHIVE SECOND PAGE\n\nA quartz lantern marks sentinel0.\n\nKeep this printed page in the document.\nThe reference amount is 456.78.",
+      "elapsed_ms": 527,
+      "sampled_pss_kib": 135817,
+      "source_sha256": "3b8e8113e63e24b1ea00e63411e1b053a7767e4843dcae5bd4f3a604737baaee",
+      "model_sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "config": "t4a-4.9.0/tess-5.5.1/eng/7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2/page-renderer-2400-v1",
+      "metrics": {
+        "characters": 125,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 20,
+        "word_errors": 0,
+        "wer": 0.0
+      }
+    }
+  ],
+  "summary": {
+    "1600": {
+      "all": {
+        "characters": 5220,
+        "character_errors": 1130,
+        "cer": 0.2164750957854406,
+        "words": 797,
+        "word_errors": 174,
+        "wer": 0.21831869510664995
+      },
+      "clean": {
+        "characters": 2571,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 390,
+        "word_errors": 0,
+        "wer": 0.0
+      },
+      "difficult": {
+        "characters": 2266,
+        "character_errors": 1130,
+        "cer": 0.49867608120035306,
+        "words": 348,
+        "word_errors": 174,
+        "wer": 0.5
+      },
+      "p50_ms": 429,
+      "p95_ms": 1052
+    },
+    "2400": {
+      "all": {
+        "characters": 5220,
+        "character_errors": 1130,
+        "cer": 0.2164750957854406,
+        "words": 797,
+        "word_errors": 174,
+        "wer": 0.21831869510664995
+      },
+      "clean": {
+        "characters": 2571,
+        "character_errors": 0,
+        "cer": 0.0,
+        "words": 390,
+        "word_errors": 0,
+        "wer": 0.0
+      },
+      "difficult": {
+        "characters": 2266,
+        "character_errors": 1130,
+        "cer": 0.49867608120035306,
+        "words": 348,
+        "word_errors": 174,
+        "wer": 0.5
+      },
+      "p50_ms": 524,
+      "p95_ms": 1675
+    }
+  },
+  "pss_samples": [
+    {
+      "time_monotonic": 64374.369976119,
+      "pss_kib": 24726
+    },
+    {
+      "time_monotonic": 64374.826582609,
+      "pss_kib": 83088
+    },
+    {
+      "time_monotonic": 64375.32681411,
+      "pss_kib": 139560
+    },
+    {
+      "time_monotonic": 64375.799051263,
+      "pss_kib": 161640
+    },
+    {
+      "time_monotonic": 64376.273660267,
+      "pss_kib": 200442
+    },
+    {
+      "time_monotonic": 64376.714496576,
+      "pss_kib": 126554
+    },
+    {
+      "time_monotonic": 64377.176954486,
+      "pss_kib": 182226
+    },
+    {
+      "time_monotonic": 64377.633352341,
+      "pss_kib": 198630
+    },
+    {
+      "time_monotonic": 64378.094955625,
+      "pss_kib": 117886
+    },
+    {
+      "time_monotonic": 64378.539785054,
+      "pss_kib": 179762
+    },
+    {
+      "time_monotonic": 64378.98650613,
+      "pss_kib": 202465
+    },
+    {
+      "time_monotonic": 64379.428080181,
+      "pss_kib": 163193
+    },
+    {
+      "time_monotonic": 64379.876436548,
+      "pss_kib": 190585
+    },
+    {
+      "time_monotonic": 64380.335845732,
+      "pss_kib": 207689
+    },
+    {
+      "time_monotonic": 64380.788518985,
+      "pss_kib": 164645
+    },
+    {
+      "time_monotonic": 64381.258932294,
+      "pss_kib": 194941
+    },
+    {
+      "time_monotonic": 64381.728179386,
+      "pss_kib": 212085
+    },
+    {
+      "time_monotonic": 64382.181143825,
+      "pss_kib": 166365
+    },
+    {
+      "time_monotonic": 64382.633367451,
+      "pss_kib": 193125
+    },
+    {
+      "time_monotonic": 64383.086537144,
+      "pss_kib": 209977
+    },
+    {
+      "time_monotonic": 64383.531708425,
+      "pss_kib": 165913
+    },
+    {
+      "time_monotonic": 64383.997620095,
+      "pss_kib": 193573
+    },
+    {
+      "time_monotonic": 64384.441065807,
+      "pss_kib": 209401
+    },
+    {
+      "time_monotonic": 64384.886946418,
+      "pss_kib": 166297
+    },
+    {
+      "time_monotonic": 64385.333400387,
+      "pss_kib": 171517
+    },
+    {
+      "time_monotonic": 64385.783218625,
+      "pss_kib": 193525
+    },
+    {
+      "time_monotonic": 64386.226249741,
+      "pss_kib": 211505
+    },
+    {
+      "time_monotonic": 64386.678524106,
+      "pss_kib": 170105
+    },
+    {
+      "time_monotonic": 64387.128869254,
+      "pss_kib": 195477
+    },
+    {
+      "time_monotonic": 64387.573114368,
+      "pss_kib": 184209
+    },
+    {
+      "time_monotonic": 64388.023408967,
+      "pss_kib": 185149
+    },
+    {
+      "time_monotonic": 64388.479954864,
+      "pss_kib": 171249
+    },
+    {
+      "time_monotonic": 64388.943458622,
+      "pss_kib": 172929
+    },
+    {
+      "time_monotonic": 64389.401936755,
+      "pss_kib": 180809
+    },
+    {
+      "time_monotonic": 64389.845145518,
+      "pss_kib": 213637
+    },
+    {
+      "time_monotonic": 64390.303206404,
+      "pss_kib": 215545
+    },
+    {
+      "time_monotonic": 64390.746809481,
+      "pss_kib": 166385
+    },
+    {
+      "time_monotonic": 64391.21367447,
+      "pss_kib": 217358
+    },
+    {
+      "time_monotonic": 64391.663223828,
+      "pss_kib": 167102
+    },
+    {
+      "time_monotonic": 64392.119953722,
+      "pss_kib": 175254
+    },
+    {
+      "time_monotonic": 64392.590512701,
+      "pss_kib": 208798
+    },
+    {
+      "time_monotonic": 64393.03691454,
+      "pss_kib": 161294
+    },
+    {
+      "time_monotonic": 64393.514276594,
+      "pss_kib": 199154
+    },
+    {
+      "time_monotonic": 64393.960478468,
+      "pss_kib": 166442
+    },
+    {
+      "time_monotonic": 64394.420468517,
+      "pss_kib": 175346
+    },
+    {
+      "time_monotonic": 64394.883282681,
+      "pss_kib": 210510
+    },
+    {
+      "time_monotonic": 64395.347281569,
+      "pss_kib": 166282
+    },
+    {
+      "time_monotonic": 64395.81645282,
+      "pss_kib": 209186
+    },
+    {
+      "time_monotonic": 64396.227277995,
+      "pss_kib": 166350
+    },
+    {
+      "time_monotonic": 64396.677127834,
+      "pss_kib": 163454
+    },
+    {
+      "time_monotonic": 64397.120202455,
+      "pss_kib": 166810
+    },
+    {
+      "time_monotonic": 64397.596893208,
+      "pss_kib": 190982
+    },
+    {
+      "time_monotonic": 64398.046608144,
+      "pss_kib": 166494
+    },
+    {
+      "time_monotonic": 64398.501665656,
+      "pss_kib": 180094
+    },
+    {
+      "time_monotonic": 64398.976761629,
+      "pss_kib": 204442
+    },
+    {
+      "time_monotonic": 64399.423460233,
+      "pss_kib": 160726
+    },
+    {
+      "time_monotonic": 64399.887304062,
+      "pss_kib": 184406
+    },
+    {
+      "time_monotonic": 64400.332939183,
+      "pss_kib": 173010
+    },
+    {
+      "time_monotonic": 64400.797735275,
+      "pss_kib": 203922
+    },
+    {
+      "time_monotonic": 64401.252031534,
+      "pss_kib": 199926
+    },
+    {
+      "time_monotonic": 64401.698764674,
+      "pss_kib": 200894
+    },
+    {
+      "time_monotonic": 64402.176682469,
+      "pss_kib": 242654
+    },
+    {
+      "time_monotonic": 64402.640951563,
+      "pss_kib": 170346
+    },
+    {
+      "time_monotonic": 64403.094369403,
+      "pss_kib": 188499
+    },
+    {
+      "time_monotonic": 64403.557969401,
+      "pss_kib": 216967
+    },
+    {
+      "time_monotonic": 64404.014274694,
+      "pss_kib": 170263
+    },
+    {
+      "time_monotonic": 64404.477057137,
+      "pss_kib": 190775
+    },
+    {
+      "time_monotonic": 64404.95430173,
+      "pss_kib": 181227
+    },
+    {
+      "time_monotonic": 64405.408645502,
+      "pss_kib": 195078
+    },
+    {
+      "time_monotonic": 64405.860299227,
+      "pss_kib": 201646
+    },
+    {
+      "time_monotonic": 64406.308731365,
+      "pss_kib": 201934
+    },
+    {
+      "time_monotonic": 64406.740331537,
+      "pss_kib": 171402
+    },
+    {
+      "time_monotonic": 64407.181251329,
+      "pss_kib": 111334
+    },
+    {
+      "time_monotonic": 64407.642298617,
+      "pss_kib": 128430
+    },
+    {
+      "time_monotonic": 64408.114486533,
+      "pss_kib": 168414
+    },
+    {
+      "time_monotonic": 64408.592252819,
+      "pss_kib": 125786
+    },
+    {
+      "time_monotonic": 64409.035194572,
+      "pss_kib": 160790
+    },
+    {
+      "time_monotonic": 64409.497479711,
+      "pss_kib": 190346
+    },
+    {
+      "time_monotonic": 64409.946355757,
+      "pss_kib": 195230
+    },
+    {
+      "time_monotonic": 64410.400256903,
+      "pss_kib": 201362
+    },
+    {
+      "time_monotonic": 64410.844528568,
+      "pss_kib": 232106
+    },
+    {
+      "time_monotonic": 64411.26422755,
+      "pss_kib": 169350
+    },
+    {
+      "time_monotonic": 64411.747865266,
+      "pss_kib": 139158
+    },
+    {
+      "time_monotonic": 64412.205499118,
+      "pss_kib": 196814
+    },
+    {
+      "time_monotonic": 64412.654651305,
+      "pss_kib": 144428
+    },
+    {
+      "time_monotonic": 64413.121165785,
+      "pss_kib": 163748
+    },
+    {
+      "time_monotonic": 64413.55353099,
+      "pss_kib": 201756
+    },
+    {
+      "time_monotonic": 64414.026720591,
+      "pss_kib": 167816
+    },
+    {
+      "time_monotonic": 64414.486165383,
+      "pss_kib": 191748
+    }
+  ],
+  "sampled_peak_pss_kib": 242654,
+  "instrumentation_passed": false,
+  "limitation": "Incomplete baseline: aborted after document 24 because fixture queried a different sentinel from the text it drew. First 24 documents are valid paired samples; do not treat this as the completed 30-document corpus."
+}
