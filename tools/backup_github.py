@@ -15,7 +15,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 DENIED_PARTS = {'.git', '.aws', '.codex', '.agents', '.android', '.gradle',
-                'node_modules', 'target', 'build', 'runtime', 'Reference',
+                'node_modules', 'target', 'build', 'Reference',
                 'reference', 'refrence', 'Refrence', '__pycache__'}
 DENIED_SUFFIXES = {'.apk', '.apkm', '.xapk', '.dex', '.smali', '.jks', '.keystore',
                    '.pem', '.key', '.p12', '.pfx', '.db', '.sqlite', '.sqlite3',
@@ -54,6 +54,7 @@ def main():
         if not source.exists():  # Uncommitted deletions remain deleted in backup.
             continue
         if (any(part in DENIED_PARTS for part in relative.parts)
+                or relative.parts[:2] == ('desktop', 'runtime')
                 or source.suffix.lower() in DENIED_SUFFIXES
                 or source.name in {'local.properties', 'hosts.yml', 'credentials', '.env'}
                 or source.name.startswith('.env.')
