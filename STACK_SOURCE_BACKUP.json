@@ -1,7 +1,7 @@
 {
   "format": "org.stackdocs.source-backup",
   "version": 1,
-  "source_base_commit": "67e38fa03d1a5e1c9ba0d826065c934c9b80ef35",
+  "source_base_commit": "b43b789887637cec098e897210bd86acc95e8c97",
   "qualification": "Source checkpoint including unfinished edits; not a verified release or personal document backup",
   "files_sha256": {
     ".gitattributes": "3383d326899ee0a8d15632c00b0f658292aa00127d9617fb83712853ef7250bb",
@@ -482,6 +482,7 @@
     "desktop/tools/test_sync_graph_java.py": "3f1f78df19dde8e18b6e53e39348fdb92f1f4f0848458069ad94af69aee2faab",
     "desktop/tools/test_sync_java.py": "7c681b1a5e13d70a65d715358eb826b6d44be3ccc8dc0aeff82df2b640da2a0e",
     "desktop/tools/test_sync_process_stops.py": "0f1cc233ac86657f24102e6f1b64d4c055bdd805debb9c97d76e88a1d8d5c1f5",
+    "docs/NEXT_SESSION_PROMPT.md": "3e395195aa1afed140abdd0426bf4eb93417e9cb5512a2a19452196bbddaa166",
     "docs/STACK_ANDROID_SIGNING.md": "4a1475f4de28ae0f1a7ffeb287505e458e3cdb6c2c1422c514f85d995d0a9e24",
     "docs/STACK_ARCHIVE_FORMAT.md": "db7262d5423a41bcb065cf54c4065014579cac1d16aff11ac2ecf55651c916ea",
     "docs/STACK_AUTOMATIC_DETAILS.md": "429bb204f69a5d9d9fada8e8cc8a735fcdd3ea4c6b153c5d843ec7d8277c4e86",
