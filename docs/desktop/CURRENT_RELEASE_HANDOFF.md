@@ -19,8 +19,12 @@ source by `desktop/tools/build_flatpak.py`). Local copies are in
 - **Test phone**: Pixel 4a, serial `0A121JEC203530`, signer `e873f2fd…`. No longer
   connected to the desktop; it keeps its own copy of the old library and is free
   for testing.
-- The desktop's previous library (paired with the test phone) is kept, unchanged,
-  at `~/.local/share/org.stackdocs.desktop.before-production-20261022`.
+- The desktop's previous library (paired with the test phone) and an old
+  development install were deleted at the user's request after the switch.
+- The desktop app is the Flatpak only. An old standalone development install
+  (`~/.local/lib/stack-desktop`, its `~/.local/bin/stack` and a launcher with the
+  same desktop-file ID as the Flatpak) had been hijacking the Stack icon; it showed
+  "Sync exchange" pages and could not read current sync state. It is removed.
 - Two adb servers may run: the default one (port 5037) often owns the phones.
   Use `adb -P 5037` if `-P 5693` lists nothing. A udev rule for Google devices is
   in `/etc/udev/rules.d/51-android.rules`.
@@ -72,6 +76,23 @@ in `org.stackdocs.app.checks.autosync`. `desktop/tools/test_android_sync.py
 - Docs: superseded plans and evidence removed (still in git history).
 
 ## Known issues
+
+Next-version fixes the user hit on 2026-10-22:
+
+1. Disconnecting on the phone while it cannot reach the computer leaves the
+   computer paired; the phone then says to use the computer's "Connect phone",
+   which the computer does not show until it is also disconnected.
+2. The desktop's Sync page is reached only through a small "Settings" entry at
+   the bottom of the sidebar; users looked for it elsewhere.
+3. Nothing detects a stale standalone install whose launcher shadows the Flatpak's.
+
+Network: on the GL-BE9300 (Flint 3) router, the phone and laptop could not reach
+each other at all (no ARP) while both used the 6 GHz radio, the phone on the MLO
+network "Asus7"; traffic between bands worked. It cleared after the phone
+restarted and joined "Asus". If "Computer unavailable" returns while the Flatpak
+is running, check 6 GHz/MLO client isolation in LuCI before suspecting Stack.
+
+Other:
 
 - Causal history keeps growing (~2,570 operations; two test renames before the
   fix added ~1,000). The first state parse in each process costs ~1–1.5 s, then it

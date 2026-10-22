@@ -1,7 +1,7 @@
 {
   "format": "org.stackdocs.source-backup",
   "version": 1,
-  "source_base_commit": "4f1c8d59effe3c0dd8e9393dc646c3bbf62e71a3",
+  "source_base_commit": "cb06f992ef233a3c370c9dd05e6be97da5f80067",
   "qualification": "Source checkpoint including unfinished edits; not a verified release or personal document backup",
   "files_sha256": {
     ".gitattributes": "3383d326899ee0a8d15632c00b0f658292aa00127d9617fb83712853ef7250bb",
@@ -489,7 +489,7 @@
     "docs/STACK_ARCHIVE_FORMAT.md": "2e56c0605e140a74618f324ec29541472fea9832b6424fde69a7efe4e2261cbb",
     "docs/STACK_DESKTOP_PHONE_TRANSFER.md": "f55b1da01de4cef2af82315d6890a1def90a2a21e504ee49c7727a8a961e09d6",
     "docs/STACK_SOURCE_BACKUP.md": "ea34902a4e28e9f69aaa21b2bd432b7843c51026260bfec293083428b380ce10",
-    "docs/desktop/CURRENT_RELEASE_HANDOFF.md": "9dba204c566d35121c6eab40d622d8c9246e1e5e5a62213d8d0f0e22a79cf46a",
+    "docs/desktop/CURRENT_RELEASE_HANDOFF.md": "de7efa548bd03dc41547ea9f4fbb12d50b58af7c2d1895fcc8750df1f7180881",
     "docs/desktop/INTEROP_SYNC_PROTOCOL_V1.md": "cdd127cbd59fafd28ae0e0c1b21140c4db3a163a68c9090c0a93c6c1679dd546",
     "docs/desktop/PAIRED_TRANSPORT.md": "73ebd1ceb92ee7b5605304d4bf045c33d17e03a50ebf5212a0e2bb7dedbebb27",
     "gradle.properties": "89414877122a9251c4d1b1e306efc81667ef95c7e0a02cf3ca26351c9b7623e0",
