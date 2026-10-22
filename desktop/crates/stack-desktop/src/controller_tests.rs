@@ -52,8 +52,11 @@ fn sync_settings_exposes_only_connection_and_everyday_actions() {
             let _ = tree;
             driver.app.sync.network.status =
                 serde_json::json!({"enrolled":true,"labels":{"peer_name":"Authored phone"}});
+            // The phone always starts a sync, so the computer offers no "Sync now".
             assert!(
-                !click_workspace(&driver.app, "Sync now", iced::Size::new(1080., 780.)).is_empty()
+                !workspace_labels(&driver.app, iced::Size::new(1080., 780.))
+                    .iter()
+                    .any(|label| label == "Sync now")
             );
             assert!(
                 !click_workspace(&driver.app, "Disconnect", iced::Size::new(1080., 780.))
@@ -132,7 +135,15 @@ fn first_saved_page_thumbnails_refresh_after_reorder_and_ignore_obsolete_results
     if std::env::var_os("STACK_THUMBNAIL_FRESH_PROCESS").is_none() {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
             .args(["--exact", "controller_tests::first_saved_page_thumbnails_refresh_after_reorder_and_ignore_obsolete_results", "--nocapture"])
-            .env("STACK_THUMBNAIL_FRESH_PROCESS", "1").output().unwrap();
+            .env("STACK_THUMBNAIL_FRESH_PROCESS", "1")
+            .env(
+                "STACK_PDFIUM_LIBRARY",
+                std::env::var_os("STACK_PDFIUM_LIBRARY").unwrap_or_else(|| {
+                    concat!(env!("CARGO_MANIFEST_DIR"), "/../../runtime/pdfium/lib/libpdfium.so").into()
+                }),
+            )
+            .output()
+            .unwrap();
         assert!(
             output.status.success(),
             "{}\n{}",
@@ -651,6 +662,25 @@ fn navigation_back_sidebar_and_background_refresh_keep_the_users_location() {
 struct FocusAudit {
     focused: Vec<Option<iced::widget::Id>>,
     total: usize,
+}
+
+fn workspace_labels(app: &Stack, size: iced::Size) -> Vec<String> {
+    let software = iced_tiny_skia::Renderer::new(cosmic::font::default(), iced::Pixels(14.));
+    #[cfg(feature = "gpu")]
+    let mut renderer = cosmic::Renderer::Secondary(software);
+    #[cfg(not(feature = "gpu"))]
+    let mut renderer = software;
+    let ui = iced::runtime::UserInterface::build(
+        app.view(),
+        size,
+        iced::runtime::user_interface::Cache::default(),
+        &mut renderer,
+    );
+    let nodes: Vec<_> = ui.a11y_nodes(iced::mouse::Cursor::Unavailable).into();
+    nodes
+        .iter()
+        .filter_map(|(_, node)| node.label().map(str::to_owned))
+        .collect()
 }
 
 // Pointer events traverse the real native widgets; resulting messages then run
@@ -2246,10 +2276,15 @@ fn application_maximum_counts_import_search_and_worker_responsiveness() {
 #[test]
 fn detail_drafts_quit_choices_and_saved_palette_overrides_are_headless() {
     // Shutdown has one terminal PDFium lifecycle; isolate it from other drivers.
+    // The child also runs without a display, so this passes in a desktop session.
     if std::env::var_os("STACK_DRAFT_CLOSEOUT_FRESH_PROCESS").is_none() {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
             .args(["--exact", "controller_tests::detail_drafts_quit_choices_and_saved_palette_overrides_are_headless", "--nocapture"])
-            .env("STACK_DRAFT_CLOSEOUT_FRESH_PROCESS", "1").output().unwrap();
+            .env("STACK_DRAFT_CLOSEOUT_FRESH_PROCESS", "1")
+            .env_remove("DISPLAY")
+            .env_remove("WAYLAND_DISPLAY")
+            .output()
+            .unwrap();
         assert!(
             output.status.success(),
             "{}\n{}",

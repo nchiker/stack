@@ -24,17 +24,20 @@ final class SyncScreen {
     void render(JSONObject library,JSONObject pairing,boolean running,String status,String last){
         body.removeAllViews();boolean paired=pairing!=null&&pairing.has("paired_peer")&&!pairing.optBoolean("revoked");
         if(paired){
-            body.addView(Ui.text(activity,pairing.optString("peer_name","Your computer"),20,true));
-            body.addView(Ui.text(activity,running?"Syncing…":(status==null||status.isEmpty()?"Connected · Syncs automatically":status),16,false));
-            body.addView(Ui.text(activity,last==null||last.isEmpty()?"Last sync: waiting for first sync":last,14,false));
-            body.addView(Ui.primary(activity,"Sync now",()->action.accept(Action.CONNECT)));
-            body.addView(Ui.button(activity,"Disconnect",()->action.accept(Action.REVOKE)));
+            add(Ui.text(activity,pairing.optString("peer_name","Your computer"),20,true),0);
+            add(Ui.text(activity,running?"Syncing…":(status==null||status.isEmpty()?"Connected · Syncs automatically":status),16,false),8);
+            add(Ui.text(activity,last==null||last.isEmpty()?"Last sync: waiting for first sync":last,14,false),4);
+            add(Ui.primary(activity,"Sync now",()->action.accept(Action.CONNECT)),32);
+            add(Ui.button(activity,"Disconnect",()->action.accept(Action.REVOKE)),12);
             if(library!=null&&library.optJSONObject("conflicts")!=null&&library.optJSONObject("conflicts").length()>0)
-                body.addView(Ui.button(activity,"Review changes",()->action.accept(Action.REVIEW)));
+                add(Ui.button(activity,"Review changes",()->action.accept(Action.REVIEW)),12);
         }else{
-            body.addView(Ui.text(activity,"No computer connected",20,true));
-            body.addView(Ui.text(activity,"On your computer, open Settings → Sync and select Connect phone. Approve the connection here. Your documents will then sync automatically over Wi-Fi.",16,false));
-            if(status!=null&&!status.isEmpty())body.addView(Ui.text(activity,status,14,false));
+            add(Ui.text(activity,"No computer connected",20,true),0);
+            add(Ui.text(activity,"On your computer, open Settings → Sync and select Connect phone. Approve the connection here. Your documents will then sync automatically over Wi-Fi.",16,false),12);
+            if(status!=null&&!status.isEmpty())add(Ui.text(activity,status,14,false),12);
         }
+    }
+    private void add(android.view.View view,int gap){
+        LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);params.topMargin=Ui.dp(activity,gap);body.addView(view,params);
     }
 }

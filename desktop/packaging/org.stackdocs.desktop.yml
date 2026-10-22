@@ -1,0 +1,52 @@
+# Builds Stack from source inside the Freedesktop SDK, without network access.
+# tools/build_flatpak.py stages the files named below next to a copy of this
+# manifest: the vendored source archive, dependency notices, the pinned PDFium
+# and OCR engines (prebuilt, see README.md) and the OCR engine's libjpeg8.
+id: org.stackdocs.desktop
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: stack
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --filesystem=xdg-data/org.stackdocs.desktop:create
+  - --filesystem=xdg-config/org.stackdocs.desktop:create
+  - --filesystem=xdg-config/cosmic:ro
+modules:
+  - name: stack
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/stack/cargo-home
+    build-commands:
+      - cargo build --offline --locked --release -p stack-desktop -p stack-cli -p stack-transport
+      - install -Dm755 -t /app/lib/stack/bin target/release/stack-desktop target/release/stack-cli target/release/stack-transport
+      - install -Dm755 packaging/stack /app/bin/stack
+      - install -Dm644 packaging/org.stackdocs.desktop.desktop /app/share/applications/org.stackdocs.desktop.desktop
+      - install -Dm644 packaging/org.stackdocs.desktop.metainfo.xml /app/share/metainfo/org.stackdocs.desktop.metainfo.xml
+      - install -Dm644 assets/org.stackdocs.desktop.svg /app/share/icons/hicolor/scalable/apps/org.stackdocs.desktop.svg
+      - cp -r runtime /app/lib/stack/runtime
+      - cp -r dependency-notices /app/lib/stack/notices
+      - install -Dm644 libjpeg-turbo8-copyright.txt /app/lib/stack/notices/libjpeg-turbo8-copyright.txt
+      - install -Dm755 libjpeg.so.8 /app/lib/libjpeg.so.8
+    sources:
+      - type: archive
+        path: SOURCE.tar.gz
+        strip-components: 2
+      - type: dir
+        path: runtime
+        dest: runtime
+      - type: dir
+        path: notices
+        dest: dependency-notices
+      - type: file
+        path: libjpeg.so.8
+      - type: file
+        path: libjpeg-turbo8-copyright.txt

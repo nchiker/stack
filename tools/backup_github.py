@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Snapshot only Stack source into a separate private GitHub backup checkout.
+"""Snapshot only Stack source into a separate GitHub source checkout.
 
 Includes tracked and nonignored source, including unfinished edits. Never stages
 or commits the shared parent repository. Refuses credentials, library archives,
@@ -32,6 +32,7 @@ def main():
     parser.add_argument('--mirror', required=True, type=Path, help='Separate owned source backup checkout')
     parser.add_argument('--repository', default='nchiker/stack')
     parser.add_argument('--push', action='store_true')
+    parser.add_argument('--public', action='store_true', help='Confirm that the destination repository is public')
     args = parser.parse_args()
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', args.repository):
         parser.error('Expected owner/repository')
@@ -111,8 +112,11 @@ def main():
         git('remote', 'add', 'origin', url, cwd=mirror)
     if args.push:
         info = json.loads(subprocess.check_output(['gh', 'repo', 'view', args.repository, '--json', 'visibility,nameWithOwner'], text=True))
-        if info['visibility'] != 'PRIVATE' or info['nameWithOwner'].lower() != args.repository.lower():
-            parser.error('Source backup destination must be the requested PRIVATE repository')
+        if info['nameWithOwner'].lower() != args.repository.lower():
+            parser.error('Source backup destination differs from the requested repository')
+        # Publishing to a public repository must be a deliberate choice.
+        if info['visibility'] != 'PRIVATE' and not args.public:
+            parser.error(f'{args.repository} is {info["visibility"]}; pass --public to publish to it')
         subprocess.run(['git', '-c', 'credential.helper=', '-c', 'credential.helper=!gh auth git-credential', 'push', '--set-upstream', 'origin', 'main'], cwd=mirror, check=True)
     print(json.dumps({'files': len(files), 'excluded': len(excluded), 'commit': git('rev-parse', 'HEAD', cwd=mirror).decode().strip(), 'mirror': str(mirror), 'repository': args.repository, 'pushed': args.push}))
 

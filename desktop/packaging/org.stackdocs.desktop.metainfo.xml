@@ -6,6 +6,9 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>Apache-2.0</project_license>
   <developer id="org.stackdocs"><name>Stack contributors</name></developer>
+  <url type="homepage">https://github.com/nchiker/stack</url>
+  <url type="bugtracker">https://github.com/nchiker/stack/issues</url>
+  <url type="vcs-browser">https://github.com/nchiker/stack</url>
   <description>
     <p>Stack is an independent document library for the COSMIC desktop. Import
     documents, organize them into stacks, search printed English text offline,
@@ -15,4 +18,10 @@
   <launchable type="desktop-id">org.stackdocs.desktop.desktop</launchable>
   <provides><binary>stack</binary></provides>
   <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.2.0" date="2026-10-22">
+      <description><p>Syncing with the phone uses much less processing when nothing has changed.</p></description>
+    </release>
+    <release version="0.1.0" date="2026-10-22"/>
+  </releases>
 </component>

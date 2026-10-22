@@ -105,9 +105,13 @@ final class LibraryArchive {
                 for(File source:sources) {
                     if(source.getName().equals(".restore_owner"))continue;
                     path("originals/"+id+"/"+source.getName());regular(source);
-                    File target=new File(directory,"originals/"+id+"/"+source.getName());mkdir(target.getParentFile());
-                    try {Os.link(source.getAbsolutePath(),target.getAbsolutePath());}
-                    catch(android.system.ErrnoException unavailable) {copyFile(source,target,progress);}
+                    // A sync capture runs on the serialized repository writer and only
+                    // hashes originals in place, so it needs no pinned copy.
+                    if(!syncInternal) {
+                        File target=new File(directory,"originals/"+id+"/"+source.getName());mkdir(target.getParentFile());
+                        try {Os.link(source.getAbsolutePath(),target.getAbsolutePath());}
+                        catch(android.system.ErrnoException unavailable) {copyFile(source,target,progress);}
+                    }
                     JSONObject entry=new JSONObject();entry.put("path","originals/"+id+"/"+source.getName());entry.put("length",source.length());
                     // Hash after pinning; files are immutable, and repository writes are serialized.
                     files.put(entry);
@@ -340,11 +344,7 @@ final class LibraryArchive {
             for(JSONObject row:objects(members)){keys(row,MEMBER);String doc=str(row,"document_id",36),stack=str(row,"stack_id",80);if(!documents.containsKey(doc)||!stackIds.contains(stack)||!relations.add(doc+":"+stack))throw invalid();}
             Set<String> proposed=new HashSet<>();
             for(JSONObject row:objects(suggestions)) {
-                keys(row,SUGGESTION);String id=str(row,"document_id",36);if(!documents.containsKey(id)||!proposed.add(id))throw invalid();number(row,"generation",0,Long.MAX_VALUE-1);number(row,"title_revision",0,Long.MAX_VALUE-1);number(row,"filing_revision",0,Long.MAX_VALUE-1);
-                if(!Arrays.asList("pending","running","waiting","ready","empty","failed").contains(str(row,"status",16)))throw invalid();
-                for(String field:new String[]{"input","evidence"}){String value=str(row,field,64);if(!value.isEmpty())sha(value);}
-                str(row,"rule",128);String payload=str(row,"payload",1024*1024);ArchiveJson.read(payload);SuggestionRules.Result.decode(payload);
-                decision(str(row,"title_state",16));decision(str(row,"filing_state",16));
+                String id=validateSuggestion(row);if(!documents.containsKey(id)||!proposed.add(id))throw invalid();
             }
             if(proposed.size()!=documents.size())throw invalid();Set<String> decisions=new HashSet<>();
             for(JSONObject row:objects(choices)){keys(row,CHOICE);String id=str(row,"document_id",36),e=str(row,"evidence",64),field=str(row,"field",16);sha(e);if(!documents.containsKey(id)||!Arrays.asList("title","filing").contains(field)||!decisions.add(id+e+field))throw invalid();decision(str(row,"choice",16));str(row,"value",1024*1024);}
@@ -403,6 +403,14 @@ final class LibraryArchive {
                 if(!expected.equals(bounds.outMimeType))throw new IOException("A backed-up original has an unexpected file type.");
             }
         }
+    }
+    /** Checks one suggestion row on its own; the caller checks its document exists. */
+    static String validateSuggestion(JSONObject row) throws JSONException,IOException {
+        keys(row,SUGGESTION);String id=str(row,"document_id",36);number(row,"generation",0,Long.MAX_VALUE-1);number(row,"title_revision",0,Long.MAX_VALUE-1);number(row,"filing_revision",0,Long.MAX_VALUE-1);
+        if(!Arrays.asList("pending","running","waiting","ready","empty","failed").contains(str(row,"status",16)))throw invalid();
+        for(String field:new String[]{"input","evidence"}){String value=str(row,field,64);if(!value.isEmpty())sha(value);}
+        str(row,"rule",128);String payload=str(row,"payload",1024*1024);ArchiveJson.read(payload);SuggestionRules.Result.decode(payload);
+        decision(str(row,"title_state",16));decision(str(row,"filing_state",16));return id;
     }
     private static void decision(String value) throws IOException {if(!Arrays.asList("offered","accepted","edited","dismissed").contains(value))throw invalid();}
     private static void name(JSONObject row,String key) throws IOException,JSONException {String value=str(row,key,200);if(!LibraryRepository.cleanName(value).equals(value))throw invalid();}

@@ -81,15 +81,40 @@ fn paired_localhost_applies_and_acknowledges_then_replays_safely() {
         &b_id,
         &temp.path().join("baseline.stackexchange"),
     );
+    // Adoption leaves both sides with the same operations, so the session ends
+    // after hello and each records the other's advertised frontier as its receipt.
     let (client, server) = run_pair(a.clone(), b.clone(), port());
-    assert_eq!(client["status"]["library"], group);
-    assert_eq!(server["status"]["library"], group);
-    assert_eq!(client["status"]["pending_gaps"], 0);
-    assert_eq!(server["status"]["pending_gaps"], 0);
-    assert_eq!(server["status"]["acknowledged_by"][&a_id][&a_id], 1);
-    let (client, server) = run_pair(a, b, port());
+    assert_eq!(client["skipped"], true);
+    assert_eq!(server["skipped"], true);
+    let status = Library::open(&b).unwrap().sync_status().unwrap();
+    assert_eq!(status["library"], group);
+    assert_eq!(status["pending_gaps"], 0);
+    assert_eq!(status["acknowledged_by"][&a_id][&a_id], 1);
+    let status = Library::open(&a).unwrap().sync_status().unwrap();
+    assert_eq!(status["acknowledged_by"][&b_id][&a_id], 1);
+    // A new local operation on one side makes the next session exchange it.
+    let mut library = Library::open(&a).unwrap();
+    let revision = library.revision().unwrap();
+    library
+        .edit_stacks(
+            revision,
+            stack_core::StackEdit::Create {
+                name: "Replayed".into(),
+                color: 0,
+                visible: true,
+            },
+            &stack_archive::Control::default(),
+        )
+        .unwrap();
+    drop(library);
+    let (client, server) = run_pair(a.clone(), b.clone(), port());
+    assert_eq!(client["skipped"], serde_json::Value::Null);
+    assert_eq!(server["received"]["applied"], 1);
     assert_eq!(client["received"]["applied"], 0);
-    assert_eq!(server["received"]["applied"], 0);
+    assert_eq!(client["status"]["pending_gaps"], 0);
+    let (client, server) = run_pair(a, b, port());
+    assert_eq!(client["skipped"], true);
+    assert_eq!(server["skipped"], true);
 }
 
 #[test]
@@ -173,8 +198,12 @@ fn interrupted_connection_can_reconnect_without_advancing_receipts() {
     drop(tcp);
     assert!(listener.join().unwrap().is_err());
     assert_eq!(Library::open(&b).unwrap().sync_status().unwrap(), before);
-    let (_, server) = run_pair(a, b, port());
-    assert_eq!(server["status"]["library"], group);
+    let (_, server) = run_pair(a.clone(), b.clone(), port());
+    assert_eq!(server["skipped"], true);
+    assert_eq!(
+        Library::open(&b).unwrap().sync_status().unwrap()["library"],
+        group
+    );
 }
 
 #[test]

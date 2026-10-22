@@ -1,7 +1,0 @@
-PASS actual Java v1 → v8 SQL; all legacy values preserved, proposals additive, foreign keys valid
-PASS actual Java v2 → v8 SQL; all legacy values preserved, proposals additive, foreign keys valid
-PASS actual Java v3 → v8 SQL; all legacy values preserved, proposals additive, foreign keys valid
-PASS actual Java v4 → v8 SQL; all legacy values preserved, proposals additive, foreign keys valid
-PASS actual Java v5 → v8 SQL; all legacy values preserved, proposals additive, foreign keys valid
-PASS actual Java v6 → v8 SQL; all legacy values preserved, proposals additive, foreign keys valid
-PASS actual Java v7 → v8 SQL; all legacy values preserved, proposals additive, foreign keys valid

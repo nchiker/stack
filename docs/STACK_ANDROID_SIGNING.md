@@ -125,9 +125,5 @@ The previously captured spare snapshots remain at:
 They were verified381-file/schema8 copies of the old spare installation, not the
 primary. They are retained unchanged despite the user's later data-disposal waiver.
 
-The [historical key investigation](desktop/SIGNING_KEY_RECOVERY_20261020.md) and
-[earlier recovery delivery](../.artifacts/stack-signing-recovery-20261020/README.md)
-remain qualified historical records. The [Android signing guide](https://developer.android.com/studio/publish/app-signing)
+The [Android signing guide](https://developer.android.com/studio/publish/app-signing)
 explains why public APKs/certificates cannot replace the missing original private key.
-Current cleanup/device and P0 continuation evidence is in
-[p0/TEST_DEVICE_CONTINUATION_20261020.md](p0/TEST_DEVICE_CONTINUATION_20261020.md).

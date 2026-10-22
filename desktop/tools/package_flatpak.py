@@ -113,11 +113,15 @@ def main():
         shutil.copy2(source_path, target)
     (files / 'bin/stack').chmod(0o755)
     metainfo = ET.parse(ROOT / f'packaging/{APP_ID}.metainfo.xml')
-    releases = ET.SubElement(metainfo.getroot(), 'releases')
-    ET.SubElement(releases, 'release', {
-        'version': args.version, 'type': 'development',
-        'date': datetime.now(timezone.utc).date().isoformat(),
-    })
+    # Releases are listed in the metainfo; add an unlisted version as a development build.
+    releases = metainfo.getroot().find('releases')
+    if releases is None:
+        releases = ET.SubElement(metainfo.getroot(), 'releases')
+    if not any(release.get('version') == args.version for release in releases):
+        releases.insert(0, ET.Element('release', {
+            'version': args.version, 'type': 'development',
+            'date': datetime.now(timezone.utc).date().isoformat(),
+        }))
     metadata_path = files / f'share/metainfo/{APP_ID}.metainfo.xml'
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
     metainfo.write(metadata_path, encoding='utf-8', xml_declaration=True)

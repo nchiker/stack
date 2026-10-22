@@ -12,18 +12,19 @@ names are combined without generating duplicate starter stacks. On startup, Stac
 also repairs verified old generated duplicates when their starter copy is unused,
 keeping the populated stack and all its document memberships.
 
-The Sync page shows the connected device, connection status, last sync, **Sync
-now** and **Disconnect**. There is no separate library adoption, direction choice,
+The phone's Sync page shows the connected computer, status, last sync, **Sync
+now** and **Disconnect**; the computer's shows the phone, status, last sync and
+**Disconnect**. There is no separate library adoption, direction choice,
 file exchange or transport configuration screen. A genuine conflicting edit shows
 the phone and desktop versions with **Keep phone version** and **Keep desktop
 version** choices. Other documents continue synchronizing while you decide.
 
-Keep the desktop app running to receive changes. The phone checks automatically
-while Stack is open and schedules background work when Android permits it.
-Android may defer background work to save battery. Saved phone changes request
-sync automatically. **Sync now** on the phone requests an immediate attempt; on
-desktop it makes the receiver ready for the phone's next automatic connection.
-Leaving Settings does not cancel everyday synchronization.
+The phone always starts a sync; the computer waits for it. Keep the desktop app
+running. While Stack is open on the phone, saved phone changes sync within
+seconds and computer changes arrive within about 30 seconds. When Stack is closed,
+Android runs a background sync about every 15 minutes on Wi-Fi, and may defer it
+longer to save battery. **Sync now** on the phone starts an immediate attempt.
+When nothing has changed on either side, a check costs very little.
 
 If either device goes offline, documents remain available and Stack retries.
 Changing Wi-Fi addresses does not require another pairing. The verified device
@@ -46,7 +47,5 @@ libraries preserves the identities that the initial connection can match.
 Resetting an identity requires a fresh connection and approval. A reset on one
 device never remotely erases the other device.
 
-## Implementation and validation
-
-See [automatic sync validation](desktop/AUTOMATIC_SYNC_20261021.md) for the tested
-implementation, artifacts and qualified runtime results.
+How the connection works is described in the
+[transport specification](desktop/PAIRED_TRANSPORT.md).

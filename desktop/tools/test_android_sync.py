@@ -394,6 +394,9 @@ def main():
                             connection.settimeout(10)
                             assert hashlib.sha256(connection.getpeercert(binary_form=True)).hexdigest() == identity['fingerprint']
                             hello = json.loads(receive(connection, b'H'))
+                            # Current phones advertise their frontier; replying without one
+                            # (as Stack 0.1.0 did) keeps the full session this check needs.
+                            assert isinstance(hello.pop('frontier'), dict)
                             assert hello == {'version': 1, 'group': lan_group, 'replica': lan_phone}
                             send(connection, b'H', json.dumps({'version': 1, 'group': lan_group, 'replica': lan_peer}).encode())
                             observed['received_bundle_bytes'] = len(receive(connection, b'B'))

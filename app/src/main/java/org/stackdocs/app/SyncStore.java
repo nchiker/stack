@@ -34,13 +34,20 @@ final class SyncStore {
         String id=UUID.randomUUID().toString();ContentValues row=new ContentValues();row.put("key","replica_id");row.put("value",id);db.insertWithOnConflict("sync_meta",null,row,SQLiteDatabase.CONFLICT_IGNORE);
         try(Cursor cursor=db.rawQuery("SELECT value FROM sync_meta WHERE key='replica_id'",null)){cursor.moveToFirst();return cursor.getString(0);}
     }
+    // The saved state is megabytes of JSON and takes about a second to parse on
+    // a phone. Reuse the last parse while the stored text is unchanged; callers
+    // get a copy, so an abandoned transaction cannot alter the cached state.
+    private static final Object cacheLock=new Object();
+    private static String cachedText;private static SyncProtocol.State cachedState;
+    private static void remember(String text,SyncProtocol.State state)throws IOException,JSONException {SyncProtocol.State copy=state.duplicate();synchronized(cacheLock){cachedText=text;cachedState=copy;}}
     SyncProtocol.State load()throws IOException,JSONException {
         final String saved;
         try {saved=DatabaseUtils.stringForQuery(db,"SELECT state FROM sync_state WHERE singleton=1",null);}
         catch(SQLiteDoneException absent){return null;}
+        synchronized(cacheLock){if(saved.equals(cachedText))return cachedState.duplicate();}
         SyncProtocol.State state=SyncProtocol.State.restore(ArchiveJson.read(saved));
         boolean model=false;for(SyncProtocol.Operation op:state.history.values())if(op.json.optJSONObject("evidence")!=null&&"baseline.explicit".equals(op.json.getJSONObject("evidence").optString("kind"))&&op.json.getJSONObject("evidence").optInt("graph_model")==SyncGraph.MODEL){model=true;break;}
-        if(!model)throw SyncProtocol.invalid("saved graph needs reviewed migration");return state;
+        if(!model)throw SyncProtocol.invalid("saved graph needs reviewed migration");remember(saved,state);return state;
     }
 
     int cleanLegacyStacks()throws IOException,JSONException {
@@ -74,11 +81,16 @@ final class SyncStore {
         try(LibraryArchive.Snapshot snapshot=repository.archive().snapshot(progress,true)) {
             JSONObject json=snapshot.manifest;
             JSONArray files=json.getJSONArray("files");for(int i=0;i<files.length();i++){
-                JSONObject entry=files.getJSONObject(i);File file=new File(snapshot.directory,entry.getString("path"));entry.put("sha256",hash(file,entry.getLong("length"),control));
+                JSONObject entry=files.getJSONObject(i);String path=entry.getString("path");File file=new File(new File(context.getFilesDir(),"documents"),path.substring("originals/".length()));long length=entry.getLong("length");
+                // Originals are immutable, so a capture only hashes files it has not seen.
+                String key=path+":"+length+":"+file.lastModified(),sha=hashes.get(key);
+                if(sha==null){sha=hash(file,length,control);hashes.put(key,sha);}
+                entry.put("sha256",sha);
             }
             LibraryArchive.validate(json);return json;
         }
     }
+    private static final Map<String,String> hashes=new java.util.concurrent.ConcurrentHashMap<>();
     static String hash(File file,long expected)throws IOException {
         return hash(file,expected,()->{});
     }
@@ -107,11 +119,13 @@ final class SyncStore {
         JSONObject current=manifest();db.beginTransaction();try {
             SyncJournal.Replay replay=SyncJournal.capture(db,state,replica(),ArchiveJson.read(saved),cursor,current,control);
             control.check();
+            String text=null;
             if(replay.operations>0||replay.cursor>cursor) {
-                ContentValues value=new ContentValues();value.put("state",state.saved().toString());value.put("projection",replay.projection.toString());value.put("journal_cursor",replay.cursor);
+                text=state.saved().toString();ContentValues value=new ContentValues();value.put("state",text);value.put("projection",replay.projection.toString());value.put("journal_cursor",replay.cursor);
                 db.update("sync_state",value,"singleton=1",null);
             }
             db.setTransactionSuccessful();
+            if(text!=null)remember(text,state);
         } finally {db.endTransaction();}
     }
     private long maxChange(){try(Cursor row=db.rawQuery("SELECT ifnull(max(sequence),0) FROM sync_change",null)){row.moveToFirst();return row.getLong(0);}}
@@ -131,9 +145,11 @@ final class SyncStore {
             probe.reached("transaction");
             db.execSQL("UPDATE sync_control SET applying=1 WHERE singleton=1");write(projected);
             probe.reached("rows_written");
-            ContentValues row=new ContentValues();row.put("state",state.saved().toString());row.put("projection",cells.toString());row.put("baseline",fallback.toString());row.put("journal_cursor",maxChange());
+            String text=state.saved().toString();
+            ContentValues row=new ContentValues();row.put("state",text);row.put("projection",cells.toString());row.put("baseline",fallback.toString());row.put("journal_cursor",maxChange());
             if(db.update("sync_state",row,"singleton=1",null)==0){row.put("singleton",1);db.insertOrThrow("sync_state",null,row);}
             db.execSQL("UPDATE sync_control SET enabled=1,applying=0 WHERE singleton=1");db.setTransactionSuccessful();
+            remember(text,state);
         }finally{db.endTransaction();}
         probe.reached("committed");
         repository.archiveChanged();
@@ -185,8 +201,13 @@ final class SyncStore {
     void receipt(String peer,TreeMap<String,Long> acknowledged)throws JSONException {
         ContentValues row=new ContentValues();row.put("peer",peer);row.put("frontier",SyncProtocol.json(acknowledged).toString());db.insertWithOnConflict("sync_receipts",null,row,SQLiteDatabase.CONFLICT_REPLACE);
     }
-    void savePending(SyncProtocol.State state)throws JSONException {
-        ContentValues row=new ContentValues();row.put("state",state.saved().toString());db.update("sync_state",row,"singleton=1",null);
+    void savePending(SyncProtocol.State state)throws IOException,JSONException {
+        String text=state.saved().toString();ContentValues row=new ContentValues();row.put("state",text);db.update("sync_state",row,"singleton=1",null);remember(text,state);
+    }
+    /** The pinned peer advertised exactly our committed frontier, so it durably holds every operation we do. */
+    void acknowledgeEqual(String peer,TreeMap<String,Long> frontier)throws IOException,JSONException {
+        SyncProtocol.State state=load();if(state==null||!state.members.contains(peer)||!state.frontier.equals(frontier))throw SyncProtocol.invalid("peer frontier differs");
+        TreeMap<String,Long> merged=new TreeMap<>(frontier);for(Map.Entry<String,Long> prior:receipt(peer).entrySet())merged.merge(prior.getKey(),prior.getValue(),Math::max);receipt(peer,merged);
     }
     TreeMap<String,Long> receipt(String peer)throws IOException,JSONException {
         try(Cursor row=db.rawQuery("SELECT frontier FROM sync_receipts WHERE peer=?",new String[]{peer})){return row.moveToFirst()?SyncProtocol.frontier(ArchiveJson.read(row.getString(0))):new TreeMap<>();}

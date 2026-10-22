@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use stack_core::library::Library;
+use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
@@ -134,6 +135,10 @@ struct Hello {
     version: u32,
     group: String,
     replica: String,
+    /// Advertised only to peers that sent one first: version 1 peers reject
+    /// unknown hello fields. Equal frontiers end the session after the hello.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    frontier: Option<BTreeMap<String, u64>>,
 }
 
 pub fn fingerprint(cert_der: &[u8]) -> String {
@@ -398,7 +403,7 @@ fn ensure_policy_current(root: &Path, expected: &Policy) -> Result<()> {
 }
 
 fn check_group(library: &Library, policy: &Policy) -> Result<Hello> {
-    let status = library.sync_status()?;
+    let status = library.sync_summary()?;
     let replica = status["replica"]
         .as_str()
         .ok_or(Error::Protocol)?
@@ -422,6 +427,7 @@ fn check_group(library: &Library, policy: &Policy) -> Result<Hello> {
         version: 1,
         group: policy.group.clone(),
         replica,
+        frontier: Some(serde_json::from_value(status["frontier"].clone())?),
     })
 }
 
@@ -505,12 +511,14 @@ fn copy_exact(
     Ok(())
 }
 
+/// Returns the shared frontier when both sides advertised the same one: each
+/// already holds every operation the other has, so no bundle is exchanged.
 fn hello(
     stream: &mut (impl Read + Write),
     local: &Hello,
     policy: &Policy,
     initiator: bool,
-) -> Result<()> {
+) -> Result<Option<BTreeMap<String, u64>>> {
     if initiator {
         send_frame(stream, b'H', &serde_json::to_vec(local)?, MAX_CONTROL)?;
     }
@@ -519,10 +527,39 @@ fn hello(
     {
         return Err(Error::Peer);
     }
+    let advertised = Hello {
+        version: local.version,
+        group: local.group.clone(),
+        replica: local.replica.clone(),
+        frontier: if initiator || remote.frontier.is_some() {
+            local.frontier.clone()
+        } else {
+            None
+        },
+    };
     if !initiator {
-        send_frame(stream, b'H', &serde_json::to_vec(local)?, MAX_CONTROL)?;
+        send_frame(stream, b'H', &serde_json::to_vec(&advertised)?, MAX_CONTROL)?;
     }
-    Ok(())
+    let known = |map: &BTreeMap<String, u64>| {
+        map.iter()
+            .filter(|(_, sequence)| **sequence > 0)
+            .map(|(replica, sequence)| (replica.clone(), *sequence))
+            .collect::<BTreeMap<_, _>>()
+    };
+    Ok(match (advertised.frontier, remote.frontier) {
+        (Some(ours), Some(theirs)) if known(&ours) == known(&theirs) => Some(ours),
+        _ => None,
+    })
+}
+
+/// Ends a session whose hello found nothing to exchange.
+fn skipped(
+    library: &mut Library,
+    policy: &Policy,
+    frontier: &BTreeMap<String, u64>,
+) -> Result<Value> {
+    library.sync_acknowledge_equal(&policy.peer_replica, frontier)?;
+    Ok(json!({"peer":policy.peer_replica,"skipped":true}))
 }
 
 fn send_bundle(
@@ -649,7 +686,9 @@ pub fn sync_now_library(
     auth_peer(tls.conn.peer_certificates(), &policy)?;
     ensure_policy_current(root, &policy)?;
     configure_data_tcp(&tls.sock)?;
-    hello(&mut tls, &local, &policy, true)?;
+    if let Some(frontier) = hello(&mut tls, &local, &policy, true)? {
+        return skipped(library, &policy, &frontier);
+    }
     tls.sock.set_read_timeout(Some(PROCESSING_TIMEOUT))?;
     send_bundle(&mut tls, library, root, &policy, control)?;
     let first_ack = receive_receipt(&mut tls)?;
@@ -730,7 +769,9 @@ pub fn serve_accepted_library(
     auth_peer(tls.conn.peer_certificates(), &policy)?;
     ensure_policy_current(root, &policy)?;
     configure_data_tcp(&tls.sock)?;
-    hello(&mut tls, &local, &policy, false)?;
+    if let Some(frontier) = hello(&mut tls, &local, &policy, false)? {
+        return skipped(library, &policy, &frontier);
+    }
     tls.sock.set_read_timeout(Some(PROCESSING_TIMEOUT))?;
     let first = receive_bundle(&mut tls, library, root, &policy, control)?;
     send_bundle(&mut tls, library, root, &policy, control)?;
@@ -869,7 +910,8 @@ mod tests {
             .unwrap();
         let before = Library::open(&b).unwrap().sync_status().unwrap();
         let (policy, cert, key, roots) = credentials(&a).unwrap();
-        let local = check_group(&Library::open(&a).unwrap(), &policy).unwrap();
+        let mut local = check_group(&Library::open(&a).unwrap(), &policy).unwrap();
+        local.frontier = None;
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         drop(listener);
@@ -907,7 +949,8 @@ mod tests {
         // bundle before the repository can apply it.
         let status_before_revoke = Library::open(&b).unwrap().sync_status().unwrap();
         let (policy, cert, key, roots) = credentials(&a).unwrap();
-        let local = check_group(&Library::open(&a).unwrap(), &policy).unwrap();
+        let mut local = check_group(&Library::open(&a).unwrap(), &policy).unwrap();
+        local.frontier = None;
         let config =
             ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
                 .with_safe_default_protocol_versions()

@@ -1,62 +1,93 @@
-# Current release — 2026-10-22
+# Current release — 2026-10-22 (Android 0.10.0, Flatpak 0.2.0)
 
-Real two-way sync between the test phone (Pixel 4a, serial 0A121JEC203530) and
-the desktop Flatpak **passed** on the user's actual libraries. Deliverables are in
-`.artifacts/stack-release-20261022/` (see `START-HERE.txt` and `SHA256SUMS`):
+Release v0.10.0 on GitHub: `Stack-0.10.0.apk` (versionCode 24, signer
+`e873f2fd…e311`, SHA-256 `854ae450…`; both phones run exactly this file) and `Stack-0.2.0-x86_64.flatpak` (branch `stable`, built from
+source by `desktop/tools/build_flatpak.py`). Local copies are in
+`.artifacts/stack-release-20261022-v0.10.0/`.
 
-- `android/Stack-0.9.0.apk` — release, versionCode 23, signer `e873f2fd…e311`.
-  Installed on the test phone; the pulled `base.apk` matches the file exactly.
-- `flatpak/Stack-0.1.0-x86_64.flatpak` — branch `stable`, Freedesktop 25.08.
-  Installed for the user; the old `candidate` branch was uninstalled.
+## Devices
 
-## Verified on real devices (final builds)
+- **Production phone**: Pixel 10a, serial `5A101JEA313018`. Moved to Stack 0.10.0
+  on 2026-10-22. Its old 0.8.9 install was signed with the lost original key
+  `db7352c8…`, so it was backed up, uninstalled by the user, the new APK installed
+  and the backup restored by the user. The verified backup (164 documents, 257
+  pages) is kept at `~/.local/share/stack-production-backup-20261022/`.
+  **It is now the phone paired with the desktop** (since 2026-10-22, 13:40).
+  The desktop started from an empty library and received the phone's 158
+  documents / 250 pages / 16 stacks; a stack created on the desktop reached the
+  phone and its deletion on the phone reached the desktop.
+- **Test phone**: Pixel 4a, serial `0A121JEC203530`, signer `e873f2fd…`. No longer
+  connected to the desktop; it keeps its own copy of the old library and is free
+  for testing.
+- The desktop's previous library (paired with the test phone) is kept, unchanged,
+  at `~/.local/share/org.stackdocs.desktop.before-production-20261022`.
+- Two adb servers may run: the default one (port 5037) often owns the phones.
+  Use `adb -P 5037` if `-P 5693` lists nothing. A udev rule for Google devices is
+  in `/etc/udev/rules.d/51-android.rules`.
+- The desktop syncs with exactly one phone (a two-member group). Switching phones
+  means Disconnect, then a new connection. Two libraries created separately (for
+  example from separate imports or restores) have different document identities
+  and would be merged as duplicates; start one side empty instead.
 
-Baseline was 164 documents / 257 pages on both devices; the existing pairing
-(group `5ccad7b6…`, phone replica `4a385e85…`) was kept, with no reset or re-pair.
+## Verified this release
 
-- Desktop → phone: imported PDF (pages render), imported PNG, title renames,
-  deletions. Phone → desktop: notes, new photo documents (original bytes match
-  by SHA-256). Saved phone edits reach the desktop within seconds.
-- Restarting the desktop app: the phone reconnects within one poll, no approval.
-- All test documents were deleted afterwards (deletion synced); the one renamed
-  real document was restored. Both devices are back to 164 active documents.
+On the real devices (test phone ↔ desktop, the user's real 164-document libraries):
 
-## Fixes made in this session
+- Phone CPU with Stack open and nothing to sync: **13.3 s → 0.41 s per minute**
+  (`/proc/<pid>/stat`, 60 s windows). Per idle exchange ~5.3 s → ~0.1 s.
+- Equal frontiers end the session after the hello; real changes still flow:
+  a desktop-created stack reached the phone; phone renames, a visibility toggle
+  and the deletion reached the desktop. The test stack is deleted on both sides.
+- Renaming a stack on the phone: capture **121–149 s CPU and ~440 operations →
+  under 2 s and 2 operations**. Any local edit's capture ~4.7 s → ~1.8 s.
+- The new phone build against the old 0.1.0 desktop falls back to the plain hello
+  and keeps syncing.
+- Background job: with Stack killed and the phone unplugged, the periodic job ran
+  by itself (13:11) and finished normally; before the fix, app start-up
+  rescheduling cancelled the running job.
 
-1. **Desktop never opened its sync listener (intermittent).** The listener waited
-   for one library-status request through the repository worker, issued once
-   and never retried. The tick now reads the small pairing files directly and
-   retries every 2s until enrollment is known (`network_ui.rs`).
-2. **Interrupted transfers leaked `lan-receive-*` staging dirs** in the library
-   root (bundles up to 8 GB). Stale ones are removed before each receive.
-3. **Phone thumbnails never appeared for synced documents.** They rendered on the
-   same single IO executor as the foreground sync loop and were cancelled by
-   each post-sync refresh. They now use the `reads` executor.
-4. **Phone CPU while open dropped from ~50–70% to ~22% of a core**: idle polling
-   is 30s (local saves still sync immediately), the library list refreshes only
-   when the computer sent changes, and `hello()` no longer builds a full status.
-5. Desktop wording: "Waiting for phone · Syncs when Stack is open on your phone".
+Tests: desktop workspace 108 passed / 0 failed / 5 ignored with `DISPLAY` set,
+fmt, strict Clippy. Android instrumented suites `syncAuto` (twice, including
+`queuedLock`), `syncLargeState`, `syncUi`, `nearbyPhase unit`, `archiveOnly` pass
+in `org.stackdocs.app.checks.autosync`. `desktop/tools/test_android_sync.py
+--transport --recovery` passes all 16 Android↔Rust checks over real LAN.
 
-Checks: desktop workspace tests 108 passed / 0 failed (5 optional ignored; run
-with `DISPLAY`/`WAYLAND_DISPLAY` unset, one controller test requires headless),
-`cargo fmt --check`, strict workspace Clippy. Android release build passes; the
-instrumented Android check suites were not re-run this session.
+## What changed
 
-## Known follow-up
+- Phone: parsed sync state cached per process; no-op imports no longer serialize
+  the state twice or re-hash every original; hello carries the frontier;
+  suggestion-row changes from one capture become one operation; sync manifests
+  hash originals in place (no hard-link snapshot) with a hash cache.
+- Desktop: optional `frontier` in the hello (`deny_unknown_fields` kept; it is
+  echoed only to peers that sent one); cheap `sync_summary` for each session;
+  receipts recorded on skipped sessions; the "Sync now" button is removed (the
+  phone always starts a sync).
+- SyncJob: not rescheduled when a current job exists; needs Wi-Fi/Ethernet, not
+  internet; no back-off retries when the computer is unavailable.
+- Phone Sync page: spacing between the computer name, status, last sync and
+  buttons (it was jammed together).
+- Packaging: from-source Flatpak manifest; homepage and releases in metainfo;
+  `package_desktop.py` refuses stale binaries; `rust-version` 1.98.
+- `tools/backup_github.py` requires `--public` to push to the public repository.
+- Docs: superseded plans and evidence removed (still in git history).
 
-Each idle phone sync still parses the full causal state (~1,500 operations and
-growing) several times, ~6s of CPU per exchange. Caching the parsed state or
-skipping no-op exchanges would cut this further.
+## Known issues
+
+- Causal history keeps growing (~2,570 operations; two test renames before the
+  fix added ~1,000). The first state parse in each process costs ~1–1.5 s, then it
+  is cached. History compaction is not implemented.
+- The desktop spends ~1.5 s per bundle step on sessions that do transfer.
+- Android may defer the 15-minute job (Doze, standby buckets). Changes from the
+  desktop arrive within ~30 s only while Stack is open.
+- The Flatpak bundles prebuilt PDFium/OCR engines and the host's libjpeg8.
 
 ## Toolchains (persistent; `/tmp` is wiped on reboot)
 
-- Android SDK: `~/.local/share/stack-android-sdk` (`local.properties` points there).
-- JDK 25 with compiler: `~/.local/share/stack-jdk/jdk-25.0.5+8` — the system Java
-  has no `javac`. Build with
-  `JAVA_HOME=… ANDROID_HOME=… GRADLE_USER_HOME=~/.cache/stack-gradle ./gradlew -Dorg.gradle.java.installations.paths=$JAVA_HOME :app:assembleRelease`.
-- Cargo cache: `CARGO_HOME=~/.cache/stack-cargo-home`.
-- adb: `/tmp/stack-platform-tools/platform-tools/adb -P 5693 -s 0A121JEC203530`
-  (also in the SDK's `platform-tools`). Never touch the primary phone; its signing
-  key differs.
-
-Signing keys stay in `~/.local/share/stack-signing/` (see `STACK_ANDROID_SIGNING.md`).
+- Android SDK `~/.local/share/stack-android-sdk`; JDK
+  `~/.local/share/stack-jdk/jdk-25.0.5+8` (the system Java has no `javac`).
+  `JAVA_HOME=… ANDROID_HOME=… GRADLE_USER_HOME=~/.cache/stack-gradle ./gradlew -Dorg.gradle.java.installations.paths=$JAVA_HOME :app:assembleRelease`
+- Cargo cache `CARGO_HOME=~/.cache/stack-cargo-home`; Flatpak SDK 25.08 with
+  `rust-stable` (Rust 1.98.1) installed for the user.
+- adb: `/tmp/stack-platform-tools/platform-tools/adb` (also in the SDK's
+  `platform-tools`). Signing keys stay in `~/.local/share/stack-signing/`.
+- Publish source: `python3 tools/backup_github.py --mirror ~/.cache/stack-source-backup --push --public`.

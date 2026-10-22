@@ -72,6 +72,26 @@ fn load(db: &Connection) -> Result<Option<State>> {
     Ok(state)
 }
 
+fn merge_receipt(db: &Connection, peer: &str, mut acknowledged: Frontier) -> Result<()> {
+    let previous: Option<String> = db
+        .query_row(
+            "SELECT frontier FROM sync_receipts WHERE peer=?1",
+            [peer],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if let Some(previous) = previous {
+        for (origin, sequence) in serde_json::from_str::<Frontier>(&previous)? {
+            acknowledged
+                .entry(origin)
+                .and_modify(|n| *n = (*n).max(sequence))
+                .or_insert(sequence);
+        }
+    }
+    db.execute("INSERT INTO sync_receipts VALUES(?1,?2) ON CONFLICT(peer) DO UPDATE SET frontier=excluded.frontier",params![peer,serde_json::to_string(&acknowledged)?])?;
+    Ok(())
+}
+
 fn save(db: &Connection, state: &State, projection: &Cells, baseline: &Cells) -> Result<()> {
     db.execute("INSERT INTO sync_state VALUES(1,?1,?2,?3) ON CONFLICT(singleton) DO UPDATE SET state=excluded.state,projection=excluded.projection",params![serde_json::to_string(state)?,serde_json::to_string(projection)?,serde_json::to_string(baseline)?])?;
     Ok(())
@@ -823,6 +843,45 @@ impl Library {
         )
     }
 
+    /// Group identity and causal frontier only, for each network session. Unlike
+    /// `sync_status` this reads neither the manifest nor the projected graph.
+    pub fn sync_summary(&self) -> Result<Value> {
+        #[derive(serde::Deserialize)]
+        struct Summary {
+            library: String,
+            members: BTreeSet<String>,
+            frontier: Frontier,
+        }
+        let replica = meta(&self.db, "replica_id")?;
+        let value: Option<String> = self
+            .db
+            .query_row("SELECT state FROM sync_state WHERE singleton=1", [], |r| {
+                r.get(0)
+            })
+            .optional()?;
+        let Some(value) = value else {
+            return Ok(json!({"adopted":false,"replica":replica}));
+        };
+        let summary: Summary = serde_json::from_str(&value)?;
+        Ok(
+            json!({"adopted":true,"replica":replica,"library":summary.library,"members":summary.members,"frontier":summary.frontier}),
+        )
+    }
+
+    /// A pinned peer's hello advertised exactly our own committed frontier, so it
+    /// durably holds every operation we do. Record that as its receipt.
+    pub fn sync_acknowledge_equal(&mut self, peer: &str, frontier: &Frontier) -> Result<()> {
+        let summary = self.sync_summary()?;
+        if !summary["members"]
+            .as_array()
+            .is_some_and(|members| members.iter().any(|m| m == peer))
+            || serde_json::to_value(frontier)? != summary["frontier"]
+        {
+            return Err(Error::Invalid("Peer frontier differs from this library"));
+        }
+        merge_receipt(&self.db, peer, frontier.clone())
+    }
+
     pub(crate) fn ensure_sync_exportable(&self) -> Result<()> {
         if let Some(state) = load(&self.db)?
             && (!state.conflicts().is_empty() || graph::project(&state.values()).is_err())
@@ -1271,24 +1330,8 @@ impl Library {
         }
         // Receipt after apply durability. A crash before this write only causes
         // replay; it cannot acknowledge an uncommitted operation.
-        let previous: Option<String> = self
-            .db
-            .query_row(
-                "SELECT frontier FROM sync_receipts WHERE peer=?1",
-                [&header.sender],
-                |row| row.get(0),
-            )
-            .optional()?;
-        if let Some(previous) = previous {
-            for (origin, sequence) in serde_json::from_str::<Frontier>(&previous)? {
-                acknowledged
-                    .entry(origin)
-                    .and_modify(|n| *n = (*n).max(sequence))
-                    .or_insert(sequence);
-            }
-        }
         (self.probe)("sync_before_receipt")?;
-        self.db.execute("INSERT INTO sync_receipts VALUES(?1,?2) ON CONFLICT(peer) DO UPDATE SET frontier=excluded.frontier",params![header.sender,serde_json::to_string(&acknowledged)?])?;
+        merge_receipt(&self.db, &header.sender, acknowledged)?;
         (self.probe)("sync_receipt")?;
         Ok(
             json!({"applied":applied,"pending_gaps":state.pending.len(),"durable_frontier":state.frontier,"conflicts":state.conflicts().len(),"adopted":adopting}),

@@ -318,12 +318,10 @@ impl Stack {
                 }
             })
             .unwrap_or_else(|| "Last sync: waiting for first sync".into());
-        content = content.push(self.body(last));
+        // The phone always starts a sync, so there is no "Sync now" here: the
+        // computer cannot reach a phone that is not running Stack.
         content = content
-            .push(
-                self.button("Sync now")
-                    .on_press_maybe((!self.sync.busy).then_some(message(Action::Tick))),
-            )
+            .push(self.body(last))
             .push(self.button("Disconnect").on_press(message(Action::Revoke)));
         content.into()
     }

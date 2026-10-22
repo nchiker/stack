@@ -1,47 +1,35 @@
 # Stack Flatpak
 
-Build an installable x86-64 bundle from a source-matched desktop delivery:
+The release Flatpak is built from source by
+[`org.stackdocs.desktop.yml`](org.stackdocs.desktop.yml) inside the Freedesktop
+25.08 SDK with its Rust extension (`org.freedesktop.Sdk.Extension.rust-stable`):
 
 ```sh
-python3 desktop/tools/package_desktop.py --profile release \
-  --output .artifacts/stack-release-YYYYMMDD/desktop
-python3 desktop/tools/package_flatpak.py \
-  --package .artifacts/stack-release-YYYYMMDD/desktop \
-  --output .artifacts/stack-release-YYYYMMDD/flatpak --version 0.1.0 --branch stable
+python3 desktop/tools/build_flatpak.py --output .artifacts/stack-release-YYYYMMDD/flatpak
 ```
 
-The build uses the already installed Freedesktop Platform and SDK 25.08. It
-checks the prepared payload and current desktop source hashes before exporting.
-It never installs the app, downloads a runtime, or opens a document library.
-The output includes a `.flatpak`, `SHA256SUMS`, and a `DELIVERY.json` receipt.
+The script vendors every Rust dependency into `SOURCE.tar.gz`, stages it with the
+dependency notices, the pinned PDFium and OCR engines from `desktop/runtime/` and
+the host's `libjpeg.so.8` (the OCR engine needs the jpeg8 ABI, which the runtime
+lacks), then runs `flatpak-builder` without network access and writes
+`Stack-VERSION-x86_64.flatpak` and `SHA256SUMS`. The version is the newest release
+listed in `org.stackdocs.desktop.metainfo.xml`; add the new release there first.
+It never installs the app or opens a library.
 
-Install or update the supplied bundle, then launch Stack:
+Install or update, then launch:
 
 ```sh
-flatpak install --user --or-update /absolute/path/Stack-0.1.0-x86_64.flatpak
+flatpak install --user --or-update -y /absolute/path/Stack-VERSION-x86_64.flatpak
 flatpak run --user org.stackdocs.desktop
 ```
 
-Flatpak may offer to install its Freedesktop runtime when needed. Close the
-standalone Stack app before opening the Flatpak: both use the existing library
-at the host's XDG data directory under `org.stackdocs.desktop`. The repository
-lock prevents two app instances from writing that library at once. No data copy,
-reset, restore, or library migration is needed. Existing preferences and COSMIC
-theme settings are reused.
+Keep only the `stable` branch installed so the launcher cannot start an older
+build. The app uses the existing library in the host's
+`~/.local/share/org.stackdocs.desktop`; removing the Flatpak does not remove it.
+Permissions: display, GPU, local network sync, Stack's own data and preferences,
+and read-only COSMIC settings. File import/export goes through the desktop portal.
 
-Permissions provide the display, graphics, local network sync, Stack's own data
-and preferences, and read-only COSMIC configuration. File import/export uses the
-desktop portal. The package does not grant all of the home directory. Removing
-the application does not remove the existing desktop library.
-
-The pinned PDF/OCR engines and their notices are included. Ubuntu's
-`libjpeg-turbo8` is bundled with its copyright notice because the prepared OCR
-engine requires `libjpeg.so.8`, which the chosen runtime does not provide.
-Other native dependencies resolve against the runtime. Building from different
-engine binaries or choosing a different runtime requires repeating dependency,
-rendering, OCR, and native startup checks.
-
-Release 0.1.0 uses the `stable` branch. Keep only one installed branch so the
-launcher cannot start an older build (`flatpak uninstall --user org.stackdocs.desktop//candidate`). `appstreamcli validate`
-currently reports a missing homepage URL; the project has no configured public
-homepage. Desktop entry validation and Flatpak's icon/export validation pass.
+`tools/package_desktop.py` still prepares a standalone (non-Flatpak) install from
+locally built binaries and refuses binaries older than the source;
+`tools/package_flatpak.py` can wrap that output, but the source build above is the
+release path.

@@ -20,24 +20,30 @@ final class SyncJournal {
         control.check();
         JSONObject manifest=SyncGraph.project(previous),projected=previous;
         long last=cursor;int emitted=0;Set<String> fullFiling=new HashSet<>(),pageOrders=new HashSet<>();boolean catalogOrder=false,manifestValid=true;
+        JSONObject suggestionChanges=new JSONObject();long suggestionSequence=0;
         try(Cursor events=db.rawQuery("SELECT sequence,table_name,action FROM sync_change WHERE sequence>? ORDER BY sequence",new String[]{Long.toString(cursor)})) {
             while(events.moveToNext()) {
                 control.check();
                 long sequence=events.getLong(0);String source=events.getString(1),action=events.getString(2),table=table(source);
                 JSONObject row=raw(db,source,sequence,action.equals("DELETE")?"old":"new");
                 JSONObject old=action.equals("UPDATE")?raw(db,source,sequence,"old"):null;
-                // Local queue invalidations change only this independent portable
-                // row. Preserve every causal operation without copying, hashing
-                // and validating the entire document library for every queue bump.
-                if(manifestValid&&source.equals("suggestions")&&old!=null&&queueOnly(old,row)) {
+                // A suggestion row is an independent portable cell: no other cell or
+                // decision evidence depends on it. Update just that row rather than
+                // copying, validating and diffing the whole library for each event;
+                // renaming a stack re-queues every document's suggestions. Changes
+                // from one capture are consecutive local operations with no remote
+                // operation between them, so they are recorded as one operation.
+                if(manifestValid&&source.equals("suggestions")&&old!=null&&old.getString("document_id").equals(row.getString("document_id"))) {
                     JSONArray rows=manifest.getJSONArray("suggestions");String id=row.getString("document_id"),key="suggestions/"+SyncProtocol.canonical(new JSONArray().put(id));
                     JSONObject previousRow=null;for(int i=0;i<rows.length();i++)if(id.equals(rows.getJSONObject(i).getString("document_id"))){previousRow=rows.getJSONObject(i);break;}
-                    if(previousRow!=null&&SyncProtocol.canonical(previousRow).equals(SyncProtocol.canonical(old))) {
-                        JSONObject changes=new JSONObject();if(!projected.has(key)||!SyncProtocol.canonical(projected.get(key)).equals(SyncProtocol.canonical(row)))changes.put(key,row);
-                        if(changes.length()>0){SyncGraph.validateChanges(changes);state.local(replica,changes,new JSONObject().put("kind","android.raw-row").put("table",source).put("sequence",sequence));emitted++;}
+                    boolean valid=true;try{LibraryArchive.validateSuggestion(row);}catch(IOException invalid){valid=false;}
+                    if(valid&&previousRow!=null&&SyncProtocol.canonical(previousRow).equals(SyncProtocol.canonical(old))) {
+                        if(!projected.has(key)||!SyncProtocol.canonical(projected.get(key)).equals(SyncProtocol.canonical(row))){suggestionChanges.put(key,row);suggestionSequence=sequence;}
+                        if(suggestionChanges.length()>=256){emitted+=suggestions(state,replica,suggestionChanges,suggestionSequence);suggestionChanges=new JSONObject();}
                         replace(rows,row,"suggestions",false);projected.put(key,row);last=sequence;continue;
                     }
                 }
+                emitted+=suggestions(state,replica,suggestionChanges,suggestionSequence);suggestionChanges=new JSONObject();
                 if(source.equals("documents")&&old!=null&&old.getLong("filing_decision")!=row.getLong("filing_decision"))fullFiling.add(row.getString("id"));
                 if(source.equals("stacks")&&old!=null&&old.getLong("sort_order")!=row.getLong("sort_order"))catalogOrder=true;
                 if(source.equals("pages")&&(action.equals("DELETE")||old!=null&&old.getLong("position")!=row.getLong("position")))pageOrders.add(row.getString("document_id"));
@@ -82,6 +88,7 @@ final class SyncJournal {
                 manifest=candidate;last=sequence;
             }
         }
+        emitted+=suggestions(state,replica,suggestionChanges,suggestionSequence);
         control.check();
         JSONObject finalCells=SyncGraph.cells(current),changes=SyncGraph.diff(projected,finalCells);
         if(catalogOrder)changes.put("catalog_order/stacks",finalCells.get("catalog_order/stacks"));
@@ -95,10 +102,9 @@ final class SyncJournal {
         if(changes.length()>0) {state.local(replica,changes,new JSONObject().put("kind","android.raw-row.final"));emitted++;}
         return new Replay(finalCells,last,emitted);
     }
-    private static boolean queueOnly(JSONObject old,JSONObject row)throws IOException,JSONException {
-        if(!row.getString("status").equals("pending")||row.getLong("generation")<0||row.getLong("generation")>SyncProtocol.MAX_SEQUENCE)return false;
-        for(String field:SyncProtocol.keys(old))if(!field.equals("generation")&&!field.equals("status")&&!SyncProtocol.canonical(old.get(field)).equals(SyncProtocol.canonical(row.get(field))))return false;
-        return true;
+    private static int suggestions(SyncProtocol.State state,String replica,JSONObject changes,long sequence)throws IOException,JSONException {
+        if(changes.length()==0)return 0;
+        SyncGraph.validateChanges(changes);state.local(replica,changes,new JSONObject().put("kind","android.raw-row").put("table","suggestions").put("sequence",sequence));return 1;
     }
     private static String table(String source)throws IOException {
         switch(source){case "document_stacks":return "memberships";case "suggestion_choices":return "choices";

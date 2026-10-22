@@ -244,14 +244,23 @@ final class PairingTransport {
         for(int i=0;i<array.length();i++)if(value.equals(array.getString(i)))return true;return false;
     }
 
+    // Computers running Stack 0.1.0 reject unknown hello fields and close the
+    // connection. After such a refusal, use the plain hello for a while.
+    private static volatile long plainHelloUntil;
+    private static final class HelloRefused extends IOException {HelloRefused(IOException cause){super("Computer refused the hello",cause);}}
+
     private JSONObject hello(JSONObject policy,SessionControl control)throws Exception {
-        // Only group identity is needed; a full status also scans every document.
-        SyncStore current=new SyncStore(context,store.repository,control::check);SyncProtocol.State state=current.load();String local=current.replica();
+        // Only group identity and frontier are needed; a full status also scans every document.
+        SyncStore current=new SyncStore(context,store.repository,control::check);
+        // Local edits must be recorded before the frontier is advertised.
+        current.capture();SyncProtocol.State state=current.load();String local=current.replica();
         if(state==null)throw new IOException("Start or adopt the group before Sync now");
         if(!policy.getString("group").equals(state.library)||state.members.size()!=2
             ||!state.members.contains(local)||!state.members.contains(policy.getString("peer_replica")))
             throw new IOException("Network transport requires the frozen two-member group");
-        return new JSONObject().put("version",1).put("group",policy.getString("group")).put("replica",local);
+        JSONObject hello=new JSONObject().put("version",1).put("group",policy.getString("group")).put("replica",local);
+        if(System.currentTimeMillis()>=plainHelloUntil)hello.put("frontier",SyncProtocol.json(state.frontier));
+        return hello;
     }
 
     SSLContext tls(JSONObject policy)throws Exception {
@@ -276,6 +285,10 @@ final class PairingTransport {
         return syncNow(host,port,new SessionControl()).put("status",store.status());
     }
     JSONObject syncNow(String host,int port,SessionControl control)throws Exception {
+        try{return session(host,port,control);}
+        catch(HelloRefused refused){plainHelloUntil=System.currentTimeMillis()+15*60*1000L;return session(host,port,control);}
+    }
+    private JSONObject session(String host,int port,SessionControl control)throws Exception {
         if(Looper.myLooper()==Looper.getMainLooper())throw new IOException("Run Sync now on the foreground IO executor");
         control.check();
         if(host==null||host.isEmpty()||port<1||port>65535)throw new IOException("Choose a valid peer address");
@@ -296,10 +309,21 @@ final class PairingTransport {
                 ensurePolicyCurrent(policy);
                 DataInputStream in=new DataInputStream(new BufferedInputStream(socket.getInputStream(),65536));
                 DataOutputStream out=new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(),65536));
-                sendControl(out,'H',local);JSONObject remote=readControl(in,'H');
-                SyncProtocol.exact(remote,"version,group,replica");
+                sendControl(out,'H',local);JSONObject remote;
+                try{remote=readControl(in,'H');}catch(IOException refused){if(local.has("frontier")&&!control.canceled())throw new HelloRefused(refused);throw refused;}
+                SyncProtocol.exact(remote,remote.has("frontier")?"version,group,replica,frontier":"version,group,replica");
                 if(remote.getInt("version")!=1||!policy.getString("group").equals(remote.getString("group"))
                     ||!policy.getString("peer_replica").equals(remote.getString("replica")))throw new IOException("Peer group or replica mismatch");
+                // Equal frontiers: each side already holds every operation the
+                // other has, so the computer ends the session here as well.
+                if(local.has("frontier")&&remote.has("frontier")) {
+                    java.util.TreeMap<String,Long> ours=SyncProtocol.frontier(local.getJSONObject("frontier")),theirs=SyncProtocol.frontier(remote.getJSONObject("frontier"));
+                    ours.values().removeIf(sequence->sequence==0);theirs.values().removeIf(sequence->sequence==0);
+                    if(ours.equals(theirs)) {
+                        new SyncStore(context,store.repository,control::check).acknowledgeEqual(policy.getString("peer_replica"),theirs);
+                        return new JSONObject().put("peer",policy.getString("peer_replica")).put("skipped",true);
+                    }
+                }
                 // A populated peer may spend more than45s validating and durably
                 // applying a bundle before it can send its receipt. Trust and
                 // group are established first; cancel still closes this socket.

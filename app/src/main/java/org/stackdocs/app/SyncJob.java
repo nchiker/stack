@@ -20,10 +20,21 @@ public final class SyncJob extends JobService {
         if(!paired.has("paired_peer")||paired.optBoolean("revoked")||paired.optString("host").isEmpty()||paired.optString("peer_name").isEmpty())return;
         preferences(context).edit().putString("sync_host",paired.optString("host")).putString("sync_peer_name",paired.optString("peer_name")).commit();
     }
+    private static final int JOB_VERSION=2;
     static void schedule(Context context){
         JobScheduler jobs=context.getSystemService(JobScheduler.class);
         if(preferences(context).getString("sync_peer_name","").isEmpty()){jobs.cancel(JOB);return;}
-        jobs.schedule(new JobInfo.Builder(JOB,new ComponentName(context,SyncJob.class)).setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).setPersisted(true).setPeriodic(15*60*1000L).build());
+        // This runs on every process start, including the one the job itself
+        // starts, and scheduling again stops a running job. Keep a current one.
+        JobInfo current=jobs.getPendingJob(JOB);
+        if(current!=null&&current.getExtras().getInt("version")==JOB_VERSION)return;
+        android.os.PersistableBundle extras=new android.os.PersistableBundle();extras.putInt("version",JOB_VERSION);
+        JobInfo.Builder job=new JobInfo.Builder(JOB,new ComponentName(context,SyncJob.class)).setExtras(extras).setPersisted(true).setPeriodic(15*60*1000L);
+        // The computer is on the local network: Wi-Fi or Ethernet, with or without internet.
+        if(android.os.Build.VERSION.SDK_INT>=28)job.setRequiredNetwork(new android.net.NetworkRequest.Builder().removeCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .addTransportType(android.net.NetworkCapabilities.TRANSPORT_WIFI).addTransportType(android.net.NetworkCapabilities.TRANSPORT_ETHERNET).build());
+        else job.setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED);
+        jobs.schedule(job.build());
     }
     static void changed(StackApplication app){
         if(active.get()||app.resetRequested)return;
@@ -75,6 +86,6 @@ public final class SyncJob extends JobService {
         PairingTransport.SessionControl current=connection;if(current!=null)current.cancel();
         app.io.execute(()->{try{new PairingTransport(app,app.library).revoke();preferences(app).edit().remove("sync_peer_name").remove("sync_host").remove("sync_last_ack").apply();schedule(app);status="Disconnected";}catch(Exception error){status="Could not disconnect. Please try again.";}ui.post(finished);});
     }
-    @Override public boolean onStartJob(JobParameters parameters){StackApplication app=(StackApplication)getApplication();if(active.get()||!app.access.allowed()||app.resetRequested)return false;ui.post(()->kick(app,()->jobFinished(parameters,!status.equals("Up to date"))));return true;}
+    @Override public boolean onStartJob(JobParameters parameters){StackApplication app=(StackApplication)getApplication();if(active.get()||!app.access.allowed()||app.resetRequested)return false;ui.post(()->kick(app,()->jobFinished(parameters,!status.equals("Up to date")&&!status.startsWith("Computer unavailable"))));return true;}
     @Override public boolean onStopJob(JobParameters parameters){PairingTransport.SessionControl current=connection;if(current!=null)current.cancel();return !preferences(this).getString("sync_peer_name","").isEmpty();}
 }

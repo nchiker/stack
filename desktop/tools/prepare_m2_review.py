@@ -49,7 +49,7 @@ def main():
                                                'paging_documents': 60, 'paging_launcher': str(out / 'run-many'),
                                                'sources': str(out / 'sources'), 'archives': str(out / 'archives'),
                                                'exports': str(out / 'exports')}, indent=2) + '\n')
-    print(f'Prepared synthetic libraries (five and sixty documents). When ready, run:\n{out}/run\nReview: docs/desktop/M2_REVIEW.md')
+    print(f'Prepared synthetic libraries (five and sixty documents). When ready, run:\n{out}/run')
 
 
 if __name__ == '__main__':

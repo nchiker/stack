@@ -114,7 +114,10 @@ final class SyncExchange {
         }
         if(!state.library.equals(library)||!state.members.contains(sender))throw SyncProtocol.invalid("unreviewed sender or group");
         for(SyncProtocol.Operation op:staged.operations)if(op.replica.equals(local)&&!state.history.containsKey(op.key)&&!state.pending.containsKey(op.key))throw SyncProtocol.invalid("incoming peer cannot create a local-origin operation");
-        String before=state.saved().toString();int applied=state.receive(staged.operations);boolean changed=!before.equals(state.saved().toString());
+        // Receiving only adds operations, to history or pending, so the counts
+        // show a change without serializing the whole state twice.
+        java.util.Set<String> known=new HashSet<>(state.history.keySet());int held=state.history.size()+state.pending.size();
+        int applied=state.receive(staged.operations);boolean changed=state.history.size()+state.pending.size()!=held;
         if(adopting) {
             if(!state.pending.isEmpty()||state.history.isEmpty())throw SyncProtocol.invalid("complete baseline operations required");
             for(SyncProtocol.Operation op:state.history.values())if(op.sequence==1&&"baseline.explicit".equals(op.json.getJSONObject("evidence").optString("kind"))&&op.json.getJSONObject("evidence").optInt("graph_model")==SyncGraph.MODEL){baseline=op.changes;break;}
@@ -135,7 +138,10 @@ final class SyncExchange {
             else {copyFile(new File(staged.directory,sha),target,size);if(!SyncStore.hash(target,size,control).equals(sha))throw SyncProtocol.invalid("retained blob changed");}
         }
         syncDir(cache);
-        for(Ref ref:refs(state).values()){
+        // Originals of earlier history were verified when it was applied, and
+        // stay on disk while sync is enabled. Hash only what this exchange added.
+        List<SyncProtocol.Operation> added=new ArrayList<>();for(SyncProtocol.Operation op:state.history.values())if(adopting||!known.contains(op.key))added.add(op);
+        for(Ref ref:refs(added).values()){
             File output=file(ref.path);if(output.exists()){if(!SyncStore.hash(output,ref.length,control).equals(ref.sha))throw SyncProtocol.invalid("original path collision");continue;}
             File source=new File(cache,ref.sha);if(!source.isFile())throw SyncProtocol.invalid("required original missing");File parent=output.getParentFile();if(!parent.isDirectory()&&!parent.mkdirs())throw new IOException("Could not install original");
             copyFile(source,output,ref.length);if(!SyncStore.hash(output,ref.length,control).equals(ref.sha))throw SyncProtocol.invalid("installed original changed");syncDir(parent);
@@ -151,7 +157,6 @@ final class SyncExchange {
         store.probe.reached("receipt");
         return new JSONObject().put("applied",applied).put("pending_gaps",state.pending.size()).put("durable_frontier",SyncProtocol.json(state.frontier)).put("conflicts",state.conflicts().length()).put("adopted",adopting);
     }
-    private Map<String,Ref> refs(SyncProtocol.State state)throws IOException,JSONException {return refs(state.history.values());}
     private Map<String,Ref> refs(Collection<SyncProtocol.Operation> operations)throws IOException,JSONException {
         TreeMap<String,Ref> result=new TreeMap<>();for(SyncProtocol.Operation op:operations)for(String key:SyncProtocol.keys(op.changes))if(key.startsWith("files/")&&!op.changes.isNull(key)) {
             JSONObject value=op.changes.getJSONObject(key);String path=value.getString("path"),sha=value.getString("sha256");long length=SyncProtocol.integer(value.get("length"));file(path);if(!sha.matches("[0-9a-f]{64}")||length>LibraryArchive.FILE_BYTES)throw SyncProtocol.invalid("invalid file reference");

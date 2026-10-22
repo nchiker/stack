@@ -40,12 +40,18 @@ final class SyncLargeStateChecks {
             int operations=store.load().history.size();
             for(int i=0;i<4;i++)repository.database().execSQL("UPDATE suggestions SET generation=generation+1,status='pending'");
             long started=android.os.SystemClock.elapsedRealtime();store.capture();long elapsed=android.os.SystemClock.elapsedRealtime()-started;
-            NearbyPairingChecks.require(store.load().history.size()==operations+256,"Every queue invalidation retains its separate causal operation");
+            // One replay's suggestion changes are consecutive local operations, so they are recorded as one.
+            NearbyPairingChecks.require(store.load().history.size()==operations+1,"Queue invalidations from one replay are one causal operation");
+            JSONObject values=store.load().values();
+            try(android.database.Cursor rows=repository.database().rawQuery("SELECT document_id,generation,status FROM suggestions",null)){while(rows.moveToNext()){
+                JSONObject cell=values.getJSONObject("suggestions/"+SyncProtocol.canonical(new org.json.JSONArray().put(rows.getString(0))));
+                NearbyPairingChecks.require(cell.getLong("generation")==rows.getLong(1)&&cell.getString("status").equals(rows.getString(2)),"Causal suggestion cells equal every saved row");
+            }}
             NearbyPairingChecks.require(elapsed<30000,"Populated queue replay completes within30s, actual="+elapsed+"ms");
             long cursor=DatabaseUtils.longForQuery(repository.database(),"SELECT journal_cursor FROM sync_state WHERE singleton=1",null);
             NearbyPairingChecks.require(cursor==DatabaseUtils.longForQuery(repository.database(),"SELECT max(sequence) FROM sync_change",null),"Queue replay durably advances through every recorded row");
-            store.capture();NearbyPairingChecks.require(store.load().history.size()==operations+256&&notes.equals(DatabaseUtils.stringForQuery(repository.database(),"SELECT notes FROM documents LIMIT 1",null)),"Queue replay is idempotent and preserves exact document notes");
-            mark.accept("Populated queue replay retains256 causal updates without rebuilding the full library per row; elapsed="+elapsed+"ms");
+            store.capture();NearbyPairingChecks.require(store.load().history.size()==operations+1&&notes.equals(DatabaseUtils.stringForQuery(repository.database(),"SELECT notes FROM documents LIMIT 1",null)),"Queue replay is idempotent and preserves exact document notes");
+            mark.accept("Populated queue replay records256 row updates as one causal operation equal to the saved rows, without rebuilding the full library per row; elapsed="+elapsed+"ms");
         } finally {repository.closeForReset();}
     }
 }

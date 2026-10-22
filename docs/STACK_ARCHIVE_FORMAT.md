@@ -164,8 +164,7 @@ from that ID. Dollar and pound symbols alone retain unknown currency.
 ## Original Google Stack migration
 
 The one-time local converter writes compatible format 2/schema 7; it does not change
-the archive contract or import original app policy/account data. See
-[actual preparation and limitations](STACK_GOOGLE_STACK_MIGRATION.md). Legacy
+the archive contract or import original app policy/account data. Legacy
 exact strings and opaque type codes stay text plus source provenance; source
 PDF snapshots and referenced JPEGs are retained. No inferred enum/currency/date
 conversion, extra native processing or automatic personal-library restore occurs.
@@ -199,8 +198,7 @@ convention, not inferred country certainty. Old unknown-currency records and exa
 legacy text remain as stored. Actor/basis data survive archive round trips.
 
 The real original Google Stack transfer was explicitly authorized and completed
-after deletion of current test documents through production batch UI. See
-[actual verification](STACK_AUTOMATIC_DETAILS.md). This was not a test restore or
+after deletion of current test documents through production batch UI. This was not a test restore or
 a DB replacement. The original source app and private host backup remain.
 
 ## Local presentation and backup history (0.8.7)
@@ -209,5 +207,4 @@ Newest/Name document sorting and last successful backup timestamp are local view
 preferences, excluded from this archive. A restore never marks a local backup as saved
 or changes these preferences. Timestamp updates only after successful export close;
 failed output and canceled review keep the prior value. Format3/schema8 and both
-older readers are unchanged. See [primary-phone installation and restore](STACK_PRIMARY_PHONE_INSTALL.md)
-for the already converted Google archive versus a current Stack backup.
+older readers are unchanged.

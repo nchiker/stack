@@ -2,8 +2,8 @@
 
 Updated 2026-10-20. Experimental implementation in `stack-sync`, with the same causal
 kernel in production Java `SyncProtocol.java` and ten shared golden cases in
-`desktop/protocol/golden-v1.json`. This does not close the full M3/M4/M5 gates.
-The broader requirements remain in [draft 0.1](INTEROP_SYNC_CONTRACT_V0_1.md).
+`desktop/protocol/golden-v1.json`. The phone and desktop apps both use it in
+production; two-way sync between real devices was verified in Stack 0.9.0.
 
 Archive version 3/schema 8, desktop schema 4, Android schema 9 and wire version 1
 are independent. SQLite/WAL and device policy are never exchanged. The existing
@@ -95,8 +95,9 @@ see [paired transport](PAIRED_TRANSPORT.md). File exchange itself enrolls no pee
 Observed conformance includes Rust causal permutations/gaps/replay/resolution,
 ten shared host Java/Rust cases, envelope corruption/truncation/path validation,
 and actual three-library SQLite/file exchange with originals/deletion retention.
-See [remaining evidence](REMAINING_EVIDENCE.md). Android SQLite, renderer, lifecycle,
-authoritative journaling, file exchange and actual device convergence remain M5.
+Android's journal capture records a run of consecutive suggestion-row changes as
+one operation; they are local operations with no remote operation between them,
+so this matches recording each row separately.
 
 The native desktop now exposes source-matched nonempty adoption, file exchange and
 conflict resolution. Identity sections and conflict alternatives are paged; page

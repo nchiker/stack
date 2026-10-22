@@ -28,9 +28,10 @@ connections use the existing authenticated exchange on the repository worker.
 Discovery after pairing is only an address hint; exact TLS pins remain mandatory.
 
 Android uses the existing serial IO executor for exchange, debounces local changes,
-checks about every15seconds in the foreground and schedules persisted network
-jobs with Android's minimum15minute periodic interval. Android may defer those
-jobs. Pairing preferences retain the verified computer and its last address.
+checks every 30 seconds while Stack is open and schedules a persisted job with
+Android's minimum 15-minute periodic interval, requiring Wi-Fi or Ethernet (not
+internet access). Android may defer that job. Starting the app keeps an existing
+job rather than rescheduling it, because rescheduling stops a running job. Pairing preferences retain the verified computer and its last address.
 Address failure triggers existing discovery before retrying the pinned peer.
 Leaving the Sync screen does not cancel ordinary exchange. Disconnect cancels
 current work, revokes the local policy and stops scheduling.
@@ -62,8 +63,8 @@ Default ordinary exchange port is45873. The application keeps a receiver while d
 automatic attempts; these one-shot CLI tools retain their original bounded behavior.
 Android target/compile SDK remain36.
 
-The client sends a `STACKEX1` bundle, the server replies with one, and the
-client sends a final receipt bundle. The unchanged repository import path
+After the hello, the client sends a `STACKEX1` bundle, the server replies with
+one, and the client sends a final receipt bundle. The unchanged repository import path
 validates and durably applies each bundle before the receiver emits a JSON
 receipt. A failed socket can be retried; replayed operation IDs do not apply
 twice. An unresolved conflict or pending gap remains visible in repository
@@ -71,7 +72,14 @@ status rather than being reported as a complete merge.
 
 Each frame is `STACKLAN1` (nine ASCII bytes), a kind byte, an unsigned
 big-endian 64-bit payload length, then payload. `H` carries JSON
-`{version,group,replica}`, `B` carries unchanged exchange bytes, and `R`
+`{version,group,replica}` plus an optional `frontier` (the highest committed
+operation per replica). The client may include its frontier; the server includes
+its own only if the client did, because Stack 0.1.0 desktops and Stack 0.9.0
+phones reject unknown hello fields. When both frontiers are present and equal,
+neither side has an operation the other lacks: each records the other's frontier
+as its receipt and the session ends after the hello. If a desktop closes the
+connection after an extended hello, the phone retries with the plain hello and
+keeps using it for 15 minutes. `B` carries unchanged exchange bytes, and `R`
 carries the durable import result. Control payloads are capped at 16 KiB;
 bundles at the existing 8 GiB original-byte + 32 MiB metadata + 12-byte
 envelope maximum. Both platforms stream bundle data through private temporary

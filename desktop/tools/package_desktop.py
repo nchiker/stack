@@ -26,6 +26,12 @@ def main():
     for source in [ROOT / 'target' / args.profile / name for name in ('stack-desktop', 'stack-cli', 'stack-transport')]:
         if not source.is_file():
             parser.error(f'Build the workspace first: {source}')
+    # Binaries are copied, not built here: refuse ones older than the source.
+    newest = max(p.stat().st_mtime for p in ROOT.rglob('*') if p.is_file() and p.suffix in ('.rs', '.toml', '.lock')
+                 and not any(part in ('target', 'runtime') for part in p.relative_to(ROOT).parts))
+    for name in ('stack-desktop', 'stack-cli', 'stack-transport'):
+        if (ROOT / 'target' / args.profile / name).stat().st_mtime < newest:
+            parser.error(f'Rebuild first (cargo build --workspace{" --release" if args.profile == "release" else ""}): {name} is older than the source')
     for engine in ('pdfium/lib/libpdfium.so', 'ocr/ENGINE.json'):
         if not (ROOT / 'runtime' / engine).is_file():
             parser.error('Prepare the pinned PDFium and OCR runtimes first')

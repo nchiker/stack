@@ -232,6 +232,13 @@ impl Stack {
                     Some(Pending::NetworkSession) => {
                         self.sync.network.status = value["pairing"].clone();
                         self.sync.network.last_sync = Some(std::time::Instant::now());
+                        // Neither side had anything new, so the shown status is current.
+                        if value["session"]["skipped"] == true {
+                            if let Some(request) = self.sync.queued_request.take() {
+                                return self.repository_request(request);
+                            }
+                            return app::Task::none();
+                        }
                         if value["session"]["received"]["applied"]
                             .as_u64()
                             .unwrap_or(0)

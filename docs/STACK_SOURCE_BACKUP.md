@@ -1,6 +1,6 @@
-# Private phone and desktop source backup
+# Source checkpoint on GitHub
 
-The private repository is https://github.com/nchiker/stack. Its `main` branch is a
+The repository https://github.com/nchiker/stack is **public**. Its `main` branch is a
 Stack-only source checkpoint, including unfinished Android and desktop work. It is
 not a release and does not contain the user's document library, signing keys,
 credentials, build outputs or downloaded native runtimes. The shared local parent
@@ -14,19 +14,22 @@ in the original parent repository.
 To update the backup from this workspace, use a separate owned checkout:
 
 ```sh
-python3 tools/backup_github.py --mirror /tmp/stack-source-backup-20261019a --push
+python3 tools/backup_github.py --mirror ~/.cache/stack-source-backup --push --public
 ```
 
 The tool collects tracked and nonignored Stack source, rejects credentials and
-library files, verifies the destination is private, and commits/pushes only its
+library files, and commits/pushes only its
 separate checkout. It never stages the shared working repository. Reuse the same
-mirror to retain checkpoint history. If that temporary mirror is lost, clone the
-backup first, then pass its path:
+mirror to retain checkpoint history. If the mirror is lost, clone the repository
+first, then pass its path:
 
 ```sh
-gh repo clone nchiker/stack /tmp/stack-source-backup
-python3 tools/backup_github.py --mirror /tmp/stack-source-backup --push
+gh repo clone nchiker/stack ~/.cache/stack-source-backup
+python3 tools/backup_github.py --mirror ~/.cache/stack-source-backup --push --public
 ```
+
+Release binaries (APK, Flatpak) are attached to GitHub Releases, never committed.
+Never commit personal document content, keys or credentials.
 
 To recover source into a fresh directory:
 
