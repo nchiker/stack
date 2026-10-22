@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Stack
+Comment=Keep and sync your documents
+Exec=stack
+Icon=org.stackdocs.desktop
+Terminal=false
+Categories=Office;
+StartupWMClass=org.stackdocs.desktop
+StartupNotify=true

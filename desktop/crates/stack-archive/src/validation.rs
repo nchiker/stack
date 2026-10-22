@@ -318,7 +318,7 @@ fn validate_date(value: &str, precision: &str) -> Result<()> {
     Ok(())
 }
 
-fn crop(value: &str) -> Result<()> {
+pub fn crop(value: &str) -> Result<()> {
     if value.is_empty() {
         return Ok(());
     }

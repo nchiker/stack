@@ -1,5 +1,15 @@
 # Remaining P0: implement continuously, verify at the end
 
+## Current continuation — 2026-10-20
+
+The user authorized replacing only disposable Pixel4a serial0A121JEC203530 and
+resuming P0 autonomously. The original package now uses a permanent development
+key; Stack Recovery is retired. Current physical-camera/offline-library checks,
+source-specific failures and fixes are recorded in
+[the test-device continuation](p0/TEST_DEVICE_CONTINUATION_20261020.md).
+The delivery below remains historical; the later P1/H1–H8 user completion is
+retained. Do not replay that session or access the protected primary phone.
+
 ## Current delivery — 0.7.1-dev / code 12 / schema 6
 
 The remaining P0 implementation sweep and all feasible final verification are

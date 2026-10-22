@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dependencies]
 stack-core.workspace = true
+stack-archive.workspace = true
 rustls.workspace = true
 sha2.workspace = true
 serde.workspace = true

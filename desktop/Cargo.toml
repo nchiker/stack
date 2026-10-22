@@ -20,7 +20,7 @@ image = { version = "=0.25.10", default-features = false, features = ["jpeg", "p
 flate2 = "=1.1.10"
 pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881", "image_025", "thread_safe"] }
 thiserror = "=2.0.21"
-serde = { version = "=1.0.229", features = ["derive"] }
+serde = { version = "=1.0.229", features = ["derive", "rc"] }
 serde_json = "=1.0.154"
 sha2 = "=0.10.9"
 libcosmic = { git = "https://github.com/pop-os/libcosmic", rev = "dbc62f2d899cdbfbe43d170689ddc0290db663f4", default-features = false, features = ["winit", "wayland", "tokio", "xdg-portal", "a11y"] }
@@ -32,6 +32,7 @@ rusqlite = { version = "=0.40.2", features = ["bundled"] }
 uuid = { version = "=1.28.0", features = ["v4", "v5"] }
 rustix = { version = "=1.1.5", features = ["fs"] }
 tempfile = "=3.27.0"
+qrcodegen = "=1.8.0"
 
 [profile.dev]
 debug = 0
@@ -72,6 +73,23 @@ opt-level = 2
 [profile.dev.package.iced_graphics]
 opt-level = 2
 [profile.test.package.iced_graphics]
+opt-level = 2
+
+# Maximum-count archive validation, graph/index writes and native widget layout
+# also run CPU loops in development and acceptance builds. Preserve the same
+# validation/durability paths while giving them the optimization already used by
+# pixel processing and text shaping above.
+[profile.dev.package.stack-core]
+opt-level = 2
+[profile.test.package.stack-core]
+opt-level = 2
+[profile.dev.package.stack-archive]
+opt-level = 2
+[profile.test.package.stack-archive]
+opt-level = 2
+[profile.dev.package.iced_widget]
+opt-level = 2
+[profile.test.package.iced_widget]
 opt-level = 2
 
 # Scoped native adapter and owned handle fixes; upstream source/license hashes in platform/.

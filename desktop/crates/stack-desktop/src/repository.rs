@@ -4,6 +4,13 @@ use stack_core::{DocumentView, SearchHit, Sort, StackEdit, StackSummary, library
 use std::path::PathBuf;
 
 pub enum Request {
+    ResetPreview,
+    ResetRecovery,
+    ScheduleReset {
+        mode: stack_core::reset::Mode,
+        library: String,
+        revision: i64,
+    },
     Sync(SyncRequest),
     TextClaim(Option<String>),
     TextFinish(stack_core::TextJob, Result<stack_core::TextOutput, String>),
@@ -40,18 +47,16 @@ pub enum Request {
 }
 
 pub enum SyncRequest {
+    Network(crate::network_ui::Request),
     Status,
+    #[cfg(test)]
     Start(Vec<String>),
-    Review(PathBuf),
-    Adopt {
-        path: PathBuf,
-        plan: serde_json::Value,
-        control: stack_archive::Control,
-    },
-    Import {
+    #[cfg(test)]
+    Review {
         path: PathBuf,
         control: stack_archive::Control,
     },
+    #[cfg(test)]
     Export {
         peer: String,
         path: PathBuf,
@@ -66,6 +71,9 @@ pub enum SyncRequest {
 
 #[derive(Clone, Debug)]
 pub enum Response {
+    ResetPreview(serde_json::Value),
+    ResetRecovery(Option<stack_core::reset::Mode>),
+    ResetScheduled,
     Sync(serde_json::Value),
     TextClaim {
         job: Option<stack_core::TextJob>,
@@ -116,29 +124,58 @@ pub fn start_operations(
     Worker::new("stack-repository", move |request| {
         // Open/recovery/retry belongs to this thread, including lock contention.
         if library.is_none() {
-            let opened = Library::open(&root).map_err(|e| e.to_string())?;
+            let mut opened = Library::open(&root).map_err(|e| e.to_string())?;
+            opened
+                .clean_legacy_sync_stacks()
+                .map_err(|e| e.to_string())?;
             if let Some(expected) = &expected {
                 verify_synthetic(&opened, expected)?;
             }
             library = Some(opened);
         }
         let library = library.as_mut().expect("opened repository");
+        if library.reset_pending() {
+            return Err("A library reset is pending. Close and reopen Stack.".into());
+        }
         let run = || -> stack_core::library::Result<Response> {
             match request {
+                Request::ResetRecovery => {
+                    Ok(Response::ResetRecovery(library.take_reset_completion()?))
+                }
+                Request::ResetPreview => Ok(Response::ResetPreview(serde_json::to_value(
+                    library.status()?,
+                )?)),
+                Request::ScheduleReset {
+                    mode,
+                    library: expected,
+                    revision,
+                } => {
+                    library.request_reset(mode, &expected, revision)?;
+                    Ok(Response::ResetScheduled)
+                }
                 Request::Sync(command) => {
                     use SyncRequest::*;
                     let value = match command {
-                        Status => library.sync_status()?,
-                        Start(members) => library.sync_start(&members)?,
-                        Review(path) => library.sync_review_adoption(&path)?,
-                        Adopt {
-                            path,
-                            plan,
-                            control,
-                        } => library.sync_adopt_reviewed_control(&path, &plan, &control)?,
-                        Import { path, control } => {
-                            library.sync_import_control(&path, None, &control)?
+                        Status => {
+                            let mut value = library.sync_status()?;
+                            value["pairing"] = crate::network_ui::pairing_status(library.root())
+                                .unwrap_or_else(
+                                    |error| serde_json::json!({"error":error.to_string()}),
+                                );
+                            value
                         }
+                        Network(request) => {
+                            crate::network_ui::execute(library, request).map_err(|error| {
+                                stack_core::library::Error::Io(std::io::Error::other(error))
+                            })?
+                        }
+                        #[cfg(test)]
+                        Start(members) => library.sync_start(&members)?,
+                        #[cfg(test)]
+                        Review { path, control } => {
+                            library.sync_review_adoption_control(&path, &control)?
+                        }
+                        #[cfg(test)]
                         Export {
                             peer,
                             path,
@@ -357,7 +394,27 @@ mod tests {
         let started = request(SyncRequest::Start(vec![peer.clone()]));
         assert_eq!(started["adopted"], true);
         assert_eq!(started["members"].as_array().unwrap().len(), 2);
-        assert!(started["members"].as_array().unwrap().iter().any(|id| id == &own));
+        assert!(
+            started["members"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|id| id == &own)
+        );
+        let canceled = stack_archive::Control::default();
+        canceled.cancel();
+        assert!(
+            worker
+                .submit_required(Request::Sync(SyncRequest::Export {
+                    peer: peer.clone(),
+                    path: exchange.clone(),
+                    control: canceled,
+                }))
+                .blocking_recv()
+                .unwrap()
+                .is_err()
+        );
+        assert!(!exchange.exists(), "a canceled file must not be published");
         request(SyncRequest::Export {
             peer: peer.clone(),
             path: exchange.clone(),
@@ -374,9 +431,46 @@ mod tests {
             .blocking_recv()
             .unwrap()
             .unwrap()
-        else { panic!("status after restart") };
+        else {
+            panic!("status after restart")
+        };
         assert_eq!(saved["library"], status["library"]);
         assert_eq!(saved["members"], status["members"]);
+
+        let review_worker = start(directory.path().join("reviewer"), None, None);
+        let canceled = stack_archive::Control::default();
+        canceled.cancel();
+        assert!(
+            review_worker
+                .submit_required(Request::Sync(SyncRequest::Review {
+                    path: exchange.clone(),
+                    control: canceled,
+                }))
+                .blocking_recv()
+                .unwrap()
+                .is_err()
+        );
+        let Response::Sync(unchanged) = review_worker
+            .submit_required(Request::Sync(SyncRequest::Status))
+            .blocking_recv()
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("reviewer status")
+        };
+        assert_eq!(unchanged["adopted"], false);
+        let Response::Sync(review) = review_worker
+            .submit_required(Request::Sync(SyncRequest::Review {
+                path: exchange,
+                control: stack_archive::Control::default(),
+            }))
+            .blocking_recv()
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("review plan after retry")
+        };
+        assert_eq!(review["library"], saved["library"]);
     }
 
     #[test]

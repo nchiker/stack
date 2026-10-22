@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "canonical": {
+    "application_id": "org.stackdocs.app",
+    "key_alias": "stack-canonical",
+    "certificate_sha256": "db7352c8df2d3643ae9dc119ffd73ee26a700808d53efad3cf60a753e620eeab"
+  },
+  "development": {
+    "key_alias": "stack-development",
+    "certificate_sha256": "e873f2fd869005e59828db6d4f8f31d1b05a37988818a7dd94adc1ae1b07e311",
+    "application_ids": ["org.stackdocs.app", "org.stackdocs.app.checks", "org.stackdocs.app.checks.*"]
+  }
+}

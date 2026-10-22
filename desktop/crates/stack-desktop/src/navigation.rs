@@ -10,7 +10,6 @@ pub enum Location {
     Documents,
     Stack(String),
     ManageStacks,
-    Sync,
 }
 
 impl Stack {
@@ -18,8 +17,6 @@ impl Stack {
         self.nav.clear();
         let target = if self.catalog.open {
             Location::ManageStacks
-        } else if self.sync.open {
-            Location::Sync
         } else {
             self.filter
                 .clone()
@@ -37,7 +34,9 @@ impl Stack {
             )
             .data(Location::Documents)
             .id();
-        self.nav.activate(id);
+        if !self.sync.open {
+            self.nav.activate(id);
+        }
         for (index, stack) in self.stacks.iter().filter(|s| s.visible).enumerate() {
             let location = Location::Stack(stack.id.clone());
             let entry = self
@@ -47,7 +46,7 @@ impl Stack {
                 .divider_above(index == 0)
                 .icon(catalog::icon(stack))
                 .data(location.clone());
-            if target == location {
+            if !self.sync.open && target == location {
                 entry.activate();
             }
         }
@@ -57,11 +56,7 @@ impl Stack {
             .text("Manage stacks")
             .divider_above(true)
             .data(Location::ManageStacks);
-        if target == Location::ManageStacks {
-            entry.activate();
-        }
-        let entry = self.nav.insert().text("Sync exchange").data(Location::Sync);
-        if target == Location::Sync {
+        if !self.sync.open && target == Location::ManageStacks {
             entry.activate();
         }
     }
@@ -84,9 +79,14 @@ impl Stack {
 
     pub fn go_back(&mut self) -> app::Task<Message> {
         if self.sync.open {
+            if self.sync.page == crate::sync_ui::Page::Overview {
+                return self
+                    .sync_action(crate::sync_ui::Action::Page(crate::sync_ui::Page::Settings));
+            }
             self.sync.open = false;
             self.rebuild_navigation();
-            return self.refresh_browser();
+            let refresh = self.refresh_browser();
+            return self.restore_list_position(refresh);
         }
         if self.catalog.open {
             self.catalog.open = false;
@@ -128,7 +128,7 @@ impl Stack {
         .modal(false)
         .on_close(Message::LibraryMenu(false));
         if self.library_menu_open {
-            let actions = widget::column::with_capacity(2)
+            let actions = widget::column::with_capacity(3)
                 .spacing(8)
                 .push(
                     self.button("Import backup…").on_press_maybe(
@@ -142,6 +142,12 @@ impl Stack {
                             .then_some(Message::Transfer(Action::Pick(Pick::ArchiveExport))),
                     ),
                 );
+            let actions = actions.push(
+                self.button("Reset or rebuild library…").on_press_maybe(
+                    (!self.transfers.busy() && !self.sync.busy && !self.saving)
+                        .then_some(Message::Reset(crate::reset_ui::Action::Open)),
+                ),
+            );
             popup = popup.popup(
                 widget::container(actions)
                     .padding(12)

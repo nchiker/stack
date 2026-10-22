@@ -1,11 +1,11 @@
-# Executable exchange protocol 1 — implementation subset
+# Executable exchange protocol 1 — graph model 2
 
-2026-10-18. Experimental implementation in `stack-sync`, with the same causal
-kernel in production Java `SyncProtocol.java` and five shared golden cases in
+Updated 2026-10-20. Experimental implementation in `stack-sync`, with the same causal
+kernel in production Java `SyncProtocol.java` and ten shared golden cases in
 `desktop/protocol/golden-v1.json`. This does not close the full M3/M4/M5 gates.
 The broader requirements remain in [draft 0.1](INTEROP_SYNC_CONTRACT_V0_1.md).
 
-Archive version 3/schema 8, desktop schema 4, Android schema 8 and wire version 1
+Archive version 3/schema 8, desktop schema 4, Android schema 9 and wire version 1
 are independent. SQLite/WAL and device policy are never exchanged. The existing
 `org.stackdocs.local-change` journal is still local history, not this wire format.
 
@@ -39,15 +39,41 @@ applied frontier can be acknowledged; identical forwarding/replay is a no-op.
 The state/projection/index commit is one SQLite transaction. Peer receipts are
 written after that commit; interruption before a receipt causes safe replay.
 
-Graph cells use an explicitly adopted baseline's portable identities: table plus
-canonical JSON row-key array. Document title/provenance and notes/revision are
-separate decision cells. Other portable rows retain their full supported values.
-This subset does **not** yet implement the complete stable-entity mapping, atomic
-whole-page/catalog ordering decisions, reviewed existing-library adoption or every
-cross-row conflict rule required by M3. Such gaps must not be represented as full
-protocol conformance. The current baseline API requires an empty receiving library
-and the explicitly reviewed complete member list. It refuses nonempty adoption;
-titles, matching bytes/hashes and source IDs do not silently join identities.
+Graph model 2 cells use portable identities: table plus canonical JSON row-key
+array. Document title/provenance, notes/revision, filing origin and metadata counters
+are separate cells. Stack name, color and visibility merge independently. Derived
+metadata/filing counters take their maximum as compatibility state, never causal
+order. Whole saved page order and whole catalog order have explicit array cells;
+page records and originals remain in history when a page is removed from an order.
+Concurrent removal versus an unseen appearance edit reviews the editor's observed
+whole order. A page's text carries its exact source and saved appearance input;
+equal numeric revisions alone never make text current after a different crop.
+
+Membership relations merge as independent deltas. Full filing replacements record
+their observed complete set, including an explicit empty decision. An unseen
+concurrent delta requires review. Edited legacy CSV filing-choice rows are derived
+from merged relations when concurrent; their original exact values remain retained
+in history. Deletion versus concurrent document/page/filing or stack-reference
+changes remains reviewable; automatic text commits cannot resurrect a deletion.
+
+Every incoming partial cell must have a supported canonical identity key, exact
+row/suffix allowlist, matching row identity and bounded order array before entering
+the durable inbox. Cross-row constraints are checked by the production portable
+graph validator. A conflicting combination can have a provisional fallback;
+`projection_valid`/`projection_error` make this visible and block full portable
+export until corrected. Unsupported graph shapes are rejected rather than used as
+a provisional conflict representation.
+
+Desktop existing-library adoption proposes distinct, stable UUIDv5 mappings scoped
+to group/replica, never matches by title, bytes or legacy ID. A review contains the
+incoming file digest, local graph fingerprint, source/local counts, complete member
+list, all identity maps and explicit catalog-name collision renames. Changing the
+local graph or incoming file invalidates review. Explicit matches preserve local
+and source decisions as concurrent alternatives; the accepted mapping and original
+names remain in retained operation evidence. Originals publish without replacement
+before the single state/projection transaction. The phone's ability to initiate a
+group from its existing library remains separate from symmetric nonempty adoption;
+see current runtime evidence for that implementation's acceptance state.
 
 File bundles begin with 8 bytes `STACKEX\x01`, then an unsigned big-endian 32-bit
 metadata length, strict UTF-8 JSON, then blob bodies in declared order. Header keys
@@ -63,11 +89,21 @@ visible document. Owned staging directories recover separately from archives.
 Publication writes an exclusive private partial, flushes/syncs, links without
 replacement and syncs the selected directory. Written/transferred is distinct from
 acknowledged. Local-file exchange provides integrity and explicit file consent;
-it provides no sender authentication or confidentiality. No network listener,
-pairing, TLS or Android synchronization is implemented by this subset.
+it provides no sender authentication or confidentiality. Authenticated paired LAN is a separate, opt-in transport for these same files;
+see [paired transport](PAIRED_TRANSPORT.md). File exchange itself enrolls no peer.
 
 Observed conformance includes Rust causal permutations/gaps/replay/resolution,
-five shared host Java/Rust cases, envelope corruption/truncation/path validation,
+ten shared host Java/Rust cases, envelope corruption/truncation/path validation,
 and actual three-library SQLite/file exchange with originals/deletion retention.
 See [remaining evidence](REMAINING_EVIDENCE.md). Android SQLite, renderer, lifecycle,
 authoritative journaling, file exchange and actual device convergence remain M5.
+
+The native desktop now exposes source-matched nonempty adoption, file exchange and
+conflict resolution. Identity sections and conflict alternatives are paged; page
+boundaries preserve the original alternative IDs/indices passed to stale-review
+validation. Complete page/catalog order conflicts and page removal versus unseen
+appearance edits have SQLite/file/restart coverage in addition to the causal
+kernel. Seven actual SIGKILL cases cover sync originals, transaction, committed
+state, receipt and bundle publication boundaries. File replay never regresses a
+verified acknowledgment. Paired TLS/native controls reuse the same apply path and
+remain distinct from unperformed Android runtime exchange.

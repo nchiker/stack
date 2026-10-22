@@ -97,7 +97,9 @@ public final class MainActivity extends LibraryActivity {
         }
     }
 
-    @Override protected void onResume() { super.onResume(); thumbnails.invalidate(); refresh(); observeImport(); }
+    @Override protected void onResume() { super.onResume(); thumbnails.invalidate(); refresh(); observeImport(); whenAllowed(() -> work(() -> getSharedPreferences("library_reset",MODE_PRIVATE).getString("completed",""),this::showResetRecovery)); }
+
+    private void showResetRecovery(String mode){if(mode.isEmpty())return;getSharedPreferences("library_reset",MODE_PRIVATE).edit().remove("completed").apply();new android.app.AlertDialog.Builder(this).setTitle(mode.equals("erase")?"This phone's library was erased":"Ready for a new connection").setMessage(mode.equals("erase")?"Restore a saved backup, or set up sync with a computer that still has your documents. On that computer choose Start a new connection while keeping its documents, then pair again. Automatic photo import is off.":"Saved documents are kept. Choose Start a new connection on the computer too while keeping its documents, then open Settings → Sync on the computer and select Connect phone. Approve the connection here.").setNegativeButton("Later",null).setNeutralButton("Restore backup",(d,w)->startActivity(new Intent(this,BackupActivity.class))).setPositiveButton("Open Sync",(d,w)->startActivity(new Intent(this,SyncActivity.class))).show();}
 
     @Override protected void onPause() {
         if(search!=null)getSharedPreferences("navigation",MODE_PRIVATE).edit().putString("tab",tab)
@@ -275,7 +277,7 @@ public final class MainActivity extends LibraryActivity {
         final boolean homeTab=tab.equals("home");
         final String selectedOrder=documentSort;
         progress.setVisibility(View.VISIBLE);
-        work(() -> {
+        read(() -> {
             List<StackCategory> catalog=app().library.stacks();
             boolean present=filter==null;
             for(StackCategory category:catalog)if(category.id.equals(filter))present=true;

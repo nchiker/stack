@@ -36,12 +36,34 @@ final class SyncProtocol {
     }
     static String canonical(Object value)throws JSONException,IOException {
         if(value==null || value==JSONObject.NULL)return "null";
-        if(value instanceof JSONObject){JSONObject object=(JSONObject)value;StringBuilder out=new StringBuilder("{");boolean first=true;for(String key:keys(object)){unicode(key);if(!first)out.append(',');first=false;out.append(JSONObject.quote(key)).append(':').append(canonical(object.get(key)));}return out.append('}').toString();}
+        if(value instanceof JSONObject){JSONObject object=(JSONObject)value;StringBuilder out=new StringBuilder("{");boolean first=true;for(String key:keys(object)){if(!first)out.append(',');first=false;out.append(quote(key)).append(':').append(canonical(object.get(key)));}return out.append('}').toString();}
         if(value instanceof JSONArray){JSONArray array=(JSONArray)value;StringBuilder out=new StringBuilder("[");for(int i=0;i<array.length();i++){if(i>0)out.append(',');out.append(canonical(array.get(i)));}return out.append(']').toString();}
-        if(value instanceof String){unicode((String)value);return JSONObject.quote((String)value);}
+        if(value instanceof String)return quote((String)value);
         if(value instanceof Boolean)return value.toString();
         if(value instanceof Integer || value instanceof Long){long n=((Number)value).longValue();if(n < -MAX_SEQUENCE || n>MAX_SEQUENCE)throw invalid("unsafe number");return Long.toString(n);}
         throw invalid("wire values require integers or exact typed strings");
+    }
+    /** Wire identity arrays use the same spelling as serde_json. Android's
+     * JSONObject.quote adds optional slash escapes that change nested cell keys. */
+    private static String quote(String value)throws IOException {
+        unicode(value);StringBuilder out=new StringBuilder("\"");
+        final String hex="0123456789abcdef";
+        for(int i=0;i<value.length();i++) {
+            char c=value.charAt(i);
+            switch(c) {
+                case '"':out.append("\\\"");break;
+                case '\\':out.append("\\\\");break;
+                case '\b':out.append("\\b");break;
+                case '\f':out.append("\\f");break;
+                case '\n':out.append("\\n");break;
+                case '\r':out.append("\\r");break;
+                case '\t':out.append("\\t");break;
+                default:
+                    if(c<0x20)out.append("\\u00").append(hex.charAt(c>>>4)).append(hex.charAt(c&15));
+                    else out.append(c);
+            }
+        }
+        return out.append('"').toString();
     }
     static JSONObject copy(JSONObject value)throws JSONException,IOException{return ArchiveJson.read(canonical(value));}
     static TreeMap<String,Long> frontier(JSONObject object)throws JSONException,IOException {
@@ -85,6 +107,7 @@ final class SyncProtocol {
                 if(old!=null){if(!canonical(old.json).equals(canonical(op.json)))throw invalid("operation ID reused");continue;}
                 long current=next.frontier.getOrDefault(op.replica,0L);
                 if(op.sequence<=current)throw invalid("missing retained history");
+                for(Map.Entry<String,Long> dependency:op.context.entrySet())if(dependency.getValue()>next.frontier.getOrDefault(dependency.getKey(),0L)+MAX_OPERATIONS)throw invalid("pending dependency gap limit");
                 if(next.pending.size()>=MAX_OPERATIONS || op.sequence-current>MAX_OPERATIONS)throw invalid("pending gap limit");
                 next.pending.put(op.key,op);
             }
@@ -167,6 +190,34 @@ final class SyncProtocol {
                 }
                 boolean conflict=false;String first=canonical(review.get(0).get("value"));for(JSONObject row:review)if(!first.equals(canonical(row.get("value")))){conflict=true;break;}
                 if(conflict){review.sort((a,b)->{try{return origin(a).key.compareTo(origin(b).key);}catch(JSONException error){throw new IllegalStateException(error);}});out.put(entry.getKey(),new JSONArray(review));}
+            }
+            for(Map.Entry<String,List<JSONObject>> entry:registers.entrySet())if(entry.getKey().startsWith("page_order/")) {
+                String key=entry.getKey();List<JSONObject> review=new ArrayList<>(entry.getValue());
+                for(JSONObject decision:entry.getValue()) {
+                    JSONArray order=decision.optJSONArray("value");if(order==null)continue;Operation replace=origin(decision);
+                    for(Operation op:history.values())if(concurrent(op,replace)) {
+                        JSONObject evidence=op.evidenceHolder.optJSONObject("evidence");if(evidence!=null&&"page.text.commit".equals(evidence.optString("kind")))continue;
+                        boolean present=false;for(JSONObject row:review)if(origin(row).key.equals(op.key)){present=true;break;}if(present)continue;
+                        JSONArray observed=null;
+                        for(Operation past:history.values())if(op.context.getOrDefault(past.replica,0L)>=past.sequence&&past.changes.optJSONArray(key)!=null) {
+                            boolean superseded=false;
+                            for(Operation later:history.values())if(op.context.getOrDefault(later.replica,0L)>=later.sequence&&later.context.getOrDefault(past.replica,0L)>=past.sequence&&later.changes.has(key)){superseded=true;break;}
+                            if(!superseded)observed=past.changes.getJSONArray(key);
+                        }
+                        if(observed==null)continue;boolean touched=false;
+                        for(String field:keys(op.changes))if(field.startsWith("pages/")) {
+                            String raw=field.substring("pages/".length());int end=raw.indexOf("]/");if(end>=0)raw=raw.substring(0,end+1);
+                            JSONArray ids;try{ids=new JSONArray(raw);}catch(JSONException ignored){continue;}if(ids.length()==0)continue;
+                            String page=ids.optString(0);boolean wasPresent=false,isPresent=false;
+                            for(int i=0;i<observed.length();i++)if(page.equals(observed.optString(i)))wasPresent=true;
+                            for(int i=0;i<order.length();i++)if(page.equals(order.optString(i)))isPresent=true;
+                            if(wasPresent&&!isPresent){touched=true;break;}
+                        }
+                        if(touched)review.add(new JSONObject().put("id",op.json.getJSONObject("id")).put("value",observed).put("evidence",op.evidenceHolder.get("evidence")));
+                    }
+                }
+                boolean conflict=false;String first=canonical(review.get(0).get("value"));for(JSONObject row:review)if(!first.equals(canonical(row.get("value")))){conflict=true;break;}
+                if(conflict){review.sort((a,b)->{try{return origin(a).key.compareTo(origin(b).key);}catch(JSONException error){throw new IllegalStateException(error);}});out.put(key,new JSONArray(review));}
             }return out;
         }
         JSONObject saved()throws JSONException {

@@ -75,6 +75,127 @@ final class SyncGraph {
         JSONObject changes=new JSONObject();for(String key:SyncProtocol.keys(after))if(!before.has(key)||!SyncProtocol.canonical(before.get(key)).equals(SyncProtocol.canonical(after.get(key))))changes.put(key,after.get(key));
         for(String key:SyncProtocol.keys(before))if(!after.has(key))changes.put(key,JSONObject.NULL);return changes;
     }
+    static void validateChanges(JSONObject changes)throws IOException,JSONException {
+        for(String cell:SyncProtocol.keys(changes)) {
+            Object value=changes.get(cell);
+            if(cell.startsWith("page_order/")||cell.startsWith("filing_review/")) {
+                String document=cell.substring(cell.indexOf('/')+1);SyncProtocol.uuid(document);
+                if(value!=JSONObject.NULL)validateIds(value,cell.startsWith("page_order/"));continue;
+            }
+            if(cell.equals("catalog_order/stacks")){if(value!=JSONObject.NULL)validateIds(value,false);continue;}
+            int slash=cell.indexOf('/');if(slash<0)throw SyncProtocol.invalid("invalid graph identity");String table=cell.substring(0,slash),rest=cell.substring(slash+1),suffix=null;
+            int boundary=rest.indexOf("]/");if(boundary>=0){suffix=rest.substring(boundary+2);rest=rest.substring(0,boundary+1);}
+            JSONArray ids;try{ids=new JSONArray(rest);}catch(JSONException error){throw SyncProtocol.invalid("invalid graph identity array");}
+            if(!SyncProtocol.canonical(ids).equals(rest))throw SyncProtocol.invalid("noncanonical graph identity");
+            for(int i=0;i<ids.length();i++)if(!(ids.get(i) instanceof String))throw SyncProtocol.invalid("non-string graph identity");
+            String fields=fields(table,suffix);int count=identityCount(table);if(ids.length()!=count)throw SyncProtocol.invalid("wrong graph identity arity");
+            if(value==JSONObject.NULL)continue;
+            if(!(value instanceof JSONObject))throw SyncProtocol.invalid("graph decision must be an object");JSONObject row=(JSONObject)value;SyncProtocol.exact(row,fields);
+            validatePrimitives(row);
+            if(table.equals("details")) {
+                if(!row.getString("field_id").matches("[A-Za-z0-9:_-]{1,100}"))throw SyncProtocol.invalid("invalid detail identity");
+                try{DetailValue.validate(row.getString("kind"),row.getString("label"),row.getString("value"),row.getString("qualifier"));}
+                catch(IllegalArgumentException invalid){throw SyncProtocol.invalid("invalid exact detail value");}
+                if(!java.util.Arrays.asList("manual","accepted","edited","dismissed").contains(row.getString("origin"))
+                        ||!java.util.Arrays.asList("saved","removed","rejected").contains(row.getString("state"))
+                        ||row.getLong("revision")<1)throw SyncProtocol.invalid("invalid detail decision");
+                ArchiveJson.read(row.getString("evidence"));
+            }
+            if(suffix==null&&java.util.Arrays.asList("documents","pages","tags").contains(table))SyncProtocol.uuid(row.getString("id"));
+            if(suffix==null&&table.equals("stacks")&&!row.getString("id").matches("[A-Za-z0-9_-]{1,80}"))throw SyncProtocol.invalid("invalid stack identity");
+            if(table.equals("choices")&&!row.getString("evidence").matches("[a-f0-9]{64}"))throw SyncProtocol.invalid("invalid choice evidence");
+            if(table.equals("suggestions"))for(String field:new String[]{"input","evidence"}){
+                String text=row.getString(field);if(!text.isEmpty()&&!text.matches("[a-f0-9]{64}"))throw SyncProtocol.invalid("invalid suggestion evidence");
+            }
+            if(suffix==null&&!key(table,row).equals(cell))throw SyncProtocol.invalid("graph row identity changed");
+            if(table.equals("pages")&&"text".equals(suffix)){
+                SyncProtocol.exact(row.getJSONObject("input"),"id,document_id,source_file,source_page,rotation,crop,enhancement,flatten,content_revision");
+                SyncProtocol.exact(row.getJSONObject("row"),"ocr_text,ocr_state,ocr_engine,language,text_revision,ocr_error,ocr_config,text_config");
+            }
+        }
+    }
+    /** Validate partial rows before storing a causal gap. A failed whole-graph
+     * projection can represent conflicts, but cannot legitimize malformed cells. */
+    private static void validatePrimitives(JSONObject row)throws IOException,JSONException {
+        for(String field:SyncProtocol.keys(row)) {
+            Object value=row.get(field);
+            if((field.equals("input")||field.equals("row"))&&value instanceof JSONObject){validatePrimitives((JSONObject)value);continue;}
+            if(field.equals("source_scan_id")&&value==JSONObject.NULL)continue;
+            if(java.util.Arrays.asList("added_at","initial_page_count","title_user_edited","title_decision","notes_revision",
+                    "filing_decision","metadata_revision","source_page","rotation","flatten","content_revision","text_revision",
+                    "color","visible","generation","title_revision","filing_revision","revision","length").contains(field)) {
+                if(!(value instanceof Integer||value instanceof Long))throw SyncProtocol.invalid("integer field has another type");
+                long number=((Number)value).longValue();long minimum=field.equals("color")?Integer.MIN_VALUE:field.equals("text_revision")?-1:0;
+                if(number<minimum||number>SyncProtocol.MAX_SEQUENCE
+                        ||field.equals("color")&&number>Integer.MAX_VALUE
+                        ||java.util.Arrays.asList("visible","flatten","title_user_edited").contains(field)&&number>1
+                        ||field.equals("rotation")&&number!=0&&number!=90&&number!=180&&number!=270
+                        ||field.equals("initial_page_count")&&(number<1||number>1000)
+                        ||field.equals("source_page")&&number>999
+                        ||field.equals("length")&&(number<1||number>LibraryArchive.FILE_BYTES))throw SyncProtocol.invalid("decision integer outside supported range");
+                continue;
+            }
+            if(!(value instanceof String))throw SyncProtocol.invalid("text field has another type");String text=(String)value;int maximum;
+            switch(field) {
+                case "notes":maximum=20000;break;
+                case "ocr_text":case "payload":case "value":maximum=1024*1024;break;
+                case "ocr_engine":case "ocr_config":case "text_config":case "crop":maximum=256;break;
+                case "language":case "input":maximum=64;break;
+                case "ocr_error":maximum=80;break;case "rule":maximum=128;break;
+                case "title":case "name":case "label":maximum=200;break;
+                case "mime":case "source_file":maximum=40;break;case "path":maximum=160;break;
+                case "field_id":maximum=100;break;case "source_scan_id":case "document_id":case "tag_id":maximum=36;break;
+                case "status":case "title_state":case "filing_state":case "choice":case "field":case "title_origin":case "filing_origin":maximum=16;break;
+                default:maximum=8192;
+            }
+            if(text.length()>maximum)throw SyncProtocol.invalid("decision text exceeds field limit");
+            if(field.equals("title")||field.equals("name"))try{
+                if(!LibraryRepository.cleanName(text).equals(text))throw SyncProtocol.invalid("decision name is not normalized");
+            }catch(IllegalArgumentException invalid){throw SyncProtocol.invalid("invalid decision name");}
+            if(java.util.Arrays.asList("document_id","tag_id","source_scan_id").contains(field))SyncProtocol.uuid(text);
+            if(field.equals("source_file"))originalPath("originals/00000000-0000-0000-0000-000000000000/"+text);
+            if(field.equals("path"))originalPath(text);
+            if(field.equals("mime")&&!java.util.Arrays.asList("application/pdf","application/x-stack-scan","image/jpeg","image/png","image/webp").contains(text))throw SyncProtocol.invalid("unsupported document MIME");
+            if(field.equals("status")&&!java.util.Arrays.asList("pending","running","waiting","ready","empty","failed").contains(text))throw SyncProtocol.invalid("unsupported suggestion status");
+            if(java.util.Arrays.asList("title_state","filing_state","choice").contains(field)&&!java.util.Arrays.asList("offered","accepted","edited","dismissed").contains(text))throw SyncProtocol.invalid("unsupported decision");
+            if(field.equals("field")&&!text.equals("title")&&!text.equals("filing"))throw SyncProtocol.invalid("unsupported choice field");
+            if(field.equals("payload"))ArchiveJson.read(text);
+            if(field.equals("crop"))try{PageGeometry.decode(text);}catch(IllegalArgumentException invalid){throw SyncProtocol.invalid("invalid saved crop");}
+            if(field.equals("sha256")&&!text.matches("[a-f0-9]{64}"))throw SyncProtocol.invalid("invalid original digest");
+            if(field.equals("enhancement")&&!java.util.Arrays.asList("original","medium","bright","black_white").contains(text))throw SyncProtocol.invalid("unsupported saved enhancement");
+            if(field.equals("ocr_state")&&!java.util.Arrays.asList("pending","running","succeeded","failed").contains(text))throw SyncProtocol.invalid("unsupported text state");
+            if(java.util.Arrays.asList("title_origin","filing_origin").contains(field)&&!java.util.Arrays.asList("default","filename","legacy","manual","accepted","edited").contains(text))throw SyncProtocol.invalid("unsupported decision provenance");
+        }
+    }
+    private static void originalPath(String path)throws IOException {
+        String[] parts=path.split("/",-1);if(parts.length!=3||!parts[0].equals("originals"))throw SyncProtocol.invalid("invalid original path");
+        SyncProtocol.uuid(parts[1]);if(!parts[2].equals("source")){
+            if(!parts[2].endsWith(".jpg"))throw SyncProtocol.invalid("invalid original filename");
+            SyncProtocol.uuid(parts[2].substring(0,parts[2].length()-4));
+        }
+    }
+    private static void validateIds(Object value,boolean uuid)throws IOException,JSONException {
+        if(!(value instanceof JSONArray))throw SyncProtocol.invalid("order decision must be an array");JSONArray ids=(JSONArray)value;if(ids.length()>1000)throw SyncProtocol.invalid("order limit");Set<String> seen=new HashSet<>();
+        for(int i=0;i<ids.length();i++){if(!(ids.get(i) instanceof String))throw SyncProtocol.invalid("order identity must be a string");String id=ids.getString(i);if(!seen.add(id))throw SyncProtocol.invalid("duplicate order identity");if(uuid)SyncProtocol.uuid(id);}
+    }
+    private static int identityCount(String table)throws IOException {
+        switch(table){case "documents":case "pages":case "stacks":case "tags":case "files":case "suggestions":return 1;
+            case "memberships":case "details":case "document_tags":return 2;case "choices":return 3;
+            default:throw SyncProtocol.invalid("unsupported graph table");}
+    }
+    private static String fields(String table,String suffix)throws IOException {
+        if(table.equals("documents")) {
+            if(suffix==null)return "id,mime,added_at,initial_page_count,source_scan_id";
+            switch(suffix){case "title":return "title,title_origin,title_user_edited,title_decision";case "notes":return "notes,notes_revision";case "filing_origin":return "filing_origin";case "filing_decision":return "filing_decision";case "metadata_revision":return "metadata_revision";}
+        }
+        if(table.equals("pages")){if(suffix==null)return "id,document_id,source_file,source_page";if(suffix.equals("appearance"))return "rotation,crop,enhancement,flatten,content_revision";if(suffix.equals("text"))return "input,row";}
+        if(table.equals("stacks")){if(suffix==null)return "id";if(suffix.equals("name")||suffix.equals("color")||suffix.equals("visible"))return suffix;}
+        if(suffix!=null)throw SyncProtocol.invalid("unsupported graph suffix");
+        switch(table){case "memberships":return "document_id,stack_id";case "suggestions":return android.text.TextUtils.join(",",LibraryArchive.SUGGESTION);
+            case "choices":return "document_id,evidence,field,choice,value";case "details":return android.text.TextUtils.join(",",LibraryArchive.DETAIL);
+            case "tags":return "id,name";case "document_tags":return "document_id,tag_id,field_id";case "files":return "path,length,sha256";
+            default:throw SyncProtocol.invalid("unsupported graph decision");}
+    }
     static JSONObject project(JSONObject cells)throws IOException,JSONException {
         JSONObject manifest=new JSONObject().put("format","org.stackdocs.library").put("version",3).put("schema",8).put("created_at",System.currentTimeMillis());
         for(String table:TABLES)manifest.put(table,new JSONArray());

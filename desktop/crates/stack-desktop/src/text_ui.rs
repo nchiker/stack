@@ -40,6 +40,7 @@ impl Stack {
                 if !self.text.busy
                     && !self.library_loading
                     && !self.saving
+                    && !self.sync.busy
                     && !self.transfers.busy() =>
             {
                 self.text.busy = true;

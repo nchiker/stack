@@ -3,6 +3,7 @@ mod browsing;
 mod editing;
 mod interchange;
 pub mod library;
+pub mod reset;
 mod schema;
 mod search;
 mod sync;

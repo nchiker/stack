@@ -2,18 +2,31 @@ plugins {
     id 'com.android.application'
 }
 
+def checksBuild = providers.gradleProperty('stackChecks').isPresent()
+def checksNamespace = providers.gradleProperty('stackChecksNamespace').orElse('').get()
+def unsignedRelease = providers.gradleProperty('stackUnsignedRelease').isPresent()
+if (providers.gradleProperty('stackRecovery').isPresent()) {
+    throw new GradleException('Stack Recovery is retired; build the single org.stackdocs.app development application')
+}
+if (unsignedRelease && checksBuild) {
+    throw new GradleException('Choose stackChecks or stackUnsignedRelease')
+}
+if (!checksNamespace.isEmpty() && (!checksBuild || !checksNamespace.matches('[a-z][a-z0-9_]{0,31}'))) {
+    throw new GradleException('A checks namespace requires -PstackChecks and a simple lowercase test suffix')
+}
+
 android {
     namespace 'org.stackdocs.app'
     compileSdk 36
     buildToolsVersion '36.0.0'
 
     defaultConfig {
-        applicationId providers.gradleProperty('stackChecks').isPresent() ? 'org.stackdocs.app.checks' : 'org.stackdocs.app'
-        manifestPlaceholders = [appLabel: providers.gradleProperty('stackChecks').isPresent() ? 'Stack Checks' : '@string/app_name']
+        applicationId checksBuild ? 'org.stackdocs.app.checks' + (checksNamespace.isEmpty() ? '' : '.' + checksNamespace) : 'org.stackdocs.app'
+        manifestPlaceholders = [appLabel: checksBuild ? 'Stack Checks' : '@string/app_name']
         minSdk 24
         targetSdk 36
-        versionCode 22
-        versionName '0.8.9-dev'
+        versionCode 23
+        versionName '0.9.0'
         testInstrumentationRunner providers.gradleProperty('preservationProbe').isPresent() ? 'org.stackdocs.app.PreservationRunner' : 'org.stackdocs.app.ScannerChecks'
     }
 
@@ -23,7 +36,13 @@ android {
     }
 }
 
+ext.stackSigningProfile = 'development'
+ext.stackUnsignedRelease = unsignedRelease
+apply from: rootProject.file('gradle/stack-signing.gradle')
+
 dependencies {
+    // Bundled QR decoding; pairing never needs a Google service or download.
+    implementation 'com.google.zxing:core:3.5.4'
     // Standard single-threaded, bundled native engine; no runtime downloads.
     implementation('cz.adaptech.tesseract4android:tesseract4android:4.9.0') {
         exclude group: 'androidx.annotation'
@@ -58,3 +77,19 @@ tasks.register('verifyOcrDependency') {
     }
 }
 tasks.named('preBuild').configure { dependsOn 'verifyOcrDependency' }
+
+tasks.register('verifyQrDependency') {
+    group = 'verification'
+    description = 'Verify the pinned, bundled QR decoder.'
+    doLast {
+        def artifact = configurations.debugRuntimeClasspath.resolvedConfiguration.resolvedArtifacts.find {
+            it.moduleVersion.id.group == 'com.google.zxing' && it.name == 'core'
+        }
+        if (artifact == null) throw new GradleException('Missing bundled QR decoder')
+        def actual = java.security.MessageDigest.getInstance('SHA-256').digest(artifact.file.bytes).encodeHex().toString()
+        if (actual != '71de5d89341b5fcf5dd89da7f44e84d825d0e084cdf3ec77c9abe26b0f0ceb13') {
+            throw new GradleException('QR decoder artifact SHA-256 mismatch')
+        }
+    }
+}
+tasks.named('preBuild').configure { dependsOn 'verifyQrDependency' }

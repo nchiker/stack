@@ -1,0 +1,6 @@
+Stack's bundled QR decoder uses ZXing core 3.5.4.
+Upstream: https://github.com/zxing/zxing
+Artifact: https://repo.maven.apache.org/maven2/com/google/zxing/core/3.5.4/core-3.5.4.jar
+Artifact SHA-256: 71de5d89341b5fcf5dd89da7f44e84d825d0e084cdf3ec77c9abe26b0f0ceb13
+License: Apache-2.0; full text in ZXing-LICENSE.txt.
+QR images and camera frames are decoded locally and are not library documents.

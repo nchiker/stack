@@ -1,3 +1,31 @@
+# Current handoff — 2026-10-21 automatic sync follow-up
+
+Stopped at explicit user quota limit (3%). Commits `caa3cec` (simplified sync),
+`b6f6020` (Flatpak packaging), `54f1677` (responsive browsing and saved-peer TLS).
+Canonical spare debug browsing repair is installed and populated; signed release
+APK is built, verified, NOT installed. Real transfer did NOT complete: fresh phone
+worker passed TLS/group authentication and was replaying journal for first export;
+desktop remained zero documents/seven stacks. Coordinator stopped its offscreen
+receiver. No reset/unpair/restore. User data must remain intact.
+
+Delivery `.artifacts/stack-delivery-20261021/`: Android `android/Stack-release.apk`
+SHA256 `a9b8bc85d3c4381a5eb56eece8b263eb082526eac49c4bf4c666d3f5fc7733f5`;
+Flatpak `flatpak-final/Stack-0.1.0-rc1-x86_64.flatpak`
+SHA256 `0cb82e059471984135ec60002f9515b56ea11b9be5428e9e6f1df19005c656fe`.
+Do not label final sync stable/passed. Exact source snapshots include preserved
+unrelated icon/version edits excluded from sync commits. Detailed current test
+qualifications: [automatic sync evidence](desktop/AUTOMATIC_SYNC_20261021.md).
+Final large-state2/2 pass; latest UI fixture incomplete after2passes; auto4passes
+then occupied-writer assertion failed. Build/lint/Clippy pass. No more tests were
+requested at the quota stop. Next work: inspect pending raw-journal export cost
+on retained164-document/257-page spare; complete one real exchange and preservation
+before installing the exact release APK. Spare only ADB port5693 serial0A121JEC203530.
+No primary phone access. Unrelated dirty user files remain uncommitted.
+
+---
+
+The following handoff is historical:
+
 # Current handoff — 0.8.7 direct unlock and primary-phone delivery
 
 **0.8.7-dev/code20/schema8/archive3**, implementation `b5cc48e`. Read

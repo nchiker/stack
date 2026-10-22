@@ -1,5 +1,9 @@
 # Remaining P0 delivery and final evidence — 2026-10-16
 
+Current original-package, physical test-device and offline P0 continuation:
+[2026-10-20 record](p0/TEST_DEVICE_CONTINUATION_20261020.md). The dated evidence
+below remains historical; it does not describe the replacement signing identity.
+
 > Current acceptance work is consolidated in the [single P0/P1 H1–H8 session](p1/HANDSON_CHECKLIST.md).
 > This P0 report and its original checklist are historical evidence; remaining gates
 > are carried forward there, not counted passed by the P1 implementation.

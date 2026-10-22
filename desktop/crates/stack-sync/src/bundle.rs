@@ -73,9 +73,14 @@ impl Header {
 
 /// Write only to caller-owned unpublished storage; caller makes publication durable.
 pub fn write(header: &Header, blobs: &Path, out: &mut impl Write) -> Result<()> {
-    write_control(header,blobs,out,&stack_archive::Control::default())
+    write_control(header, blobs, out, &stack_archive::Control::default())
 }
-pub fn write_control(header: &Header, blobs: &Path, out: &mut impl Write, control:&stack_archive::Control) -> Result<()> {
+pub fn write_control(
+    header: &Header,
+    blobs: &Path,
+    out: &mut impl Write,
+    control: &stack_archive::Control,
+) -> Result<()> {
     control.check()?;
     header.validate()?;
     let bytes = serde_json::to_vec(header)?;
@@ -87,11 +92,15 @@ pub fn write_control(header: &Header, blobs: &Path, out: &mut impl Write, contro
     out.write_all(&bytes)?;
     for blob in &header.blobs {
         let path = blobs.join(&blob.sha256);
-        let digest = stack_archive::transfer(&mut stack_archive::read_regular(&path)?,out,blob.length,control)?;
+        let digest = stack_archive::transfer(
+            &mut stack_archive::read_regular(&path)?,
+            out,
+            blob.length,
+            control,
+        )?;
         if digest != blob.sha256 {
             return Err(Error::Invalid("outgoing blob changed"));
         }
-
     }
     out.flush()?;
     Ok(())
@@ -100,9 +109,13 @@ pub fn write_control(header: &Header, blobs: &Path, out: &mut impl Write, contro
 /// A fresh caller-owned directory is mandatory. Failed or partial inputs never
 /// reach the repository. Caller retains/removes only this owned staging directory.
 pub fn read(input: &mut impl Read, destination: &Path) -> Result<Header> {
-    read_control(input,destination,&stack_archive::Control::default())
+    read_control(input, destination, &stack_archive::Control::default())
 }
-pub fn read_control(input: &mut impl Read, destination: &Path, control:&stack_archive::Control) -> Result<Header> {
+pub fn read_control(
+    input: &mut impl Read,
+    destination: &Path,
+    control: &stack_archive::Control,
+) -> Result<Header> {
     control.check()?;
     if !destination.is_dir() || fs::read_dir(destination)?.next().is_some() {
         return Err(Error::Invalid("staging must be a fresh empty directory"));
@@ -129,7 +142,7 @@ pub fn read_control(input: &mut impl Read, destination: &Path, control:&stack_ar
             .create_new(true)
             .mode(0o600)
             .open(&path)?;
-        let hash=stack_archive::transfer(input,&mut output,blob.length,control)?;
+        let hash = stack_archive::transfer(input, &mut output, blob.length, control)?;
         output.sync_all()?;
         if hash != blob.sha256 {
             return Err(Error::Invalid("missing or corrupt blob"));
@@ -144,14 +157,30 @@ pub fn read_control(input: &mut impl Read, destination: &Path, control:&stack_ar
 }
 
 pub fn publish(header: &Header, blobs: &Path, destination: &Path) -> Result<()> {
-    publish_control(header,blobs,destination,&stack_archive::Control::default())
+    publish_control(
+        header,
+        blobs,
+        destination,
+        &stack_archive::Control::default(),
+    )
 }
-pub fn publish_control(header:&Header,blobs:&Path,destination:&Path,control:&stack_archive::Control)->Result<()> {
-    publish_with(header,blobs,destination,control,&mut |_| Ok(()))
+pub fn publish_control(
+    header: &Header,
+    blobs: &Path,
+    destination: &Path,
+    control: &stack_archive::Control,
+) -> Result<()> {
+    publish_with(header, blobs, destination, control, &mut |_| Ok(()))
 }
 /// Hook observes durable publication boundaries; production callers normally use
 /// publish_control. A stop before publication leaves only an ignored partial.
-pub fn publish_with(header:&Header,blobs:&Path,destination:&Path,control:&stack_archive::Control,hook:&mut impl FnMut(&str)->std::io::Result<()>)->Result<()> {
+pub fn publish_with(
+    header: &Header,
+    blobs: &Path,
+    destination: &Path,
+    control: &stack_archive::Control,
+    hook: &mut impl FnMut(&str) -> std::io::Result<()>,
+) -> Result<()> {
     control.check()?;
     let parent = destination
         .parent()
@@ -165,7 +194,7 @@ pub fn publish_with(header:&Header,blobs:&Path,destination:&Path,control:&stack_
             .create_new(true)
             .mode(0o600)
             .open(&partial)?;
-        write_control(header, blobs, &mut out,control)?;
+        write_control(header, blobs, &mut out, control)?;
         out.sync_all()?;
         hook("sync_bundle_written")?;
         control.check()?;

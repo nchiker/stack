@@ -27,6 +27,13 @@
 /.tools/
 *.jks
 *.keystore
+*.p12
+*.pfx
+/keystore.properties
+/signing.properties
 
 # Optional offline consolidation-tool bytecode.
 /tools/__pycache__/
+
+# Prepared local application deliveries, including binaries and vendored sources.
+/.artifacts/

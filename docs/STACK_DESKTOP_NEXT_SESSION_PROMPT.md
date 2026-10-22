@@ -1,5 +1,16 @@
 # Next session — Stack for COSMIC in Rust, with phone interoperability and sync
 
+Latest continuation (2026-10-20): desktop reviewed adoption/order conflicts,
+file exchange/recovery and native paired TLS controls are implemented. Read the
+[current evidence](desktop/REMAINING_EVIDENCE.md) and
+[resume prompt](STACK_DESKTOP_REMAINING_START_PROMPT.md) before the historical
+sections below. [Disposable Android file/LAN evidence](desktop/ANDROID_SYNC_EVIDENCE.md)
+now passes, including reviewed nonempty adoption, foreground controls,8 LAN
+recovery checks and5 actual apply-stop boundaries. Final artifacts are prepared;
+normal Android update awaits the original signing key. Physical/native release
+observations remain in the single project-plan checklist. Standard tests should run through lower-model verifier agents,
+with results returned to the main agent for decisions, per the latest user request.
+
 For the remaining project, use the
 [remaining-work playbook](STACK_DESKTOP_REMAINING_PLAYBOOK.md) and
 [autonomous kickoff prompt](STACK_DESKTOP_REMAINING_START_PROMPT.md). The user
@@ -9,6 +20,9 @@ cover R1 M2 closeout through R7 release, including desktop text search and M3–
 Latest import-menu follow-up:50 functional tests/checks pass; two stress timing
 targets remain unmet in `/tmp/stack-import-feedback/final-checks/report.json`.
 Do not substitute an earlier all-green report or reopen GUI tests.
+That report describes its earlier source; later resolved performance evidence is
+in REMAINING_RESULTS.json. The older UI-only/no-M3 work orders below are historical
+and superseded by the invoked remaining-work playbook.
 
 Current phase: **M2 native visual refinement delivered; remaining user interaction
 gates are separate**. The user reports the interface is “much, much better.” Latest

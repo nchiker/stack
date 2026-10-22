@@ -85,6 +85,8 @@ final class LibraryRepository {
         }
     }
 
+    void closeForReset(){helper.close();}
+    void blockAfterResetFailure(Exception error){initializationError=new IllegalStateException("Library reset did not finish. Original data is retained; close and reopen Stack to recover.",error);}
     LibraryArchive archive() { return new LibraryArchive(context,this,db()); }
     void archiveChanged() { if(!db().inTransaction())ocrChanged.run(); if(!db().inTransaction())suggestionChanged.run(); }
 

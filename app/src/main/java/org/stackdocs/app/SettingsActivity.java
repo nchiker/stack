@@ -15,6 +15,7 @@ public final class SettingsActivity extends LibraryActivity {
     @Override protected void onLibraryChanged(){refresh();}
     private void refresh(){
         if(body==null)return;body.removeAllViews();
+        body.addView(Ui.actionRow(this,Icons.Symbol.DOCUMENTS,"Sync","Connect your computer and sync automatically",0xFFDCECF9,()->startActivity(new Intent(this,SyncActivity.class))));line();
         boolean photos=app().photos.enabled();
         body.addView(Ui.actionRow(this,Icons.Symbol.PHOTO,"Photo import",photos?(app().photos.permission()?"On · New camera photos":"Paused · Photo access needed"):"Off · New camera photos only",0xFFDCECF9,this::photoOptions));
         if(photos){body.addView(Ui.button(this,"Photo access",this::requestPhotos));body.addView(Ui.button(this,"Check now",() -> {app().photos.kick(null);android.widget.Toast.makeText(this,"Checking new photos",android.widget.Toast.LENGTH_SHORT).show();}));}

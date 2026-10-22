@@ -25,8 +25,16 @@ import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-/** Platform-only device checks. All data writes use fresh isolated directories, never the real library/draft. */
+/** Platform-only checks; real-library UI/camera flows require an explicitly disposable target. */
 public final class ScannerChecks extends Instrumentation {
+    private static boolean disposableCanonical;
+    static boolean disposableLibraryTarget(Context context) {
+        return checksTarget(context)||(disposableCanonical&&context.getPackageName().equals("org.stackdocs.app"));
+    }
+    static boolean checksTarget(Context context) {
+        String name=context.getPackageName();
+        return name.equals("org.stackdocs.app.checks")||name.matches("org\\.stackdocs\\.app\\.checks\\.[a-z][a-z0-9_]{0,31}");
+    }
     private int passed;
     private String restartKey;
     private String suggestionCorpusAsset;
@@ -34,14 +42,18 @@ public final class ScannerChecks extends Instrumentation {
     private boolean p1Only,p1Corpus,p1Ui,p1Batch,p1Performance,googleMigration,stackEditor,lockUi,convenience;
     private boolean backupLayout,navigationOnly,backupUi,archivePerformance,archiveOnly,archivePrepare,archiveResume;
     private String archiveBoundary;
+    private Bundle syncArguments;
     private boolean longWorkflow,workflowOnly,providerWorkflow,workflowUi,namingOnly;
     private boolean suggestionPrepare,suggestionResume, suggestionUi, suggestionCorpus, suggestionsOnly, baseline, qualityOnly, ocrOnly, preserveOnly, restartPrepare, restartResume, corpusOnly;
 
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
+        disposableCanonical=arguments!=null&&"0A121JEC203530".equals(arguments.getString("disposableDevice"))
+                &&"sunfish".equals(android.os.Build.DEVICE)&&"Pixel 4a".equals(android.os.Build.MODEL);
         archivePrepare=arguments!=null && "prepare".equals(arguments.getString("archiveRestart"));
         archiveResume=arguments!=null && "resume".equals(arguments.getString("archiveRestart"));
         archiveBoundary=arguments==null?"file":arguments.getString("archiveBoundary","file");
+        syncArguments=arguments==null?new Bundle():new Bundle(arguments);
         if(!java.util.Arrays.asList("staged","journal","file","transaction","committed").contains(archiveBoundary))throw new IllegalArgumentException("Unknown boundary");
         backupLayout=arguments!=null && "true".equals(arguments.getString("backupLayout"));
         navigationOnly=arguments!=null && "true".equals(arguments.getString("navigationOnly"));
@@ -92,17 +104,35 @@ public final class ScannerChecks extends Instrumentation {
     @Override public void onStart() {
         Bundle result = new Bundle();
         try {
-            if (!getTargetContext().getPackageName().equals("org.stackdocs.app") && !getTargetContext().getPackageName().equals("org.stackdocs.app.checks")) {
+            if (!getTargetContext().getPackageName().equals("org.stackdocs.app") && !checksTarget(getTargetContext())) {
                 throw new SecurityException("Checks require the canonical Stack installation");
             }
             StackApplication app = (StackApplication) getTargetContext().getApplicationContext();
-            if((p1Batch||p1Ui||stackEditor||lockUi||convenience||backupUi||backupLayout)&&getTargetContext().getPackageName().equals("org.stackdocs.app.checks")) {
+            if(disposableCanonical||((p1Batch||p1Ui||stackEditor||lockUi||convenience||backupUi||backupLayout)&&getTargetContext().getPackageName().equals("org.stackdocs.app.checks"))) {
                 runOnMainSync(() -> app.registerActivityLifecycleCallbacks(new android.app.Application.ActivityLifecycleCallbacks(){
                     @Override public void onActivityCreated(Activity activity,Bundle state){activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON|android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED|android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);}
                     public void onActivityStarted(Activity a){}public void onActivityResumed(Activity a){}public void onActivityPaused(Activity a){}public void onActivityStopped(Activity a){}public void onActivitySaveInstanceState(Activity a,Bundle b){}public void onActivityDestroyed(Activity a){}
                 }));
             }
-            if (preserveOnly) mark(PreservationChecks.fingerprint(getTargetContext()));
+            if(syncArguments.containsKey("disposableSmoke")) {
+                if(!disposableCanonical||!getTargetContext().getPackageName().equals("org.stackdocs.app"))throw new SecurityException("Explicit disposable Pixel 4a authorization required");
+                DisposableSmokeChecks.run(this,syncArguments.getString("disposableSmoke"),this::mark);
+            }
+            else if (syncArguments.containsKey("nearbyPhase")) mark("nearby "+syncArguments.getString("nearbyPhase")+": "+NearbyPairingChecks.run(this,syncArguments));
+            else if ("true".equals(syncArguments.getString("resetUi"))) LibraryResetChecks.runUi(this,this::mark);
+            else if ("true".equals(syncArguments.getString("libraryReset"))) LibraryResetChecks.run(this,this::mark);
+            else if ("true".equals(syncArguments.getString("syncLargeState"))) SyncLargeStateChecks.run(this,this::mark);
+            else if ("true".equals(syncArguments.getString("syncLabelsOnly"))) SyncAutoChecks.inspectLabels(this,this::mark);
+            else if ("true".equals(syncArguments.getString("syncAuto"))) SyncAutoChecks.run(this,this::mark);
+            else if ("true".equals(syncArguments.getString("simpleSyncPrepare"))) SyncAutoChecks.prepare(this,this::mark);
+            else if ("true".equals(syncArguments.getString("syncUi"))) SyncUiChecks.run(this,this::mark);
+            else if ("migrations".equals(syncArguments.getString("syncPhase"))) {
+                if(!checksTarget(getTargetContext()))throw new SecurityException("Disposable Checks installation required");
+                for(int version=1;version<=8;version++)migration(new IsolatedContext(getTargetContext()),version);
+            }
+            else if (syncArguments.containsKey("syncPhase")) {syncArguments.putString("phase",syncArguments.getString("syncPhase"));mark("sync "+syncArguments.getString("phase")+": "+SyncDeviceChecks.run(this,syncArguments));}
+            else if (syncArguments.containsKey("transportPhase")) mark("transport "+syncArguments.getString("transportPhase")+": "+PairingTransportChecks.run(this,syncArguments));
+            else if (preserveOnly) mark(PreservationChecks.fingerprint(getTargetContext()));
             else if(!p1Restart.isEmpty())P1RestartChecks.run(this,p1Restart,p1Boundary,restartKey,this::mark);
             else if(lockUi)LockUiChecks.run(this,this::mark);
             else if(convenience)ConvenienceChecks.run(this,this::mark);
@@ -140,9 +170,9 @@ public final class ScannerChecks extends Instrumentation {
                 }
                 catch (Exception error) { throw new RuntimeException(error); }
             }).get(120, TimeUnit.SECONDS);
-            // The app contains user documents. Never seed its real draft or drive
-            // save/edit UI against its library; all test writes stay in fresh, isolated child directories.
-            result.putString("stream", "\nPASS: " + passed + " scanner check groups; synthetic data only.\n");
+            // Default fixtures stay isolated; explicitly disposable UI/camera flows
+            // may exercise their opted-in real library and a physical camera scene.
+            result.putString("stream", "\nPASS: " + passed + " scanner check groups.\n");
             finish(Activity.RESULT_OK, result);
         } catch (Throwable error) {
             result.putString("stream", "\nFAIL after " + passed + " groups: " + android.util.Log.getStackTraceString(error));
@@ -314,11 +344,17 @@ public final class ScannerChecks extends Instrumentation {
                 db.execSQL("INSERT INTO details VALUES(?, 'amount:total','amount','Total','20','USD','edited','removed','{}',3)",new Object[]{id});
                 db.execSQL("INSERT INTO editor_drafts VALUES(?,'notes','Unsaved draft',3)",new Object[]{id});
             }
+            if(fromVersion>=8) {
+                java.lang.reflect.Method method=LibraryDatabase.class.getDeclaredMethod("addStackOrder",SQLiteDatabase.class);method.setAccessible(true);method.invoke(null,db);
+            }
             db.setVersion(fromVersion);
         }
         try (LibraryDatabase helper = new LibraryDatabase(context)) {
             SQLiteDatabase db = helper.getWritableDatabase();
-            check(db.getVersion() == 8, "Real SQLiteOpenHelper migration ran");
+            check(db.getVersion() == 9, "Real SQLiteOpenHelper migration ran");
+            try(Cursor sync=db.rawQuery("SELECT enabled,applying FROM sync_control WHERE singleton=1",null)) {
+                check(sync.moveToFirst()&&sync.getInt(0)==0&&sync.getInt(1)==0,"Additive sync journal starts disabled before explicit baseline");
+            }
             try (Cursor row = db.rawQuery("SELECT d.title,d.initial_page_count,p.source_file,p.ocr_text,p.flatten,p.rotation,p.crop,p.enhancement,p.source_page FROM documents d JOIN pages p ON p.document_id=d.id", null)) {
                 check(row.moveToFirst() && row.getString(0).equals("Migration specimen") && row.getInt(1) == 1
                         && row.getString(2).equals(fromVersion == 1 ? "source" : pageId+".jpg") && row.getString(3).equals("preserved text") && row.getInt(4) == (fromVersion >= 3 ? 1 : 0) && row.getInt(5) == 90 && PageGeometry.decode(row.getString(6))[0] == .1f
@@ -335,7 +371,7 @@ public final class ScannerChecks extends Instrumentation {
                 while(rows.moveToNext()){check(rows.getString(0).equals(expected[i])&&rows.getInt(1)==i,"Historical rowid order retained including hidden stack");i++;}
                 check(i==3,"All stacks retained");
             }
-            if(fromVersion==7) {
+            if(fromVersion>=7) {
                 try(Cursor rows=db.rawQuery("SELECT notes,notes_revision,metadata_revision,(SELECT count(*) FROM details),(SELECT value FROM editor_drafts) FROM documents",null)) {
                     check(rows.moveToFirst()&&rows.getString(0).equals("Saved migration notes")&&rows.getInt(1)==3&&rows.getInt(2)==4&&rows.getInt(3)==2&&rows.getString(4).equals("Unsaved draft"),"Schema7 manual values, removals and draft preserved");
                 }
@@ -347,7 +383,7 @@ public final class ScannerChecks extends Instrumentation {
                 check(rows.moveToFirst() && rows.getInt(0) == 1, "Migration preserves search index");
             }
         }
-        mark("Actual v" + fromVersion + "-to-v8 migration; text, metadata, memberships and flatten preserved");
+        mark("Actual v" + fromVersion + "-to-v9 migration; text, metadata, memberships and flatten preserved");
     }
 
     private static Bitmap fixture(int paperColor) {

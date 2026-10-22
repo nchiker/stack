@@ -7,11 +7,15 @@ mod editor_smoke;
 mod frame;
 mod launcher;
 mod navigation;
+mod network_ui;
 mod operations;
+mod pairing_ui;
 mod portal_smoke;
 mod preferences;
 mod preview_cache;
 mod repository;
+mod reset_ui;
+mod sync_pages;
 mod sync_ui;
 mod text_ui;
 mod thumbnails;
@@ -295,6 +299,7 @@ struct Stack {
     text: text_ui::Ui,
     text_worker: Option<Worker<stack_core::TextJob, stack_core::TextOutput>>,
     context_title: String,
+    reset: reset_ui::Ui,
     closing: bool,
     confirm_quit: bool,
     repository_generation: u64,
@@ -334,6 +339,7 @@ struct RenderJob {
 #[derive(Debug, Clone)]
 enum Message {
     Close,
+    Reset(reset_ui::Action),
     Text(text_ui::Event),
     KeepEditing,
     DiscardAndQuit,
@@ -432,6 +438,7 @@ impl cosmic::Application for Stack {
             text: text_ui::Ui::default(),
             text_worker: Some(text_ui::worker()),
             context_title: String::new(),
+            reset: reset_ui::Ui::default(),
             closing: false,
             confirm_quit: false,
             repository_generation: 0,
@@ -475,13 +482,15 @@ impl cosmic::Application for Stack {
         } else {
             app.browse()
         };
-        (app, app::Task::batch([title, render]))
+        let recovery = app.reset_recovery();
+        (app, app::Task::batch([title, render, recovery]))
     }
 
     fn subscription(&self) -> iced::Subscription<Message> {
         iced::Subscription::batch([
             transfers_ui::progress_subscription(&self.transfers),
             text_ui::subscription(self),
+            network_ui::subscription(&self.sync.network),
         ])
     }
 
@@ -489,6 +498,9 @@ impl cosmic::Application for Stack {
         Some(&self.nav)
     }
     fn dialog(&self) -> Option<Element<'_, Message>> {
+        if self.reset.phase > 0 && !self.confirm_quit {
+            return self.reset_dialog();
+        }
         self.confirm_quit.then(|| widget::dialog()
             .title("Discard unsaved changes and quit?")
             .body("Unfinished document and stack edits are kept only while this app is open. Keep editing to save them individually. Discard and quit loses those drafts; accepted saves finish before closing.")
@@ -523,6 +535,10 @@ impl cosmic::Application for Stack {
         app::Task::batch([browse, iced::widget::operation::focus("stack-search")])
     }
     fn on_escape(&mut self) -> app::Task<Message> {
+        if self.reset.phase > 0 && !self.reset.busy {
+            self.reset = reset_ui::Ui::default();
+            return app::Task::none();
+        }
         if self.confirm_quit {
             self.confirm_quit = false;
             return app::Task::none();
@@ -567,9 +583,6 @@ impl cosmic::Application for Stack {
                 self.sync.open = false;
                 return self.catalog_action(catalog::Action::Open);
             }
-            if location == navigation::Location::Sync {
-                return self.sync_action(sync_ui::Action::Open);
-            }
             self.sync.open = false;
             self.catalog.open = false;
             self.browse_offset = 0;
@@ -603,7 +616,11 @@ impl cosmic::Application for Stack {
                 if self.catalog.open {
                     "Manage stacks".into()
                 } else if self.sync.open {
-                    "Sync exchange".into()
+                    if self.sync.page == crate::sync_ui::Page::Settings {
+                        "Settings".into()
+                    } else {
+                        "Sync".into()
+                    }
                 } else {
                     self.library_location()
                 }
@@ -798,6 +815,10 @@ impl Stack {
     }
 
     fn repository_request(&mut self, request: Request) -> app::Task<Message> {
+        if self.sync.busy {
+            self.sync.queued_request = Some(request);
+            return app::Task::none();
+        }
         let Some(worker) = &self.repository else {
             return app::Task::none();
         };
@@ -900,6 +921,7 @@ impl Stack {
             return app::Task::none();
         }
         match message {
+            Message::Reset(action) => return self.reset_action(action),
             Message::Text(event) => return self.text_action(event),
             Message::Close
                 if !self.closing
@@ -959,12 +981,6 @@ impl Stack {
             Message::Sync(action) => return self.sync_action(action),
             Message::SyncResult(result) => return self.sync_result(result),
             Message::Picked(pick, result) => {
-                if matches!(
-                    pick,
-                    transfers_ui::Pick::SyncImport | transfers_ui::Pick::SyncExport
-                ) {
-                    return self.sync_picked(pick, result);
-                }
                 let result = if self.flags.browser_case == "portal" {
                     match result {
                         Ok(Some(paths)) => {
@@ -1175,7 +1191,13 @@ impl Stack {
             Message::Repository(generation, result) if generation == self.repository_generation => {
                 self.library_loading = false;
                 match result {
-                    Ok(Response::TextClaim { .. } | Response::TextFinished { .. }) => {}
+                    Ok(
+                        Response::TextClaim { .. }
+                        | Response::TextFinished { .. }
+                        | Response::ResetPreview(_)
+                        | Response::ResetScheduled
+                        | Response::ResetRecovery(_),
+                    ) => {}
                     Ok(Response::Browser {
                         stacks,
                         hits,
@@ -1266,6 +1288,12 @@ impl Stack {
                         self.page_count = document.pages.len() as u32;
                         let saved = document.pages[page].clone();
                         self.opening_document = None;
+                        if let Some(draft) = self.drafts.get_mut(&document.token.id)
+                            && !draft.has_unsaved_changes()
+                            && draft.token.revision != document.token.revision
+                        {
+                            *draft = editor::Draft::new(&document);
+                        }
                         self.selected = Some(document);
                         return self.render_job(RenderJob {
                             source,

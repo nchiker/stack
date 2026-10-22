@@ -12,8 +12,6 @@ pub enum Pick {
     Documents,
     Archive,
     ArchiveExport,
-    SyncImport,
-    SyncExport,
     Pdf {
         token: stack_core::library::DocumentToken,
         title: String,
@@ -221,7 +219,6 @@ impl Stack {
                 token,
                 destination: files[0].clone(),
             }),
-            Pick::SyncImport | Pick::SyncExport => app::Task::none(),
         }
     }
 
@@ -687,26 +684,6 @@ async fn pick_files(
                 "Stack-library.stackbackup".into(),
                 directory,
                 file_chooser::FileFilter::new("Stack archives").glob("*.stackbackup"),
-                parent,
-            )
-            .await
-        }
-        Pick::SyncImport => {
-            open_files(
-                title("Import Stack exchange"),
-                directory,
-                file_chooser::FileFilter::new("Stack exchange files").glob("*.stackexchange"),
-                false,
-                parent,
-            )
-            .await
-        }
-        Pick::SyncExport => {
-            save_file(
-                title("Export Stack exchange"),
-                "Stack-exchange.stackexchange".into(),
-                directory,
-                file_chooser::FileFilter::new("Stack exchange files").glob("*.stackexchange"),
                 parent,
             )
             .await

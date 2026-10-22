@@ -27,7 +27,7 @@ final class AccessPolicy implements Application.ActivityLifecycleCallbacks {
     boolean screenLockInProgress(Activity activity){return request!=null&&request.owner==activity&&request.credential;}
     boolean enabled(){return policy.getBoolean("app_lock",false);}
     boolean allowed(){return !enabled()||(session.authenticated()&&!app.getSystemService(KeyguardManager.class).isDeviceLocked());}
-    void lock(){session.lock();if(!enabled())return;if(request!=null&&!request.credential)cancel(request);if(app.archives!=null&&app.archives.busy())app.archives.cancel();app.notifyLibraryChanged();}
+    void lock(){session.lock();if(!enabled())return;SyncJob.pause();if(request!=null&&!request.credential)cancel(request);if(app.archives!=null&&app.archives.busy())app.archives.cancel();app.notifyLibraryChanged();}
     void authenticate(Activity activity,Consumer<Boolean> callback) {
         if(request!=null)cancel(request);
         KeyguardManager keyguard=app.getSystemService(KeyguardManager.class);

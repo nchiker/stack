@@ -104,6 +104,8 @@ impl Library {
             .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32)
             .open(root.join("writer.lock"))?;
         lock.try_lock().map_err(|_| Error::Busy)?;
+        let lock = Arc::new(lock);
+        let mut reset = crate::reset::ColdReset::begin(&root, lock.clone())?;
         for dir in ["originals", "operations"] {
             private_dir(&root.join(dir))?;
         }
@@ -142,7 +144,7 @@ impl Library {
             root,
             db,
             probe: Box::new(|_| Ok(())),
-            _lock: Arc::new(lock),
+            _lock: lock,
         };
         library.recover_operations()?;
         library.recover_text()?;
@@ -187,6 +189,10 @@ impl Library {
                 json!({"graph":manifest.json(),"bindings":bindings(&tx)?}),
             )?;
             tx.commit()?;
+        }
+        crate::reset::connection(&mut library)?;
+        if let Some(reset) = reset.as_mut() {
+            reset.finish()?;
         }
         // Bootstrap/migration and every authoritative mutation maintain FTS in the
         // same transaction. Reopening keeps those persisted indexes.

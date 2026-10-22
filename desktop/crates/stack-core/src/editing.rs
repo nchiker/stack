@@ -65,7 +65,12 @@ impl Library {
             _ => None,
         };
         let edit = if let Some((stack, selected)) = &delta {
-            if !graph["stacks"].as_array().expect("stacks").iter().any(|row| row["id"] == *stack) {
+            if !graph["stacks"]
+                .as_array()
+                .expect("stacks")
+                .iter()
+                .any(|row| row["id"] == *stack)
+            {
                 return Err(Error::Invalid("Membership references a deleted stack"));
             }
             let mut filing: Vec<String> = graph["memberships"]

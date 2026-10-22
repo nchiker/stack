@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+from package_notices import package as package_notices
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -22,44 +23,22 @@ def main():
     output = args.output.absolute()
     if output.exists():
         parser.error('Choose a fresh output directory')
-    for source in [ROOT / 'target' / args.profile / name for name in ('stack-desktop', 'stack-cli')]:
+    for source in [ROOT / 'target' / args.profile / name for name in ('stack-desktop', 'stack-cli', 'stack-transport')]:
         if not source.is_file():
             parser.error(f'Build the workspace first: {source}')
     for engine in ('pdfium/lib/libpdfium.so', 'ocr/ENGINE.json'):
         if not (ROOT / 'runtime' / engine).is_file():
             parser.error('Prepare the pinned PDFium and OCR runtimes first')
     output.mkdir(parents=True, mode=0o700)
-    for name in ('stack-desktop', 'stack-cli'):
+    for name in ('stack-desktop', 'stack-cli', 'stack-transport'):
         target = output / 'bin' / name
         target.parent.mkdir(exist_ok=True)
         shutil.copy2(ROOT / 'target' / args.profile / name, target)
     shutil.copytree(ROOT / 'runtime', output / 'runtime', ignore=shutil.ignore_patterns('*.tgz', '*.zip'))
     shutil.copytree(ROOT / 'assets', output / 'assets')
     shutil.copy2(ROOT / 'tools/install_desktop.py', output / 'install.py')
-    notices = output / 'notices'
-    notices.mkdir()
-    shutil.copy2(ROOT.parent / 'LICENSE', notices / 'Stack-Apache-2.0.txt')
     metadata = json.loads(subprocess.check_output(['cargo', 'metadata', '--manifest-path', str(ROOT / 'Cargo.toml'), '--locked', '--offline', '--format-version', '1', '--filter-platform', 'x86_64-unknown-linux-gnu'], text=True))
-    inventory = []
-    for package in metadata['packages']:
-        base = Path(package['manifest_path']).parent
-        target = notices / f"{package['name']}-{package['version']}"
-        target.mkdir(exist_ok=True)
-        for file in base.iterdir():
-            if file.is_file() and file.name.upper().startswith(('LICENSE', 'COPYING', 'NOTICE', 'COPYRIGHT')):
-                shutil.copy2(file, target / file.name)
-        if not any(target.iterdir()):
-            # Workspace crates commonly keep their license at the workspace root.
-            for parent in base.parents:
-                candidates = [p for p in parent.iterdir() if p.is_file() and p.name.upper().startswith(('LICENSE', 'COPYING', 'NOTICE', 'COPYRIGHT'))]
-                if candidates:
-                    for file in candidates:
-                        shutil.copy2(file, target / file.name)
-                    break
-                if parent == Path('/tmp/stack-desktop-dev/cargo-home') or parent == ROOT.parent:
-                    break
-        inventory.append({'name': package['name'], 'version': package['version'], 'license': package['license'], 'source': package['source']})
-    (notices / 'dependencies.json').write_text(json.dumps(inventory, indent=2) + '\n')
+    dependency_count = package_notices(ROOT, output, metadata)
     wrapper = '''#!/bin/sh
 set -eu
 stack_install_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -77,6 +56,7 @@ exec "$stack_install_root/bin/stack-desktop" "$@"
                'source_base': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
                'platform': 'Ubuntu 24.04 x86-64; COSMIC/Wayland; system Wayland/xkbcommon and OCR dependency ABI required',
                'native_user_acceptance': 'pending',
+               'dependency_notice_count': dependency_count,
                'source_sha256': {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sources},
                'files': {str(p.relative_to(output)): hashlib.sha256(p.read_bytes()).hexdigest() for p in output.rglob('*') if p.is_file()}}
     (output / 'INSTALL.json').write_text(json.dumps(receipt, indent=2) + '\n')

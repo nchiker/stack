@@ -14,6 +14,8 @@ import android.widget.TextView;
 /** Shared Stack typography, circular original icons and ordinary library action rows. */
 final class BackupScreen {
     final LinearLayout root;
+    private final Activity activity;
+    private final LinearLayout body;
     private final View backup,restore;
     private final LinearLayout operation;
     private final TextView heading,status,summary,backupDate;
@@ -23,13 +25,14 @@ final class BackupScreen {
     private String lastMessage="",lastState="";
 
     BackupScreen(Activity activity,Runnable back,Runnable save,Runnable open,Runnable add,Runnable stop,Runnable help) {
+        this.activity=activity;
         root=Ui.column(activity);
         LinearLayout toolbar=Ui.toolbar(activity);
         toolbar.addView(Ui.iconButton(activity,Icons.Symbol.BACK,"Back",back),new LinearLayout.LayoutParams(Ui.dp(activity,48),Ui.dp(activity,48)));
         toolbar.addView(Ui.text(activity,"Backup & restore",18,false),new LinearLayout.LayoutParams(0,-2,1));
         root.addView(toolbar);
         scroll=new ScrollView(activity);scroll.setFillViewport(true);
-        LinearLayout body=Ui.column(activity);body.setPadding(Ui.dp(activity,24),Ui.dp(activity,24),Ui.dp(activity,24),Ui.dp(activity,24));scroll.addView(body);
+        body=Ui.column(activity);body.setPadding(Ui.dp(activity,24),Ui.dp(activity,24),Ui.dp(activity,24),Ui.dp(activity,24));scroll.addView(body);
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
 
         TextView title=Ui.text(activity,"A copy of your library",22,false);body.addView(title);
@@ -65,6 +68,7 @@ final class BackupScreen {
     private static TextView muted(Activity activity,String value,int size) {
         TextView text=Ui.text(activity,value,size,false);text.setTextColor(Ui.MUTED);text.setLineSpacing(Ui.dp(activity,3),1);return text;
     }
+    void reset(Runnable open){body.addView(Ui.divider(activity));body.addView(Ui.actionRow(activity,Icons.Symbol.TUNE,"Reset or rebuild library…","Careful local erase or a fresh sync connection",0xFFF0E3EF,open));}
     void history(String label){if(!backupDate.getText().toString().equals(label))backupDate.setText(label);}
     void render(String state,String label,String message,String reviewSummary,boolean canceled) {
         boolean busy=state.equals("exporting")||state.equals("validating")||state.equals("restoring"),review=state.equals("review");

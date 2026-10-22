@@ -1,0 +1,11 @@
+The published package omits a standalone license file. Its unchanged Cargo.toml and source are included in the source archive. This standard SPDX license text supplements, rather than replaces, all available upstream attribution.
+
+{
+  "name": "drm-fourcc",
+  "version": "2.2.0",
+  "authors": [
+    "Daniel Franklin <daniel@danielzfranklin.org>"
+  ],
+  "license": "MIT",
+  "repository": "https://github.com/danielzfranklin/drm-fourcc-rs"
+}

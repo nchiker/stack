@@ -66,13 +66,19 @@ pub fn run(args: &[OsString]) -> Result<()> {
         ("sync", "export", [peer, path]) => {
             report(&library.sync_export(text(peer)?, Path::new(path))?)
         }
-        ("sync", "review-adoption", [path]) => report(&library.sync_review_adoption(Path::new(path))?),
-        ("sync", "adopt-reviewed", [path,review]) => {
-            let review=stack_archive::strict_json::object(&fs::read(review)?)?;
-            report(&library.sync_adopt_reviewed(Path::new(path),&review)?)
+        ("sync", "review-adoption", [path]) => {
+            report(&library.sync_review_adoption(Path::new(path))?)
         }
-        ("sync", "resolve", [key,expected,value]) => {
-            library.sync_resolve_json(text(key)?,&serde_json::from_str(text(expected)?)?,serde_json::from_str(text(value)?)?)?;
+        ("sync", "adopt-reviewed", [path, review]) => {
+            let review = stack_archive::strict_json::object(&fs::read(review)?)?;
+            report(&library.sync_adopt_reviewed(Path::new(path), &review)?)
+        }
+        ("sync", "resolve", [key, expected, value]) => {
+            library.sync_resolve_json(
+                text(key)?,
+                &serde_json::from_str(text(expected)?)?,
+                serde_json::from_str(text(value)?)?,
+            )?;
             report(&library.sync_status()?)
         }
         ("sync", "import", [path]) => report(&library.sync_import(Path::new(path), None)?),
@@ -298,20 +304,32 @@ fn interruption(
     let mut library = Library::open(&root)?;
     let checkpoint = checkpoint.to_owned();
     let ready = ready.to_owned();
-    let mut probe=move |point:&str| {
+    let mut probe = move |point: &str| {
         if point == checkpoint {
             use std::io::Write;
-            let mut marker = fs::OpenOptions::new().write(true).create_new(true).open(&ready)?;
+            let mut marker = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&ready)?;
             marker.write_all(point.as_bytes())?;
             marker.sync_all()?;
-            loop { std::thread::park(); }
+            loop {
+                std::thread::park();
+            }
         }
         Ok(())
     };
-    if kind=="sync-publish" {
-        let blobs=root.join("publish-blobs");fs::create_dir(&blobs)?;
-        let header=stack_sync::bundle::read(&mut stack_archive::read_regular(input)?,&blobs)?;
-        stack_sync::bundle::publish_with(&header,&blobs,&root.join("published.stackexchange"),&Control::default(),&mut probe)?;
+    if kind == "sync-publish" {
+        let blobs = root.join("publish-blobs");
+        fs::create_dir(&blobs)?;
+        let header = stack_sync::bundle::read(&mut stack_archive::read_regular(input)?, &blobs)?;
+        stack_sync::bundle::publish_with(
+            &header,
+            &blobs,
+            &root.join("published.stackexchange"),
+            &Control::default(),
+            &mut probe,
+        )?;
         return Err("Publication checkpoint was not reached".into());
     }
     library.set_probe(Box::new(probe));
@@ -327,7 +345,9 @@ fn interruption(
             library.commit_archive(&plan, &control)?;
         }
         "export" => library.export_archive(input, &control)?,
-        "sync-import" => {library.sync_import(input,None)?;},
+        "sync-import" => {
+            library.sync_import(input, None)?;
+        }
         _ => return Err("Expected restore, export or sync-import probe".into()),
     }
     Err("Checkpoint was not reached".into())

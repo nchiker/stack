@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+# Keep the existing standalone library and COSMIC theme. Flatpak grants only
+# Stack's data/preferences and read-only COSMIC configuration, not all of home.
+export XDG_DATA_HOME="${HOST_XDG_DATA_HOME:-$HOME/.local/share}"
+export XDG_CONFIG_HOME="${HOST_XDG_CONFIG_HOME:-$HOME/.config}"
+export STACK_PDFIUM_LIBRARY=/app/lib/stack/runtime/pdfium/lib/libpdfium.so
+export STACK_TESSERACT_LIBRARY=/app/lib/stack/runtime/ocr/lib/libtesseract.so.5
+export STACK_TESSDATA_DIR=/app/lib/stack/runtime/ocr/tessdata
+export LD_LIBRARY_PATH="/app/lib/stack/runtime/ocr/lib:/app/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export OMP_THREAD_LIMIT=1
+exec /app/lib/stack/bin/stack-desktop "$@"

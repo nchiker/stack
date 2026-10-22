@@ -17,11 +17,11 @@ import java.util.function.Consumer;
 final class BackupUiChecks {
     static void run(Instrumentation instrumentation,Consumer<String> mark)throws Exception {
         android.content.Context target=instrumentation.getTargetContext();
-        if(!target.getPackageName().equals("org.stackdocs.app.checks"))throw new SecurityException("Production-flow check requires disposable package");
+        if(!ScannerChecks.disposableLibraryTarget(target))throw new SecurityException("Production-flow check requires an explicitly disposable library");
         StackApplication app=(StackApplication)target.getApplicationContext();
         instrumentation.runOnMainSync(()->{});await(()->app.library!=null && app.archives!=null && app.imports!=null,"Application startup");app.io.submit(()->{}).get();
         WorkflowRepositoryChecks.require(app.io.submit(()->app.library.documents("",null).isEmpty()).get(),"Disposable first saved library is empty");
-        WorkflowRepositoryChecks.require(target.checkSelfPermission(android.Manifest.permission.INTERNET)!=android.content.pm.PackageManager.PERMISSION_GRANTED,"No network permission");
+        WorkflowRepositoryChecks.require(OcrModel.valid(new File(OcrModel.install(target),"tessdata/eng.traineddata")),"Bundled model is locally available; host separately verifies offline radios");
         File fixture=OcrQueueChecks.fixture(new ScannerChecks.IsolatedContext(target),"production-flow.pdf");
         instrumentation.runOnMainSync(()->app.imports.start(Uri.fromFile(fixture)));
         await(()->!app.imports.busy,"Production import completes");WorkflowRepositoryChecks.require(app.imports.failure.isEmpty(),"Production import succeeded");String id=app.imports.documentId;
@@ -46,7 +46,7 @@ final class BackupUiChecks {
             instrumentation.runOnMainSync(()->app.archives.export(Uri.fromFile(new File(target.getCacheDir(),"missing-parent/denied.stackbackup"))));await(()->!app.archives.busy(),"Failed export completes");
             WorkflowRepositoryChecks.require(app.archives.state.equals("failed")&&BackupHistory.last(target)==completed&&backup.isFile(),"Failed destination keeps last successful date and prior archive");
             mark.accept("Local successful-backup date: empty default, visible after provider write/flush/close, unchanged by canceled review/additive restore/failed destination; synthetic archive only");
-            mark.accept("Fresh disposable saved-library production import→bundled OCR/suggestions→manual choices→later-page search→local backup→review/cancel/retry/additive restore; Backup screen scope/protection/commit controls; no INTERNET permission, account or download (file URI boundary; system picker and device network-disabled walkthrough remain separate)");
+            mark.accept("Fresh disposable saved-library production import→bundled OCR/suggestions→manual choices→later-page search→local backup→review/cancel/retry/additive restore; bundled model, no account/download; optional LAN permission does not establish a core network dependency (file URI boundary; host records radio state separately, no system-picker claim)");
         }finally{instrumentation.runOnMainSync(screen::finish);}
     }
     private static boolean hasText(View view,String needle){if(view instanceof TextView && ((TextView)view).getText().toString().contains(needle))return true;if(view instanceof ViewGroup)for(int i=0;i<((ViewGroup)view).getChildCount();i++)if(hasText(((ViewGroup)view).getChildAt(i),needle))return true;return false;}

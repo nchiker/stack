@@ -13,8 +13,6 @@ impl Stack {
             let label = self.nav.text(id).unwrap_or_default();
             if self.nav.data::<crate::navigation::Location>(id)
                 == Some(&crate::navigation::Location::ManageStacks)
-                || self.nav.data::<crate::navigation::Location>(id)
-                    == Some(&crate::navigation::Location::Sync)
             {
                 nav = nav.push(widget::divider::horizontal::default());
             }
@@ -37,6 +35,25 @@ impl Stack {
             widget::container(
                 widget::column::with_capacity(4)
                     .push(widget::scrollable(nav).height(iced::Length::Fill))
+                    .push(widget::divider::horizontal::default())
+                    .push(
+                        widget::container(
+                            widget::button::custom(
+                                widget::row::with_capacity(2)
+                                    .spacing(10)
+                                    .push(widget::icon::from_name("phone-symbolic").icon().size(20))
+                                    .push(widget::text::body("Settings")),
+                            )
+                            .name("Settings")
+                            .width(iced::Length::Fill)
+                            .class(cosmic::theme::Button::ListItem([6.; 4]))
+                            .selected(self.sync.open)
+                            .on_press(cosmic::Action::App(
+                                Message::Sync(crate::sync_ui::Action::Settings),
+                            )),
+                        )
+                        .padding([0, 8]),
+                    )
                     .push(
                         widget::container(self.library_menu().map(cosmic::Action::App)).padding(8),
                     )

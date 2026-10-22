@@ -13,8 +13,7 @@ fn key(table: &str, row: &Value) -> Result<String> {
         "suggestions" => &["document_id"],
         "memberships" => &["document_id", "stack_id"],
         "choices" => &["document_id", "evidence", "field"],
-        "details" => &["document_id", "field_id"],
-        "document_tags" => &["document_id", "tag_id"],
+        "details" | "document_tags" => &["document_id", "field_id"],
         _ => return Err(Error::Invalid("unsupported graph table")),
     };
     Ok(format!(
@@ -154,6 +153,320 @@ pub fn diff(before: &Cells, after: &Cells) -> Cells {
         changes.insert(key.clone(), Value::Null);
     }
     changes
+}
+
+fn validate_primitives(value: &Value) -> Result<()> {
+    let row = value
+        .as_object()
+        .ok_or(Error::Invalid("decision must be an object"))?;
+    for (field, value) in row {
+        if matches!(field.as_str(), "input" | "row") && value.is_object() {
+            validate_primitives(value)?;
+            continue;
+        }
+        if field == "source_scan_id" && value.is_null() {
+            continue;
+        }
+        if matches!(
+            field.as_str(),
+            "added_at"
+                | "initial_page_count"
+                | "title_user_edited"
+                | "title_decision"
+                | "notes_revision"
+                | "filing_decision"
+                | "metadata_revision"
+                | "source_page"
+                | "rotation"
+                | "flatten"
+                | "content_revision"
+                | "text_revision"
+                | "color"
+                | "visible"
+                | "generation"
+                | "title_revision"
+                | "filing_revision"
+                | "revision"
+                | "length"
+        ) {
+            let n = value
+                .as_i64()
+                .ok_or(Error::Invalid("integer field has another type"))?;
+            let minimum = if field == "color" {
+                i64::from(i32::MIN)
+            } else if field == "text_revision" {
+                -1
+            } else {
+                0
+            };
+            if n < minimum
+                || (field == "color" && n > i64::from(i32::MAX))
+                || (matches!(field.as_str(), "visible" | "flatten" | "title_user_edited") && n > 1)
+                || (field == "rotation" && ![0, 90, 180, 270].contains(&n))
+                || (field == "initial_page_count" && !(1..=1000).contains(&n))
+                || (field == "source_page" && n > 999)
+                || (field == "length" && !(1..=stack_archive::FILE_LIMIT as i64).contains(&n))
+            {
+                return Err(Error::Invalid("decision integer outside supported range"));
+            }
+        } else {
+            let text = value
+                .as_str()
+                .ok_or(Error::Invalid("text field has another type"))?;
+            if matches!(field.as_str(), "title" | "name") && validation::clean_name(text)? != text {
+                return Err(Error::Invalid("decision name is not normalized"));
+            }
+            let maximum = match field.as_str() {
+                "notes" => 20_000,
+                "ocr_text" | "payload" | "value" => 1024 * 1024,
+                "ocr_engine" | "ocr_config" | "text_config" | "crop" => 256,
+                "language" | "input" => 64,
+                "ocr_error" => 80,
+                "rule" => 128,
+                "title" | "name" | "label" => 200,
+                "mime" | "source_file" => 40,
+                "path" => 160,
+                "field_id" => 100,
+                "source_scan_id" | "document_id" | "tag_id" => 36,
+                "status" | "title_state" | "filing_state" | "choice" | "field" | "title_origin"
+                | "filing_origin" => 16,
+                _ => 8192,
+            };
+            if validation::utf16_len(text) > maximum {
+                return Err(Error::Invalid("decision text exceeds field limit"));
+            }
+            if matches!(field.as_str(), "document_id" | "tag_id") {
+                stack_archive::uuid(text)?;
+            }
+            if field == "source_file" {
+                stack_archive::original_path(&format!(
+                    "originals/00000000-0000-0000-0000-000000000000/{text}"
+                ))?;
+            }
+            if field == "mime"
+                && ![
+                    "application/pdf",
+                    "application/x-stack-scan",
+                    "image/jpeg",
+                    "image/png",
+                    "image/webp",
+                ]
+                .contains(&text)
+            {
+                return Err(Error::Invalid("unsupported document MIME"));
+            }
+            if field == "status"
+                && !["pending", "running", "waiting", "ready", "empty", "failed"].contains(&text)
+            {
+                return Err(Error::Invalid("unsupported suggestion status"));
+            }
+            if matches!(field.as_str(), "title_state" | "filing_state" | "choice") {
+                validation::decision(text)?;
+            }
+            if field == "field" && !["title", "filing"].contains(&text) {
+                return Err(Error::Invalid("unsupported choice field"));
+            }
+            if field == "payload" {
+                stack_archive::strict_json::object(text.as_bytes())?;
+            }
+            if field == "crop" {
+                validation::crop(text)?;
+            }
+            if field == "path" {
+                stack_archive::original_path(text)?;
+            }
+            if field == "source_scan_id" {
+                stack_archive::uuid(text)?;
+            }
+            if field == "sha256"
+                && (text.len() != 64
+                    || !text
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)))
+            {
+                return Err(Error::Invalid("invalid original digest"));
+            }
+            if field == "enhancement"
+                && !["original", "medium", "bright", "black_white"].contains(&text)
+            {
+                return Err(Error::Invalid("unsupported saved enhancement"));
+            }
+            if field == "ocr_state"
+                && !["pending", "running", "succeeded", "failed"].contains(&text)
+            {
+                return Err(Error::Invalid("unsupported text state"));
+            }
+            if matches!(field.as_str(), "title_origin" | "filing_origin")
+                && ![
+                    "default", "filename", "legacy", "manual", "accepted", "edited",
+                ]
+                .contains(&text)
+            {
+                return Err(Error::Invalid("unsupported decision provenance"));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Validate the structure of each partial decision before storing an inbox.
+/// Cross-row conflicts may make a projection provisional, but unknown fields and
+/// malformed identity keys are never a supported conflict representation.
+pub fn validate_changes(cells: &Cells) -> Result<()> {
+    for (cell, value) in cells {
+        if let Some(document) = cell
+            .strip_prefix("page_order/")
+            .or_else(|| cell.strip_prefix("filing_review/"))
+        {
+            stack_archive::uuid(document)?;
+            if !value.is_null() {
+                let ids = value
+                    .as_array()
+                    .ok_or(Error::Invalid("order/filing decision must be an array"))?;
+                if ids.len() > 1000
+                    || ids.iter().any(|id| !id.is_string())
+                    || ids
+                        .iter()
+                        .map(Value::to_string)
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .len()
+                        != ids.len()
+                {
+                    return Err(Error::Invalid("invalid order/filing identity array"));
+                }
+                if cell.starts_with("page_order/") {
+                    for id in ids {
+                        stack_archive::uuid(id.as_str().expect("checked string"))?;
+                    }
+                }
+            }
+            continue;
+        }
+        if cell == "catalog_order/stacks" {
+            if !value.is_null() {
+                let ids = value
+                    .as_array()
+                    .ok_or(Error::Invalid("catalog order must be an array"))?;
+                if ids.len() > 1000
+                    || ids.iter().any(|id| !id.is_string())
+                    || ids
+                        .iter()
+                        .map(Value::to_string)
+                        .collect::<std::collections::BTreeSet<_>>()
+                        .len()
+                        != ids.len()
+                {
+                    return Err(Error::Invalid("invalid catalog order"));
+                }
+            }
+            continue;
+        }
+        let (table, raw) = cell
+            .split_once('/')
+            .ok_or(Error::Invalid("invalid graph identity"))?;
+        let (raw, suffix) = if let Some((raw, suffix)) = raw.split_once("]/") {
+            (format!("{raw}]"), Some(suffix))
+        } else {
+            (raw.to_owned(), None)
+        };
+        let ids: Vec<Value> = serde_json::from_str(&raw)?;
+        if serde_json::to_string(&ids)? != raw || ids.iter().any(|id| !id.is_string()) {
+            return Err(Error::Invalid(
+                "graph identity must be a canonical string array",
+            ));
+        }
+        let fields = match (table, suffix) {
+            ("documents", None) => "id,mime,added_at,initial_page_count,source_scan_id",
+            ("documents", Some("title")) => "title,title_origin,title_user_edited,title_decision",
+            ("documents", Some("notes")) => "notes,notes_revision",
+            ("documents", Some("filing_origin")) => "filing_origin",
+            ("documents", Some("filing_decision")) => "filing_decision",
+            ("documents", Some("metadata_revision")) => "metadata_revision",
+            ("pages", None) => "id,document_id,source_file,source_page",
+            ("pages", Some("appearance")) => "rotation,crop,enhancement,flatten,content_revision",
+            ("pages", Some("text")) => "input,row",
+            ("stacks", None) => "id",
+            ("stacks", Some("name")) => "name",
+            ("stacks", Some("color")) => "color",
+            ("stacks", Some("visible")) => "visible",
+            ("memberships", None) => "document_id,stack_id",
+            ("suggestions", None) => validation::SUGGESTION,
+            ("choices", None) => "document_id,evidence,field,choice,value",
+            ("details", None) => validation::DETAIL,
+            ("tags", None) => "id,name",
+            ("document_tags", None) => "document_id,tag_id,field_id",
+            ("files", None) => "path,length,sha256",
+            _ => return Err(Error::Invalid("unsupported graph decision")),
+        };
+        let expected = match table {
+            "documents" | "pages" | "stacks" | "tags" | "files" | "suggestions" => 1,
+            "memberships" | "details" | "document_tags" => 2,
+            "choices" => 3,
+            _ => 0,
+        };
+        if ids.len() != expected {
+            return Err(Error::Invalid("wrong graph identity arity"));
+        }
+        if value.is_null() {
+            continue;
+        }
+        validation::keys(value, fields)?;
+        validate_primitives(value)?;
+        if table == "details" {
+            validation::validate_detail(value)?;
+        }
+        if matches!(table, "documents" | "pages" | "tags") && suffix.is_none() {
+            stack_archive::uuid(
+                value["id"]
+                    .as_str()
+                    .ok_or(Error::Invalid("missing identity"))?,
+            )?;
+        }
+        if table == "choices" {
+            validation::sha(
+                value["evidence"]
+                    .as_str()
+                    .ok_or(Error::Invalid("missing decision evidence"))?,
+            )?;
+        }
+        if table == "suggestions" {
+            for field in ["input", "evidence"] {
+                let text = value[field]
+                    .as_str()
+                    .ok_or(Error::Invalid("missing suggestion input"))?;
+                if !text.is_empty() {
+                    validation::sha(text)?;
+                }
+            }
+        }
+        if table == "stacks" && suffix.is_none() {
+            let id = value["id"]
+                .as_str()
+                .ok_or(Error::Invalid("missing stack identity"))?;
+            if id.is_empty()
+                || id.len() > 80
+                || !id
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"_-".contains(&b))
+            {
+                return Err(Error::Invalid("invalid stack identity"));
+            }
+        }
+        if suffix.is_none() && key(table, value)? != *cell {
+            return Err(Error::Invalid("graph identity differs from its row"));
+        }
+        if table == "pages" && suffix == Some("text") {
+            validation::keys(
+                &value["input"],
+                "id,document_id,source_file,source_page,rotation,crop,enhancement,flatten,content_revision",
+            )?;
+            validation::keys(
+                &value["row"],
+                "ocr_text,ocr_state,ocr_engine,language,text_revision,ocr_error,ocr_config,text_config",
+            )?;
+        }
+    }
+    Ok(())
 }
 
 pub fn project(cells: &Cells) -> Result<Manifest> {

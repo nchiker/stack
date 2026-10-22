@@ -14,12 +14,14 @@ gpu = ["libcosmic/wgpu"]
 stack-core.workspace = true
 stack-render.workspace = true
 stack-archive.workspace = true
+stack-transport.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
 libcosmic.workspace = true
 iced-accessibility.workspace = true
 tokio.workspace = true
 image.workspace = true
+qrcodegen.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

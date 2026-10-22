@@ -1,6 +1,13 @@
 # Stack remaining-work playbook
 
-Updated 2026-10-18. This is the execution order for finishing the desktop companion,
+Current continuation: follow the [desktop/sync handoff](STACK_DESKTOP_REMAINING_START_PROMPT.md).
+The user confirms the Android APK is completed and in production use; H1–H8 remains
+closed. The older starting-state tables and staged implementation instructions
+below are historical where superseded by current evidence. Do not repeat delivered
+R1–R7 engineering, signing-key recovery or general Android P0 acceptance. Continue
+only concrete defects, unfinished desktop work and newly added sync integration.
+
+Updated 2026-10-20. This is the execution order for finishing the desktop companion,
 document-text search and safe phone/desktop synchronization. Start with the
 [kickoff prompt](STACK_DESKTOP_REMAINING_START_PROMPT.md).
 
@@ -67,13 +74,29 @@ verification, not reconstruction from personal data. Read the durable
 | --- | --- | --- |
 | R1 / M2 closeout | Engineering delivered, qualified; native user acceptance pending | Dependable local desktop workflow ready for final user review |
 | R2 text search | Implemented offline English PDF/OCR; real repository/worker/UI/search path verified | Offline PDF text extraction and OCR |
-| R3 / M3 | Preliminary causal kernel and three-replica file test pass; full adoption/order/review gates pending | Tested causal merge, adoption and conflicts |
-| R4 / M4 | Preliminary real-file exchange passes; installer and native exchange workflow under implementation | Desktop file exchange and normal installation |
-| R5 / M5 | Shared Java causal golden cases pass on host; Android transactional integration/runtime exchange pending | Demonstrated disposable Android/desktop file sync |
-| R6 / M6 | Not implemented | Paired authenticated local-network sync |
-| R7 release | Pending the stages above | Integrated verification, reproducible artifacts and one final user handoff |
+| R3 / M3 | Reviewed nonempty adoption, whole ordering, membership/conflict semantics and process-stop recovery implemented; headless native review verified; human review pending | Tested causal merge, adoption and conflicts |
+| R4 / M4 | Native file exchange and source-matched persistent debug package verified:950 payload hashes,216 source hashes,509 notices; isolated install/update/uninstall preserves the library | Desktop file exchange and normal installation |
+| R5 / M5 | Actual Android/Rust file exchange,8 migrations, separate/matched nonempty adoption,13 host review cases and5 actual apply-stop boundaries pass; normal-app/human observations pending | Demonstrated disposable Android/desktop file sync |
+| R6 / M6 | Desktop and Android foreground controls implemented; actual Android Keystore LAN exchange and8 pin/cancel/corruption/reconnect/revoke checks pass; physical UI/security review pending | Paired authenticated local-network sync |
+| R7 release | Desktop93-test acceptance/package and Android Checks/normal unsigned candidate prepared; canonical update needs original signing key; physical/native and other-device qualification remain open | Integrated verification, reproducible artifacts and one final user handoff |
 
 Current in-progress evidence: [remaining-work checkpoint](desktop/REMAINING_EVIDENCE.md). Stage gates remain open until their complete acceptance criteria are demonstrated.
+
+The historical import-feedback and pre-optimization continuation timing failures
+are retained for their source. The final optimized continuation passes93 tests and
+all ten unchanged limits; use the latest
+source-matched report rather than repeating resolved R1 work. R5/R6 device
+continuation is complete to the recorded engineering scope; exact final evidence
+is in [Android sync evidence](desktop/ANDROID_SYNC_EVIDENCE.md). SDK/Gradle/JDK are
+restored under `/tmp/stack-dev`; the authorized spare Pixel4a uses isolated r5/r6
+Checks apps. `/dev/kvm` remains unavailable. Current remaining gates are original
+canonical signing identity, normal update and human/native observations from the
+single project-plan checklist. No other engineering input is required. Preserve
+unmeasured Android maximum-count performance/other-version qualifications.
+
+The user's 2026-10-20 preference is lower-model agents for executing standard tests,
+with exact results returned to the main agent for implementation and decisions.
+Keep verifier roles read-only and reuse valid evidence rather than rerunning it.
 
 ## R1 — Finish M2 engineering and interaction readiness
 

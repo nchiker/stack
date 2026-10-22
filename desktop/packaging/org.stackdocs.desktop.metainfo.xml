@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.stackdocs.desktop</id>
+  <name>Stack</name>
+  <summary>Keep and sync your documents</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <developer id="org.stackdocs"><name>Stack contributors</name></developer>
+  <description>
+    <p>Stack is an independent document library for the COSMIC desktop. Import
+    documents, organize them into stacks, search printed English text offline,
+    and keep saved changes in sync with an approved nearby Android phone.</p>
+    <p>Documents are stored locally. No account or cloud service is required.</p>
+  </description>
+  <launchable type="desktop-id">org.stackdocs.desktop.desktop</launchable>
+  <provides><binary>stack</binary></provides>
+  <content_rating type="oars-1.1"/>
+</component>

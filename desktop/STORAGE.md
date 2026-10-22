@@ -110,4 +110,22 @@ equivalence beyond these documented limits.
 
 ## Experimental causal exchange
 
-`stack-sync` has a separate versioned operation/envelope contract and retained alternatives/history. Explicit baseline creation/adoption, durable inbox state and peer receipts are kept outside portable metadata. Three isolated Rust libraries passed real file exchange, replay, forwarding, resolution, restart and deletion/original retention. Full M3/M4 adoption/ordering/native-review requirements remain open; this subset is not Android or LAN synchronization. See [executable protocol subset](../docs/desktop/INTEROP_SYNC_PROTOCOL_V1.md) and [current results](../docs/desktop/REMAINING_RESULTS.json).
+`stack-sync` has a separate versioned operation/envelope contract and retained
+alternatives/history. Baseline creation and reviewed nonempty adoption, durable
+inbox state, immutable pending blobs and monotonic peer receipts remain outside
+portable metadata. Source/local fingerprints reject stale or replaced adoption
+inputs. Independent membership deltas merge; complete filing and whole page/catalog
+orders retain concurrent alternatives. Deletion retains originals and prevents
+resurrection by offline edits or stale text. Actual process-stop/replay checks cover
+original installation, state commit, receipt recording and bundle publication.
+
+Native conflict/adoption/file-exchange controls use the existing serialized writer;
+review lists have bounded pages. Paired foreground TLS also borrows that same
+repository owner, never opening a second writer. Networking is explicitly enabled
+per session, with cancellation and durable-state refresh after socket failure.
+Pairing credentials stay in private device-local files outside archives and bundles.
+Current network evidence is Rust localhost peers plus native headless controls.
+Android runtime, physical pairing and native interaction gates remain separate.
+See the [executable protocol](../docs/desktop/INTEROP_SYNC_PROTOCOL_V1.md),
+[paired transport](../docs/desktop/PAIRED_TRANSPORT.md) and
+[current results](../docs/desktop/REMAINING_RESULTS.json).

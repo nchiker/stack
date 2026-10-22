@@ -22,7 +22,7 @@ public final class BackupActivity extends LibraryActivity {
         super.onCreate(state);
         screen=new BackupScreen(this,this::finish,() -> pick(true),() -> pick(false),
                 () -> {app().archives.restore();render();},() -> {app().archives.cancel();render();},this::aboutBackups);
-        screen.root.addView(Ui.button(this,"Sync with a computer",() -> whenAllowed(() -> startActivity(new Intent(this,SyncActivity.class)))));
+        screen.reset(() -> whenAllowed(() -> startActivity(new Intent(this,LibraryResetActivity.class))));
         Ui.install(this,screen.root);removeBack=Ui.backHandler(this,this::finish);
         if(state!=null && state.getBoolean("active") && app().archives.state.equals("idle")) app().archives.message="The previous operation was interrupted. Existing data was kept; select the file or destination again. Startup recovery removes uncommitted restored files.";
         render();

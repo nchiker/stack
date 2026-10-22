@@ -1,0 +1,2157 @@
+unstable/cosmic-a11y-unstable-v1.xml
+<protocol name="cosmic_a11y_v1">
+  <copyright>
+    Copyright © 2025 System76
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice (including the next
+    paragraph) shall be included in all copies or substantial portions of the
+    Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+  </copyright>
+
+  <description summary="toggle various accessibility features">
+    This protocols provides way to toggle various accessibility features
+    in the COSMIC desktop environment for shell components.
+  </description>
+
+  <interface name="cosmic_a11y_manager_v1" version="3">
+    <description summary="a11y global">
+      Manager to toggle accessibility features.
+    </description>
+
+    <event name="magnifier">
+      <description summary="State of the screen magnifier">
+        State of the screen magnifier.
+
+        This event will be emitted by the compositor when binding the protocol
+        and whenever the state changes.
+      </description>
+      <arg name="active" type="uint" enum="active_state" summary="If the screen magnifier is enabled"/>
+    </event>
+
+    <request name="set_magnifier">
+      <description summary="Set the screen magnifier on or off">
+        Sets the state of the screen magnifier.
+
+        The client must not assume any requested changes are actually applied and should wait
+        until the next magnifier event before updating it's UI.
+      </description>
+      <arg name="active" type="uint" enum="active_state" summary="If the screen magnifier should be enabled"/>
+    </request>
+
+    <enum name="active_state">
+        <entry name="disabled" value="0" summary="function is disabled"/>
+        <entry name="enabled" value="1" summary="function is enabled"/>
+    </enum>
+
+    <event name="screen_filter" since="2" deprecated-since="3">
+      <description summary="State of screen filtering">
+        Parameters used for screen filtering.
+
+        This event will be emitted by the compositor when binding the protocol
+        and whenever the state changes.
+
+        If a screen filter is used not known to the protocol or the bound version
+        filter will be set to unknown.
+
+        Since version 3 this event will not be emitted anymore, instead use `screen_filter2`.
+      </description>
+      <arg name="inverted" type="uint" enum="active_state" summary="If the screen colors are inverted"/>
+      <arg name="filter" type="uint" enum="filter" summary="Which if any screen filter is enabled"/>
+    </event>
+
+    <request name="set_screen_filter" since="2" deprecated-since="3">
+      <description summary="Set screen filtering">
+        Set the parameters for screen filtering.
+
+        If the filter is set to unknown, the compositor MUST not change the current state
+        of the filter. This is to allow clients to update the inverted state, even if they
+        don't know about the current active filter.
+
+        The client must not assume any requested changes are actually applied and should wait
+        until the next screen_filter event before updating it's UI.
+
+        Send this request will raised a "deprecated" protocol error, if version 3 or higher was bound.
+        Use `set_screen_filter2` instead.
+      </description>
+      <arg name="inverted" type="uint" enum="active_state" summary="If the screen colors should be inverted"/>
+      <arg name="filter" type="uint" enum="filter" summary="Which if any filter should be used"/>
+    </request>
+
+    <enum name="filter" since="2">
+        <entry name="disabled" value="0" summary="No screen filter is set" deprecated-since="3"/>
+        <entry name="unknown" value="1" summary="A custom or unknown screen filter"/>
+        <entry name="greyscale" value="2" summary="Greyscale colors"/>
+        <entry name="daltonize_protanopia" value="3" summary="Daltonize for Protanopia"/>
+        <entry name="daltonize_deuteranopia" value="4" summary="Daltonize for Deuteranopia"/>
+        <entry name="daltonize_tritanopia" value="5" summary="Daltonize for Tritanopia"/>
+    </enum>
+
+    <event name="screen_filter2" since="3">
+      <description summary="State of screen filtering">
+        Parameters used for screen filtering.
+
+        This event will be emitted by the compositor when binding the protocol
+        and whenever the state changes.
+
+        If a screen filter is used not known to the protocol or the bound version
+        filter will be set to unknown.
+
+        The compositor must never send "disabled" as the "filter" argument.
+      </description>
+      <arg name="inverted" type="uint" enum="active_state" summary="If the screen colors are inverted"/>
+      <arg name="filter" type="uint" enum="filter" summary="Which if any screen filter is selected"/>
+      <arg name="filter_state" type="uint" enum="active_state" summary="If the screen filter is active"/>
+    </event>
+
+    <request name="set_screen_filter2" since="3">
+      <description summary="Set screen filtering">
+        Set the parameters for screen filtering.
+
+        If the filter is set to unknown, the compositor MUST not change the currently set
+        filter. This is to allow clients to update the inverted state or toggle the screen filter,
+        even if they don't know about the currently selected filter.
+
+        The client must not assume any requested changes are actually applied and should wait
+        until the next screen_filter event before updating it's UI.
+
+        The "deprecated" protocol error is raised, if "disabled" is set for "filter".
+      </description>
+      <arg name="inverted" type="uint" enum="active_state" summary="If the screen colors should be inverted"/>
+      <arg name="filter" type="uint" enum="filter" summary="Which if filter should be used"/>
+      <arg name="filter_state" type="uint" enum="active_state" summary="If the screen filter should be active"/>
+    </request>
+
+    <enum name="error" since="3">
+        <entry name="deprecated" value="0" summary="A deprecated request or value was used"/>
+    </enum>
+  </interface>
+</protocol>
+
+
+unstable/cosmic-corner-radius-unstable-v1.xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<protocol name="cosmic_corner_radius_v1">
+  <copyright>
+    Copyright © 2024 System76
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice (including the next
+    paragraph) shall be included in all copies or substantial portions of the
+    Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+  </copyright>
+
+  <description summary="communicate corner radius of windows">
+    This protocol provides a way for clients to communicate the
+    corner radius of their toplevels, should they use rounded corners.
+
+    This hint can then be used by the compositor to draw fitting outlines
+    or prevent overdrawing of other server-side drawn interfaces.
+  </description>
+
+  <interface name="cosmic_corner_radius_manager_v1" version="2">
+    <description summary="corner radius global">
+      Manager for creating corner-radius objects for existing surfaces
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="Destroy the global">
+        Informs the server, that the client will no longer use this global.
+        Any previously created corner-radius objects remain valid until destroyed.
+      </description>
+    </request>
+
+    <request name="get_corner_radius" deprecated-since="2">
+      <description
+        summary="Create a new corner-radius object for an existing toplevel"
+      >
+        Instantiate an interface extension for the given xdg_toplevel to specify their corner radius.
+
+        If the given xdg_toplevel already has a cosmic_corner_radius_toplevel_v1 object associated,
+        the corner_radius_exists protocol error will be raised.
+
+        Deprecated: Use `get_corner_radius_surface` instead.
+      </description>
+      <arg
+        name="id"
+        type="new_id"
+        interface="cosmic_corner_radius_toplevel_v1"
+        summary="the new cosmic_corner_radius_toplevel_v1 object"
+      />
+      <arg
+        name="toplevel"
+        type="object"
+        interface="xdg_toplevel"
+        summary="the toplevel"
+      />
+    </request>
+
+    <request name="get_corner_radius_surface" since="2">
+      <description
+        summary="Create a new corner-radius object for an existing xdg-surface"
+      >
+        Instantiate an interface extension for the given xdg_surface to specify their corner radius.
+
+        If the given xdg_surface already has a cosmic_corner_radius_toplevel_v1 object associated,
+        the corner_radius_exists protocol error will be raised.
+
+        It is an error submitting this request for a xdg+surface object, that doesn't have a role
+        associated yet. (See `xdg_surface::get_toplevel` or `xdg_surface::get_popup`.) A no_role
+        protocol error will be raised in this case.
+      </description>
+      <arg
+        name="id"
+        type="new_id"
+        interface="cosmic_corner_radius_toplevel_v1"
+        summary="the new cosmic_corner_radius_toplevel_v1 object"
+      />
+      <arg
+        name="surface"
+        type="object"
+        interface="xdg_surface"
+        summary="the surface"
+      />
+    </request>
+
+    <request name="get_corner_radius_layer" since="2">
+      <description
+        summary="Create a new corner-radius object for an existing layer"
+      >
+        Instantiate an interface extension for the given layer-surface to specify their corner radius.
+
+        If the given layer-suface already has a cosmic_corner_radius_layer_v1 object associated,
+        the corner_radius_exists protocol error will be raised.
+      </description>
+      <arg
+        name="id"
+        type="new_id"
+        interface="cosmic_corner_radius_layer_v1"
+        summary="the new cosmic_corner_radius_layer_v1 object"
+      />
+      <arg
+        name="layer"
+        type="object"
+        interface="zwlr_layer_surface_v1"
+        summary="the layer surface"
+      />
+    </request>
+
+    <enum name="error">
+      <entry
+        name="corner_radius_exists"
+        value="0"
+        summary="the surface already has a corner-radius object"
+      /><entry
+        name="no_role"
+        value="1"
+        summary="the surface already has a corner-radius object"
+      />
+    </enum>
+  </interface>
+
+  <interface name="cosmic_corner_radius_toplevel_v1" version="1">
+    <description summary="corner radius toplevel">
+      The corner-radius object provides a way to specify a corner-radius
+      for it's associated toplevel.
+
+      If the xdg_toplevel associated with the cosmic_corner_radius_toplevel_v1
+      object has been destroyed, this object becomes inert. Any further requests
+      other than destroy will raise the toplevel_destroyed protocol error.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="Destroy the corner-radius object">
+        Informs the server that the client will no longer be using this protocol
+        object. The corner radius will be unset on the next commit.
+      </description>
+    </request>
+
+    <request name="set_radius">
+      <description summary="Set corner radius">
+        This request sets the hinted corner radius values for rectangular windows.
+
+        The corner radius hint is double-buffered state and will be applied on
+        the next wl_surface.commit.
+
+        The value is given in logical space relative to the window geometry of the
+        associated xdg_toplevel. If any value exceeds a quarter of either dimension
+        of the window geometry the radius_too_large protocol error is raised.
+      </description>
+      <arg name="top_left" type="uint" summary="top-left corner radius" />
+      <arg name="top_right" type="uint" summary="top-right corner radius" />
+      <arg
+        name="bottom_right"
+        type="uint"
+        summary="bottom-right corner radius"
+      />
+      <arg name="bottom_left" type="uint" summary="bottom-left corner radius" />
+    </request>
+
+    <request name="unset_radius">
+      <description summary="Unset corner radius">
+        Unsets any previously hinted corner radius values without invalidating the object for later use.
+        Can be used by clients that possibly have temporary irregular shapes.
+      </description>
+    </request>
+
+    <enum name="error">
+      <entry
+        name="toplevel_destroyed"
+        value="0"
+        summary="the associated toplevel object has been already destroyed"
+      />
+      <entry
+        name="radius_too_large"
+        value="1"
+        summary="the associated toplevel's window geometry isn't large enough for the requested radius"
+      />
+    </enum>
+  </interface>
+
+  <interface name="cosmic_corner_radius_layer_v1" version="1">
+    <description summary="corner radius layer">
+      The corner-radius object provides a way to specify a corner-radius
+      for it's associated layer surface.
+
+      If the zwlr_layer_surface_v1 associated with the cosmic_corner_radius_layer_v1
+      object has been destroyed, this object becomes inert. Any further requests
+      other than destroy will raise the layer_destroyed protocol error.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="Destroy the corner-radius object">
+        Informs the server that the client will no longer be using this protocol
+        object. The corner radius will be unset on the next commit.
+      </description>
+    </request>
+
+    <request name="set_radius">
+      <description summary="Set corner radius">
+        This request sets the hinted corner radius values for rectangular layers.
+
+        The corner radius hint is double-buffered state and will be applied on
+        the next wl_surface.commit.
+
+        The value is given in logical space relative to the remaining size of the
+        associated zwlr_layer_surface_v1 after any said padding was applied.
+        If any value exceeds half of the respective dimension of the remaining size
+        the radius_too_large protocol error is raised.
+      </description>
+      <arg name="top_left" type="uint" summary="top-left corner radius" />
+      <arg name="top_right" type="uint" summary="top-right corner radius" />
+      <arg
+        name="bottom_right"
+        type="uint"
+        summary="bottom-right corner radius"
+      />
+      <arg name="bottom_left" type="uint" summary="bottom-left corner radius" />
+    </request>
+
+    <request name="unset_radius">
+      <description summary="Unset corner radius">
+        Unsets any previously hinted corner radius values without invalidating the object for later use.
+        Can be used by clients that possibly have temporary irregular shapes.
+      </description>
+    </request>
+
+    <request name="set_padding">
+      <description summary="Set edge padding">
+        This request sets the hinted padding values for rectangular layers.
+
+        The padding hint is double-buffered state and will be applied on
+        the next wl_surface.commit.
+
+        The value is given in logical space as the amount of pixels to subtract from
+        the size of the associated zwlr_layer_surface and in the case of the top and left padding
+        added to the layer position before applying the corner radius. Negative padding values are allowed.
+
+        If any value exceeds half of the respective dimension of the surface size the padding_too_large
+        protocol error is raised.
+      </description>
+      <arg name="top" type="int" summary="top padding" />
+      <arg name="right" type="int" summary="right padding" />
+      <arg name="bottom" type="int" summary="bottom left padding" />
+      <arg name="left" type="int" summary="left padding" />
+    </request>
+
+    <request name="unset_padding">
+      <description summary="Unset edge padding">
+        Unsets any previously hinted padding values without invalidating the object for later use.
+        Can be used by clients that possibly have temporary irregular shapes.
+      </description>
+    </request>
+
+    <enum name="error">
+      <entry
+        name="layer_destroyed"
+        value="0"
+        summary="the associated layer surface object has been already destroyed"
+      />
+      <entry
+        name="radius_too_large"
+        value="1"
+        summary="the associated layer's size isn't large enough for the requested radius"
+      />
+      <entry
+        name="padding_too_large"
+        value="2"
+        summary="the associated layer's size isn't large enough for the requested padding"
+      />
+    </enum>
+  </interface>
+</protocol>
+
+
+unstable/cosmic-image-capture-source-unstable-v1.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="cosmic_image_source_unstable_v1">
+  <copyright>
+    Copyright © 2025 System76
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice (including the next
+    paragraph) shall be included in all copies or substantial portions of the
+    Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+  </copyright>
+
+  <description summary="cosmic image capture sources">
+    This protocols `extends ext-image-capture-source-v1` with additional capture
+    sources.
+  </description>
+
+  <interface name="zcosmic_workspace_image_capture_source_manager_v1" version="1">
+    <description summary="image source manager for outputs">
+      A manager for creating image source objects for wl_output objects.
+    </description>
+
+    <request name="create_source">
+      <description summary="create source object for output">
+        Creates a source object for a workspaces. Images captured from this source
+        will show the same content as the workspace. Some elements may be omitted,
+        such as cursors and overlays that have been marked as transparent to
+        capturing.
+      </description>
+      <arg name="source" type="new_id" interface="ext_image_capture_source_v1"/>
+      <arg name="output" type="object" interface="ext_workspace_handle_v1"/>
+    </request>
+
+    <request name="destroy" type="destructor">
+      <description summary="delete this object">
+        Destroys the manager. This request may be sent at any time by the client
+        and objects created by the manager will remain valid after its
+        destruction.
+      </description>
+    </request>
+  </interface>
+</protocol>
+
+
+
+unstable/cosmic-keyboard-layout-unstable-v1.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="cosmic_keyboard_layout_unstable_v1">
+  <copyright>
+    Copyright © 2026 System76, Inc
+
+    Permission to use, copy, modify, distribute, and sell this
+    software and its documentation for any purpose is hereby granted
+    without fee, provided that the above copyright notice appear in
+    all copies and that both that copyright notice and this permission
+    notice appear in supporting documentation, and that the name of
+    the copyright holders not be used in advertising or publicity
+    pertaining to distribution of the software without specific,
+    written prior permission.  The copyright holders make no
+    representations about the suitability of this software for any
+    purpose.  It is provided "as is" without express or implied
+    warranty.
+
+    THE COPYRIGHT HOLDERS DISCLAIM ALL WARRANTIES WITH REGARD TO THIS
+    SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+    FITNESS, IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY
+    SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+    AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+    ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+    THIS SOFTWARE.
+  </copyright>
+
+  <description summary="Protocol to control keyboard layout group">
+    This protocol notifies clients of the active keyboard layout group, and allows
+    setting a new value.
+
+    Warning! The protocol described in this file is currently in the testing
+    phase. Backward compatible changes may be added together with the
+    corresponding interface version bump. Backward incompatible changes can
+    only be done by creating a new major version of the extension.
+  </description>
+
+  <interface name="zcosmic_keyboard_layout_manager_v1" version="1">
+    <description summary="keyboard layout manager">
+      Manager for creating `zcosmic_keyboard_layout_v1` instances.
+    </description>
+
+    <request name="get_keyboard_layout">
+      <description summary="Get keyboard layout object">
+        Create a `zcosmic_keyboard_layout_v1` to get and set group for given keyboard.
+      </description>
+      <arg name="keyboard_layout" type="new_id" interface="zcosmic_keyboard_layout_v1"/>
+      <arg name="keyboard" type="object" interface="wl_keyboard"/>
+    </request>
+
+    <request name="destroy" type="destructor">
+      <description summary="delete this object">
+      </description>
+    </request>
+  </interface>
+
+  <interface name="zcosmic_keyboard_layout_v1" version="1">
+    <description summary="">
+      Object to get and set `group` for a particular `wl_keyboard`.
+    </description>
+
+    <event name="group">
+      <description summary="layout group changed">
+        Unlike `wl_keyboard::modifiers`, this event is received even when the client has no focused window.
+      </description>
+      <arg name="group" type="uint"/>
+    </event>
+
+    <request name="set_group">
+      <description summary="set layout group">
+        On success, the `group` event will be generated for all clients, and the focused client will
+        receive `wl_keyboard::modifiers` with the new group.
+
+        The request will be ignored if `group` is out of bounds.
+      </description>
+      <arg name="group" type="uint"/>
+    </request>
+
+    <request name="destroy" type="destructor">
+      <description summary="delete this object">
+      </description>
+    </request>
+  </interface>
+</protocol>
+
+
+unstable/cosmic-output-management-unstable-v1.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="cosmic_output_management_unstable_v1">
+  <copyright>
+    Copyright © 2024 Victoria Brekenfeld
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice (including the next
+    paragraph) shall be included in all copies or substantial portions of the
+    Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+  </copyright>
+
+  <description summary="extension protocol to wlr-output-management">
+    This protocol serves as an extension to wlr-output-management.
+
+    It primarily adds explicit output mirroring,
+    while upstream is figuring out how to best support that.
+
+    It was designed against version 4 of wlr-output-management, but tries
+    it's best to be forward compatible.
+  </description>
+
+  <interface name="zcosmic_output_manager_v1" version="3">
+    <description summary="Output configuration manager">
+        This interface provides extension points for wlr-output-management types.
+    </description>
+
+    <enum name="error">
+      <entry name="already_extended" value="1"
+        summary="object already created"/>
+    </enum>
+
+    <request name="get_head">
+        <description summary="Get a zcosmic_output_head_v1 for an existing zwlr_output_head_v1">
+            Gets an extension object for zwlr_output_head_v1.
+
+            As soon as the extended output is created, events will be dispatched with an accompanying
+            `done`-event delivered to the matching `zwlr_output_manager_v1` afterwards.
+
+            Any further updates will produce new events, if properties of the zcosmic_output_head_v1 change,
+            just like for the original `zwlr_output_head_v1`. Events should be handled as atomic, as denoted
+            by `zwlr_output_manager_v1::done`.
+
+            Trying to create more than one zcosmic_output_head_v1 per zwlr_output_head_v1 will raise an
+            "already_extended" error.
+        </description>
+        <arg name="extended" type="new_id" interface="zcosmic_output_head_v1"/>
+        <arg name="head" type="object" interface="zwlr_output_head_v1"/>
+    </request>
+
+    <request name="get_configuration">
+        <description summary="Get a zcosmic_output_configuration_v1 for an existing zwlr_output_configuration_v1">
+            Gets an extension object for zwlr_output_configuration_v1.
+
+            Trying to create more than one zcosmic_output_configuration_v1 per zwlr_output_configuration_v1
+            will raise an "already_extended" error.
+        </description>
+        <arg name="extended" type="new_id" interface="zcosmic_output_configuration_v1"/>
+        <arg name="config" type="object" interface="zwlr_output_configuration_v1"/>
+    </request>
+
+    <request name="get_configuration_head">
+        <description summary="Get a zcosmic_output_configuration_head_v1 for an existing zwlr_output_configuration_head_v1">
+            Gets an extension object for zwlr_output_configuration_head_v1.
+
+            Trying to create more than one zcosmic_output_configuration_head_v1 per
+            zwlr_output_configuration_head_v1 will raise an "already_extended" error.
+        </description>
+        <arg name="extended" type="new_id" interface="zcosmic_output_configuration_head_v1"/>
+        <arg name="config_head" type="object" interface="zwlr_output_configuration_head_v1"/>
+    </request>
+
+    <request name="release" type="destructor">
+      <description summary="Destroy this global">
+        Destroys this global. All previously created objects remain valid.
+      </description>
+    </request>
+
+    <!-- version 3 additions -->
+
+    <request name="set_xwayland_primary" since="3">
+      <description summary="set head as the primary for xwayland">
+        This requests a head to be advertised as the primary output via randr to Xwayland.
+
+        No head has to be marked primary, if `null` is passed Xwayland won't advertise a primary output.
+        Sending a disabled head will be ignored to avoid races.
+      </description>
+      <arg name="head" type="object" interface="zcosmic_output_head_v1" allow-null="true" summary="head to be advertised as primary"/>
+    </request>
+  </interface>
+
+  <interface name="zcosmic_output_head_v1" version="3">
+    <description summary="Output extension object">
+        Extension to zwlr_output_head_v1.
+
+        Adds additional read-only properties.
+
+        Properties sent via this interface are applied atomically via the wlr_output_manager.done event.
+        No guarantees are made regarding the order in which properties are sent.
+    </description>
+
+    <event name="scale_1000">
+      <description summary="current scale">
+        This events describes the scale of the head in the global compositor
+        space multiplied by 1000 for additional precision.
+
+        It is only sent if the output is enabled.
+      </description>
+      <arg name="scale_1000" type="int"/>
+    </event>
+
+    <event name="mirroring">
+      <description summary="mirroring other output">
+        This events describes that the head is mirroring another.
+        In these cases `name` contains the unique name of the matching `zwlr_output_head_v1`.
+        If the name is null, no head is being mirrored onto this one.
+
+        For mirrored heads the `position`-event is meaningless.
+
+        It is only sent if the output is enabled.
+      </description>
+      <arg name="name" type="string" allow-null="true"/>
+    </event>
+
+    <request name="release" type="destructor">
+      <description summary="destroy the output head">
+        Using this request a client can tell the compositor that it is not interested
+        in the head object anymore.
+      </description>
+    </request>
+
+    <!-- version 2 additions -->
+
+    <event name="adaptive_sync_available" since="2">
+      <description summary="is adaptive_sync available for this head">
+        This events describes if adaptive_sync is available for this head.
+
+        It is only sent if the output is enabled.
+      </description>
+      <arg name="available" type="uint" enum="adaptive_sync_availability"/>
+    </event>
+
+    <enum name="adaptive_sync_availability" since="2">
+      <entry name="unsupported" value="0" summary="adaptive sync is not supported"/>
+      <entry name="requires_modeset" value="1" summary="automatic adaptive_sync is unavailable"/>
+      <entry name="supported" value="2" summary="adaptive sync is supported in all states"/>
+    </enum>
+
+    <event name="adaptive_sync_ext" since="2">
+      <description summary="current adaptive_sync state">
+        This events describes the adaptive_sync state of this head.
+
+        It is only sent if the output is enabled.
+      </description>
+      <arg name="state" type="uint" enum="adaptive_sync_state_ext"/>
+    </event>
+
+    <enum name="adaptive_sync_state_ext" since="2">
+      <entry name="disabled" value="0" summary="adaptive sync is disabled"/>
+      <entry name="automatic" value="1" summary="adaptive sync will be actived automatically"/>
+      <entry name="always" value="2" summary="adaptive sync is forced to be always active"/>
+    </enum>
+
+    <!-- version 3 additions -->
+
+    <event name="xwayland_primary" since="3">
+      <description summary="is this head configured as the primary for xwayland">
+        This event describes if this head is advertised as the primary output via randr to Xwayland.
+
+        At most one output is marked primary, but it is not guaranteed that any output is marked.
+        It is only sent if the output is enabled.
+      </description>
+      <arg name="state" type="uint" summary="boolean if primary or not"/>
+    </event>
+  </interface>
+
+  <interface name="zcosmic_output_configuration_v1" version="1">
+    <description summary="Output configuration extension object">
+        Extension to zwlr_output_configuration_v1.
+
+        Adds additional parameters to be tested/applyed via the original zwlr_output_configuration_v1.
+    </description>
+
+    <enum name="error">
+      <entry name="already_finished" value="1"
+        summary="underlying configuration has already been used"/>
+      <entry name="mirrored_head_busy" value="2"
+        summary="mirrored head is not enabled"/>
+    </enum>
+
+    <request name="mirror_head">
+      <description summary="enable and configure a head to mirror another head">
+        Enable a head mirroring another.
+
+        This request creates a head configuration object that can be used to change the head's properties.
+
+        This is an alternative to `zwlr_output_configuration_v1::enable_head` or `zwlr_output_configuration_v1::disable_head`
+        Using either with the same `head` argument will result in an `already_configured_head` error on the original
+        `zwlr_output_configuration_v1` object.
+
+        All properties are still required to be set to the resulting `zwlr_output_configuration_head` by the client
+        as denoted in the original protocol. Some like `set_position` however might be ignored in mirroring configurations.
+
+        Trying to set a disabled or mirroring head as `mirroring` or calling `disable_head`/`mirror_head` after using a head
+        as a `mirroring` argument will raise a `mirrored_head_busy` protocol error.
+      </description>
+      <arg name="id" type="new_id" interface="zwlr_output_configuration_head_v1"
+        summary="a new object to configure the head"/>
+      <arg name="head" type="object" interface="zwlr_output_head_v1"
+        summary="the head to be enabled"/>
+      <arg name="mirroring" type="object" interface="zwlr_output_head_v1"
+        summary="the head to be mirrored"/>
+    </request>
+
+    <event name="finished">
+      <description summary="the configuration was used">
+        This event indicates that the configuration is no longer available.
+
+        This usually happens when the original configuration was `cancelled`, `suceeded` or `failed`.
+
+        Upon receiving this event, the client should destroy this object.
+
+        The configration object becomes inert and any requests other than `destroy` will be ignored.
+      </description>
+    </event>
+
+    <request name="release" type="destructor">
+      <description summary="destroy the output configuration">
+        Using this request a client can tell the compositor that it is not going
+        to use the configuration object anymore. Any changes to the outputs
+        will still be attached to the original `zwlr_output_configuration_head_v1`
+        if it isn't destroyed.
+      </description>
+    </request>
+  </interface>
+
+  <interface name="zcosmic_output_configuration_head_v1" version="2">
+    <description summary="Output configuration head extension object">
+        Extension to zwlr_output_configuration_head_v1.
+
+        Adds additional/alternative parameters to the original zwlr_output_configuration_head_v1.
+
+        Once the original `zwlr_output_configuration_head_v1` is destroyed this object will
+        become inert and all requests except `release` will be ignored.
+    </description>
+
+    <request name="set_scale_1000">
+      <description summary="set the scale multiplied by 1000">
+        This request sets the head's scale multiplied by 1000 for additional precision.
+
+        This request is meant to be used in place of `zwlr_output_configuration_head_v1::set_scale`.
+        Using `set_scale` and `set_scale_1000` at once will thus raise an `already_set` error on the
+        original `zwlr_output_configuration_head_v1`.
+
+        Any request conflicting with `set_scale` will also conflict with `set_scale_1000`.
+      </description>
+      <arg name="scale_1000" type="int"/>
+    </request>
+
+    <request name="release" type="destructor">
+      <description summary="destroy the output configuration head">
+        Using this request a client can tell the compositor that it is not going
+        to use the configuration object anymore. Already issued requests will
+        still be attached to the original `zwlr_output_configuration_head_v1`
+        until it is destroyed.
+      </description>
+    </request>
+
+    <!-- version 2 additions -->
+
+    <request name="set_adaptive_sync_ext" since="2">
+      <description summary="set adaptive sync state">
+        This request requests a new adaptive sync state.
+
+        This request is meant to be used in place of `zwlr_output_configuration_head_v1::set_adaptive_sync`.
+        Using `set_adaptive_sync` and `set_adaptive_sync_ext` at once will thus raise an `already_set` error on the
+        original `zwlr_output_configuration_head_v1`.
+
+        Any request conflicting with `set_adaptive_sync` will also conflict with `set_adaptive_sync_ext`.
+      </description>
+      <arg name="state" type="uint" enum="zcosmic_output_head_v1.adaptive_sync_state_ext"/>
+    </request>
+  </interface>
+</protocol>
+
+
+unstable/cosmic-overlap-notify-unstable-v1.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="cosmic_overlap_notify_unstable_v1">
+  <copyright>
+    Copytight © 2024 Victoria Brekenfeld
+
+    Permission to use, copy, modify, distribute, and sell this
+    software and its documentation for any purpose is hereby granted
+    without fee, provided that the above copyright notice appear in
+    all copies and that both that copyright notice and this permission
+    notice appear in supporting documentation, and that the name of
+    the copyright holders not be used in advertising or publicity
+    pertaining to distribution of the software without specific,
+    written prior permission.  The copyright holders make no
+    representations about the suitability of this software for any
+    purpose.  It is provided "as is" without express or implied
+    warranty.
+
+    THE COPYRIGHT HOLDERS DISCLAIM ALL WARRANTIES WITH REGARD TO THIS
+    SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+    FITNESS, IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY
+    SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+    AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+    ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+    THIS SOFTWARE.
+  </copyright>
+
+  <interface name="zcosmic_overlap_notify_v1" version="1">
+    <description summary="get notifications of other elements overlapping layer surfaces">
+      The purpose of this protocol is to enable layer-shell client to get
+      notifications if part of their surfaces are occluded other elements
+      (currently toplevels and other layer-surfaces).
+
+      You can request a notification object for any of your zwlr_layer_surface_v1
+      surfaces, which will then emit overlap events.
+    </description>
+
+    <request name="notify_on_overlap">
+      <description summary="get notified if a layer-shell is obstructed by a toplevel">
+        Requests notifications for toplevels and layer-surfaces entering and leaving the
+        surface-area of the given zwlr_layer_surface_v1. This can be used e.g. to
+        implement auto-hide functionality.
+
+        To stop receiving notifications, destroy the returned
+        zcosmic_overlap_notification_v1 object.
+      </description>
+      <arg name="overlap_notification" type="new_id" interface="zcosmic_overlap_notification_v1"/>
+      <arg name="layer_surface" type="object" interface="zwlr_layer_surface_v1"/>
+    </request>
+  </interface>
+
+  <interface name="zcosmic_overlap_notification_v1" version="1">
+    <description summary="Subscription for overlapping toplevels on a layer-surface"/>
+
+    <event name="toplevel_enter">
+      <description summary="Toplevel entered the surface area">
+        A ext_foreign_toplevel_handle_v1 has entered the surface area.
+
+        This event will be emitted once for every ext_foreign_toplevel_handle_v1
+        representing this toplevel.
+
+        Compositors are free to update the overlapping area by sending additional
+        `toplevel_enter` events for the same toplevel without sending `toplevel_leave`
+        in between.
+      </description>
+      <arg name="toplevel" type="object" interface="ext_foreign_toplevel_handle_v1"/>
+      <arg name="x" type="int" summary="x coordinate of the upper-left corner of the overlapping area"/>
+      <arg name="y" type="int" summary="y coordinate of the upper-left corner of the overlapping area"/>
+      <arg name="width" type="int" summary="width of the overlapping area"/>
+      <arg name="height" type="int" summary="height of the overlapping area"/>
+    </event>
+
+    <event name="toplevel_leave">
+      <description summary="Toplevel entered the surface area">
+        A ext_foreign_toplevel_handle_v1 has left the surface area.
+
+        This event will be emitted once for every ext_foreign_toplevel_handle_v1
+        representing this toplevel.
+      </description>
+      <arg name="toplevel" type="object" interface="ext_foreign_toplevel_handle_v1"/>
+    </event>
+
+    <event name="layer_enter">
+      <description summary="Layer surface entered the surface area">
+        A zwlr_layer_surface_v1 has entered the surface area.
+
+        Compositors are free to update the overlapping area by sending additional
+        `layer_enter` events for the same surface without sending `layer_leave`
+        in between.
+
+        The overlapping region is given surface-relative to the zwlr_layer_surface_v1
+        used to create this notification object.
+      </description>
+      <arg name="identifier" type="string" summary="unique identifier for the overlapping layer-surface"/>
+      <arg name="namespace" type="string" summary="namespace for the layer surface"/>
+      <arg name="exclusive" type="uint" summary="if the overlapping surface is requesting an exclusive area or not"/>
+      <arg name="layer" type="uint" enum="zwlr_layer_shell_v1.layer" summary="layer the overlapping surface sits on"/>
+      <arg name="x" type="int" summary="x coordinate of the upper-left corner of the overlapping area"/>
+      <arg name="y" type="int" summary="y coordinate of the upper-left corner of the overlapping area"/>
+      <arg name="width" type="int" summary="width of the overlapping area"/>
+      <arg name="height" type="int" summary="height of the overlapping area"/>
+    </event>
+
+    <event name="layer_leave">
+      <description summary="Layer surface left the surface area">
+        A zwlr_layer_surface_v1 has left the surface area.
+      </description>
+      <arg name="identifier" type="string" summary="unique identifier for the overlapping layer-surface"/>
+    </event>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the notification object">
+        This request should be called when the client has no interest in overlap
+        notifications anymore.
+      </description>
+    </request>
+  </interface>
+</protocol>
+
+
+unstable/cosmic-session-lock-layer-v1.xml
+<protocol name="cosmic_session_lock_v1">
+  <copyright>
+    Copyright © 2026 System76
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice (including the next
+    paragraph) shall be included in all copies or substantial portions of the
+    Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+  </copyright>
+
+  <description summary="Show layer surfaces in locked session.">
+    Normally, `ext-session-lock-v1` hides all other surfaces. This protocol allows
+    a client to indicate that a layer surface should also be shown when the session
+    is locked.
+  </description>
+
+  <interface name="cosmic_session_lock_layer_manager_v1" version="1">
+    <request name="set_show_on_lock" since="1">
+      <description
+        summary="Show layer on lock."
+      >
+      Show on lock is double buffered, see wl_surface.commit.
+      </description>
+      <arg
+        name="layer"
+        type="object"
+        interface="zwlr_layer_surface_v1"
+        summary="the layer surface"
+      />
+    </request>
+
+    <request name="unset_show_on_lock" since="1">
+      <description
+        summary="Do not show layer on lock."
+      >
+      Show on lock is double buffered, see wl_surface.commit.
+      </description>
+      <arg
+        name="layer"
+        type="object"
+        interface="zwlr_layer_surface_v1"
+        summary="the layer surface"
+      />
+    </request>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the global">
+      </description>
+    </request>
+  </interface>
+</protocol>
+
+
+unstable/cosmic-toplevel-info-unstable-v1.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="cosmic_toplevel_info_unstable_v1">
+  <copyright>
+    Copyright © 2018 Ilia Bozhinov
+    Copyright © 2020 Isaac Freund
+    Copyright © 2024 Victoria Brekenfeld
+
+    Permission to use, copy, modify, distribute, and sell this
+    software and its documentation for any purpose is hereby granted
+    without fee, provided that the above copyright notice appear in
+    all copies and that both that copyright notice and this permission
+    notice appear in supporting documentation, and that the name of
+    the copyright holders not be used in advertising or publicity
+    pertaining to distribution of the software without specific,
+    written prior permission.  The copyright holders make no
+    representations about the suitability of this software for any
+    purpose.  It is provided "as is" without express or implied
+    warranty.
+
+    THE COPYRIGHT HOLDERS DISCLAIM ALL WARRANTIES WITH REGARD TO THIS
+    SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+    FITNESS, IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY
+    SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+    AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+    ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+    THIS SOFTWARE.
+  </copyright>
+
+  <interface name="zcosmic_toplevel_info_v1" version="3">
+    <description summary="list toplevels and properties thereof">
+      The purpose of this protocol is to enable clients such as taskbars
+      or docks to access a list of opened applications and basic properties
+      thereof.
+
+      It thus extends ext_foreign_toplevel_v1 to provide more information
+      and actions on foreign toplevels.
+    </description>
+
+    <event name="toplevel" deprecated-since="2">
+      <description summary="a toplevel has been created">
+        This event is never emitted for clients binding version 2
+        of this protocol, they should use `get_cosmic_toplevel` instead.
+
+        This event is emitted for clients binding version 1 whenever a
+        new toplevel window is created. It is emitted for all toplevels,
+        regardless of the app that has created them.
+
+        All initial properties of the toplevel (title, app_id, states, etc.)
+        will be sent immediately after this event via the corresponding
+        events in zcosmic_toplevel_handle_v1.
+      </description>
+      <arg name="toplevel" type="new_id" interface="zcosmic_toplevel_handle_v1"/>
+    </event>
+
+    <request name="stop" deprecated-since="2">
+      <description summary="stop sending events">
+        This request indicates that the client no longer wishes to receive
+        events for new toplevels.  However, the compositor may emit further
+        toplevel_created events until the finished event is emitted.
+
+        The client must not send any more requests after this one.
+
+        Note: This request isn't necessary for clients binding version 2
+        of this protocol and will be ignored.
+      </description>
+    </request>
+
+    <event name="finished" deprecated-since="2">
+      <description summary="the compositor has finished with the toplevel manager">
+        This event indicates that the compositor is done sending events
+        to the zcosmic_toplevel_info_v1. The server will destroy the
+        object immediately after sending this request, so it will become
+        invalid and the client should free any resources associated with it.
+
+        Note: This event is emitted immediately after calling `stop` for
+        clients binding version 2 of this protocol for backwards compatibility.
+      </description>
+    </event>
+
+    <request name="get_cosmic_toplevel" since="2">
+      <description summary="get cosmic toplevel extension object">
+        Request a zcosmic_toplevel_handle_v1 extension object for an existing
+        ext_foreign_toplevel_handle_v1.
+
+        All initial properties of the toplevel (states, etc.)
+        will be sent immediately after this event via the corresponding
+        events in zcosmic_toplevel_handle_v1.
+      </description>
+      <arg name="cosmic_toplevel" type="new_id" interface="zcosmic_toplevel_handle_v1"/>
+      <arg name="foreign_toplevel" type="object" interface="ext_foreign_toplevel_handle_v1"/>
+    </request>
+
+    <event name="done" since="2">
+      <description summary="all information about active toplevels have been sent">
+        This event is sent after all changes for currently active
+        zcosmic_toplevel_handle_v1 have been sent.
+
+        This allows changes to multiple zcosmic_toplevel_handle_v1 handles
+        and their properties to be seen as atomic, even if they happen via
+        multiple events.
+      </description>
+    </event>
+  </interface>
+
+  <interface name="zcosmic_toplevel_handle_v1" version="3">
+    <description summary="an open toplevel">
+      A zcosmic_toplevel_handle_v1 object represents an open toplevel
+      window. A single app may have multiple open toplevels.
+
+      Each toplevel has a list of outputs it is visible on, exposed to the
+      client via the output_enter and output_leave events.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the zcosmic_toplevel_handle_v1 object">
+        This request should be called either when the client will no longer
+        use the zcosmic_toplevel_handle_v1.
+      </description>
+    </request>
+
+    <event name="closed" deprecated-since="2">
+      <description summary="the toplevel has been closed">
+        The server will emit no further events on the
+        zcosmic_toplevel_handle_v1 after this event. Any requests received
+        aside from the destroy request will be ignored. Upon receiving this
+        event, the client should make the destroy request to allow freeing
+        of resources.
+
+        Note: This event will not be emitted for clients binding version 2
+        of this protocol, as `ext_foreign_toplevel_handle_v1.closed` is
+        equivalent.
+      </description>
+    </event>
+
+    <event name="done" deprecated-since="2">
+      <description summary="all information about the toplevel has been sent">
+        This event is sent after all changes in the toplevel state have
+        been sent.
+
+        This allows changes to the zcosmic_toplevel_handle_v1 properties
+        to be seen as atomic, even if they happen via multiple events.
+
+        Note: this is is not sent after the closed event.
+
+        Note: This event will not be emitted for clients binding version 2
+        of this protocol, as `ext_foreign_toplevel_handle_v1.done` is
+        equivalent.
+      </description>
+    </event>
+
+    <event name="title" deprecated-since="2">
+      <description summary="title change">
+        This event is emitted whenever the title of the toplevel changes.
+
+        Note: This event will not be emitted for clients binding version 2
+        of this protocol, as `ext_foreign_toplevel_handle_v1.title` is
+        equivalent.
+      </description>
+      <arg name="title" type="string"/>
+    </event>
+
+    <event name="app_id" deprecated-since="2">
+      <description summary="app_id change">
+        This event is emitted whenever the app_id of the toplevel changes.
+
+        Note: This event will not be emitted for clients binding version 2
+        of this protocol, as `ext_foreign_toplevel_handle_v1.app_id` is
+        equivalent.
+      </description>
+      <arg name="app_id" type="string"/>
+    </event>
+
+    <event name="output_enter">
+      <description summary="toplevel entered an output">
+        This event is emitted whenever the toplevel becomes visible on the
+        given output. A toplevel may be visible on multiple outputs.
+      </description>
+      <arg name="output" type="object" interface="wl_output"/>
+    </event>
+
+    <event name="output_leave">
+      <description summary="toplevel left an output">
+        This event is emitted whenever the toplevel is no longer visible
+        on a given output. It is guaranteed that an output_enter event with
+        the same output has been emitted before this event.
+      </description>
+      <arg name="output" type="object" interface="wl_output"/>
+    </event>
+
+    <event name="workspace_enter" deprecated-since="3">
+      <description summary="toplevel entered an workspace">
+        This event is emitted whenever the toplevel becomes visible on the
+        given workspace. A toplevel may be visible on multiple workspaces.
+      </description>
+      <arg name="workspace" type="object" interface="zcosmic_workspace_handle_v1"/>
+    </event>
+
+    <event name="workspace_leave" deprecated-since="3">
+      <description summary="toplevel left an workspace">
+        This event is emitted whenever the toplevel is no longer visible
+        on a given workspace. It is guaranteed that an workspace_enter event with
+        the same workspace has been emitted before this event.
+      </description>
+      <arg name="workspace" type="object" interface="zcosmic_workspace_handle_v1"/>
+    </event>
+
+    <enum name="state">
+      <description summary="types of states on the toplevel">
+        The different states that a toplevel may have. These have the same
+        meaning as the states with the same names defined in xdg-toplevel
+      </description>
+      <entry name="maximized"  value="0" summary="the toplevel is maximized"  />
+      <entry name="minimized"  value="1" summary="the toplevel is minimized"  />
+      <entry name="activated"  value="2" summary="the toplevel is active"     />
+      <entry name="fullscreen" value="3" summary="the toplevel is fullscreen" />
+      <entry name="sticky"     value="4" summary="the toplevel is sticky"     since="2" />
+    </enum>
+
+    <event name="state">
+      <description summary="the toplevel state changed">
+        This event is emitted once on creation of the
+        zcosmic_toplevel_handle_v1 and again whenever the state of the
+        toplevel changes.
+      </description>
+      <arg name="state" type="array"/>
+    </event>
+
+    <event name="geometry" since="2">
+      <description summary="the toplevel's position and/or size has changed">
+        Emitted when the geometry of a toplevel (it's position and/or size)
+        relative to the provided output has changed.
+
+        This event is emitted once on creation of the
+        zcosmic_toplevel_handle_v1 for every entered output and again
+        whenever the geometry of the toplevel changes relative to any output.
+      </description>
+      <arg name="output" type="object" interface="wl_output"/>
+      <arg name="x" type="int" summary="x coordinate of the upper-left corner"/>
+      <arg name="y" type="int" summary="y coordinate of the upper-left corner"/>
+      <arg name="width" type="int" summary="width of the toplevel"/>
+      <arg name="height" type="int" summary="height of the toplevel"/>
+    </event>
+
+    <event name="ext_workspace_enter" since="3">
+      <description summary="toplevel entered an workspace">
+        This event is emitted whenever the toplevel becomes visible on the
+        given workspace. A toplevel may be visible on multiple workspaces.
+      </description>
+      <arg name="workspace" type="object" interface="ext_workspace_handle_v1"/>
+    </event>
+
+    <event name="ext_workspace_leave" since="3">
+      <description summary="toplevel left an workspace">
+        This event is emitted whenever the toplevel is no longer visible
+        on a given workspace. It is guaranteed that an workspace_enter event with
+        the same workspace has been emitted before this event.
+      </description>
+      <arg name="workspace" type="object" interface="ext_workspace_handle_v1"/>
+    </event>
+  </interface>
+</protocol>
+
+
+unstable/cosmic-toplevel-management-unstable-v1.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="cosmic_toplevel_management_unstable_v1">
+  <copyright>
+    Copyright © 2018 Ilia Bozhinov
+    Copyright © 2020 Isaac Freund
+    Copyright © 2022 wb9688
+    Copyright © 2024 Victoria Brekenfeld
+
+    Permission to use, copy, modify, distribute, and sell this
+    software and its documentation for any purpose is hereby granted
+    without fee, provided that the above copyright notice appear in
+    all copies and that both that copyright notice and this permission
+    notice appear in supporting documentation, and that the name of
+    the copyright holders not be used in advertising or publicity
+    pertaining to distribution of the software without specific,
+    written prior permission.  The copyright holders make no
+    representations about the suitability of this software for any
+    purpose.  It is provided "as is" without express or implied
+    warranty.
+
+    THE COPYRIGHT HOLDERS DISCLAIM ALL WARRANTIES WITH REGARD TO THIS
+    SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+    FITNESS, IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY
+    SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+    AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+    ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+    THIS SOFTWARE.
+  </copyright>
+
+  <interface name="zcosmic_toplevel_manager_v1" version="4">
+    <description summary="control open apps">
+      This protocol allows clients such as a taskbar to request the compositor
+      to preform typical actions on open toplevels. The compositor is in all
+      cases free to ignore the request.
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the zcosmic_toplevel_manager_v1">
+        This request indicates that the client has finished using the
+        zcosmic_toplevel_manager_v1 object and that it can be safely
+        destroyed.
+      </description>
+    </request>
+
+    <enum name="zcosmic_toplelevel_management_capabilities_v1">
+      <entry name="close" value="1" summary="close request is available"/>
+      <entry name="activate" value="2" summary="activate request is available"/>
+      <entry name="maximize" value="3" summary="set_maximized and unset_maximized requests are available"/>
+      <entry name="minimize" value="4" summary="set_minimized and unset_minimized requests are available"/>
+      <entry name="fullscreen" value="5" summary="set_fullscreen and unset_fullscreen requests are available"/>
+      <entry name="move_to_workspace" value="6" since="2" summary="move_to_workspace request is available"/>
+      <entry name="sticky" value="7" since="3" summary="set_sticky and unset_sticky requests are available"/>
+      <entry name="move_to_ext_workspace" value="8" since="4" summary="move_to_ext_workspace request is available"/>
+    </enum>
+
+    <event name="capabilities">
+      <description summary="compositor capabilities">
+        This event advertises the capabilities supported by the compositor. If
+        a capability isn't supported, clients should hide or disable the UI
+        elements that expose this functionality. For instance, if the
+        compositor doesn't advertise support for closing toplevels, a button
+        triggering the close request should not be displayed.
+
+        The compositor will ignore requests it doesn't support. For instance,
+        a compositor which doesn't advertise support for closing toplevels will ignore
+        close requests.
+
+        Compositors must send this event once after creation of an
+        zcosmic_toplevel_manager_v1 . When the capabilities change, compositors
+        must send this event again.
+
+        The capabilities are sent as an array of 32-bit unsigned integers in
+        native endianness.
+      </description>
+      <arg name="capabilities" type="array" summary="array of 32-bit capabilities"/>
+    </event>
+
+    <request name="close">
+      <description summary="request that a toplevel be closed">
+        If the compositor honors this request, the
+        zcosmic_toplevel_handle_v1.closed event will be sent.
+      </description>
+      <arg name="toplevel" type="object" interface="zcosmic_toplevel_handle_v1"/>
+    </request>
+
+    <request name="activate">
+      <description summary="request that a toplevel be activated">
+        If the compositor honors this request, the
+        zcosmic_toplevel_handle_v1.state event will be sent.
+      </description>
+      <arg name="toplevel" type="object" interface="zcosmic_toplevel_handle_v1"/>
+      <arg name="seat" type="object" interface="wl_seat"/>
+    </request>
+
+    <request name="set_maximized">
+      <description summary="request that a toplevel be maximized">
+        If the compositor honors this request, the
+        zcosmic_toplevel_handle_v1.state event will be sent.
+      </description>
+      <arg name="toplevel" type="object" interface="zcosmic_toplevel_handle_v1"/>
+    </request>
+
+    <request name="unset_maximized">
+      <description summary="request that a toplevel be unmaximized">
+        If the compositor honors this request, the
+        zcosmic_toplevel_handle_v1.state event will be sent.
+      </description>
+      <arg name="toplevel" type="object" interface="zcosmic_toplevel_handle_v1"/>
+    </request>
+
+    <request name="set_minimized">
+      <description summary="request that a toplevel be minimized">
+        If the compositor honors this request, the
+        zcosmic_toplevel_handle_v1.state event will be sent.
+      </description>
+      <arg name="toplevel" type="object" interface="zcosmic_toplevel_handle_v1"/>
+    </request>
+
+    <request name="unset_minimized">
+      <description summary="request that a toplevel be unminimized">
+        If the compositor honors this request, the
+        zcosmic_toplevel_handle_v1.state event will be sent.
+      </description>
+      <arg name="toplevel" type="object" interface="zcosmic_toplevel_handle_v1"/>
+    </request>
+
+    <request name="set_fullscreen">
+      <description summary="request that a toplevel be fullscreened">
+        If the compositor honors this request, the
+        zcosmic_toplevel_handle_v1.state and potentially the
+        zcosmic_toplevel_handle_v1.output_enter/output_leave events will
+        be sent.
+
+        The output parameter a hint to the compositor and may be ignored. A
+        value of NULL indicates that the compositor should choose the target
+        output, if it honors the fullscreen request.
+      </description>
+      <arg name="toplevel" type="object" interface="zcosmic_toplevel_handle_v1"/>
+      <arg name="output" type="object" interface="wl_output" allow-null="true"/>
+    </request>
+
+    <request name="unset_fullscreen">
+      <description summary="request that a toplevel be unfullscreened">
+        If the compositor honors this request, the
+        zcosmic_toplevel_handle_v1.state event will be sent.
+      </description>
+      <arg name="toplevel" type="object" interface="zcosmic_toplevel_handle_v1"/>
+    </request>
+
+    <request name="set_rectangle">
+      <description summary="designate a rectangle to represent a toplevel">
+        If a client using this protocol displays UI elements corresponding
+        to toplevels, it may use this request to inform the server about such
+        a relation. This information may be used by the server, for example as
+        the target for a minimize animation.
+
+        If the client sets more than one rectangle, only the most recently
+        set rectangle is considered.
+
+        The dimensions are given in surface-local coordinates.
+
+        Setting width=height=0 removes the current rectangle if one was set.
+      </description>
+      <arg name="toplevel" type="object" interface="zcosmic_toplevel_handle_v1"/>
+      <arg name="surface" type="object" interface="wl_surface"/>
+      <arg name="x" type="int"/>
+      <arg name="y" type="int"/>
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+    </request>
+
+    <request name = "move_to_workspace" since="2"  deprecated-since="4">
+      <description summary="move toplevel to workspace">
+        Move window to workspace, on given output.
+      </description>
+      <arg name="toplevel" type="object" interface="zcosmic_toplevel_handle_v1"/>
+      <arg name="workspace" type="object" interface="zcosmic_workspace_handle_v1"/>
+      <arg name="output" type="object" interface="wl_output"/>
+    </request>
+
+    <request name="set_sticky" since="3">
+      <description summary="request that a toplevel be made sticky">
+        If the compositor honors this request, the
+        zcosmic_toplevel_handle_v1.state event will be sent.
+      </description>
+      <arg name="toplevel" type="object" interface="zcosmic_toplevel_handle_v1"/>
+    </request>
+
+    <request name="unset_sticky" since="3">
+      <description summary="request that a toplevel be removed of the sticky status">
+        If the compositor honors this request, the
+        zcosmic_toplevel_handle_v1.state event will be sent.
+      </description>
+      <arg name="toplevel" type="object" interface="zcosmic_toplevel_handle_v1"/>
+    </request>
+
+    <request name = "move_to_ext_workspace" since="4">
+      <description summary="move toplevel to workspace">
+        Move window to workspace, on given output.
+      </description>
+      <arg name="toplevel" type="object" interface="zcosmic_toplevel_handle_v1"/>
+      <arg name="workspace" type="object" interface="ext_workspace_handle_v1"/>
+      <arg name="output" type="object" interface="wl_output"/>
+    </request>
+
+    <enum name="error">
+      <entry name="invalid_rectangle" value="0"
+        summary="the provided rectangle is invalid"/>
+    </enum>
+  </interface>
+</protocol>
+
+
+unstable/cosmic-workspace-unstable-v1.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="cosmic_workspace_unstable_v1">
+  <copyright>
+    Copyright © 2019 Christopher Billington
+    Copyright © 2020 Ilia Bozhinov
+    Copyright © 2022 Victoria Brekenfeld
+
+    Permission to use, copy, modify, distribute, and sell this
+    software and its documentation for any purpose is hereby granted
+    without fee, provided that the above copyright notice appear in
+    all copies and that both that copyright notice and this permission
+    notice appear in supporting documentation, and that the name of
+    the copyright holders not be used in advertising or publicity
+    pertaining to distribution of the software without specific,
+    written prior permission.  The copyright holders make no
+    representations about the suitability of this software for any
+    purpose.  It is provided "as is" without express or implied
+    warranty.
+
+    THE COPYRIGHT HOLDERS DISCLAIM ALL WARRANTIES WITH REGARD TO THIS
+    SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+    FITNESS, IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY
+    SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+    AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+    ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+    THIS SOFTWARE.
+  </copyright>
+
+  <interface name="zcosmic_workspace_manager_v1" version="2">
+    <description summary="list and control workspaces">
+      Workspaces, also called virtual desktops, are groups of surfaces. A
+      compositor with a concept of workspaces may only show some such groups of
+      surfaces (those of 'active' workspaces) at a time. 'Activating' a
+      workspace is a request for the compositor to display that workspace's
+      surfaces as normal, whereas the compositor may hide or otherwise
+      de-emphasise surfaces that are associated only with 'inactive' workspaces.
+      Workspaces are grouped by which sets of outputs they correspond to, and
+      may contain surfaces only from those outputs. In this way, it is possible
+      for each output to have its own set of workspaces, or for all outputs (or
+      any other arbitrary grouping) to share workspaces. Compositors may
+      optionally conceptually arrange each group of workspaces in an
+      N-dimensional grid.
+
+      The purpose of this protocol is to enable the creation of taskbars and
+      docks by providing them with a list of workspaces and their properties,
+      and allowing them to activate and deactivate workspaces.
+
+      After a client binds the zcosmic_workspace_manager_v1, each workspace will be
+      sent via the workspace event.
+    </description>
+
+    <event name="workspace_group">
+      <description summary="a workspace group has been created">
+        This event is emitted whenever a new workspace group has been created.
+
+        All initial details of the workspace group (workspaces, outputs) will be
+        sent immediately after this event via the corresponding events in
+        zcosmic_workspace_group_handle_v1.
+      </description>
+      <arg name="workspace_group" type="new_id" interface="zcosmic_workspace_group_handle_v1"/>
+    </event>
+
+    <request name="commit">
+      <description summary="all requests about the workspaces have been sent">
+        The client must send this request after it has finished sending other
+        requests. The compositor must process a series of requests preceding a
+        commit request atomically.
+
+        This allows changes to the workspace properties to be seen as atomic,
+        even if they happen via multiple events, and even if they involve
+        multiple zcosmic_workspace_handle_v1 objects, for example, deactivating one
+        workspace and activating another.
+      </description>
+    </request>
+
+    <event name="done">
+      <description summary="all information about the workspace groups has been sent">
+        This event is sent after all changes in all workspace groups have been
+        sent.
+
+        This allows changes to one or more zcosmic_workspace_group_handle_v1
+        properties and zcosmic_workspace_handle_v1 properties to be seen as atomic,
+        even if they happen via multiple events.
+        In particular, an output moving from one workspace group to
+        another sends an output_enter event and an output_leave event to the two
+        zcosmic_workspace_group_handle_v1 objects in question. The compositor sends
+        the done event only after updating the output information in both
+        workspace groups.
+      </description>
+    </event>
+
+    <event name="finished">
+      <description summary="the compositor has finished with the workspace_manager">
+        This event indicates that the compositor is done sending events to the
+        zcosmic_workspace_manager_v1. The server will destroy the object
+        immediately after sending this request, so it will become invalid and
+        the client should free any resources associated with it.
+      </description>
+    </event>
+
+    <request name="stop">
+      <description summary="stop sending events">
+        Indicates the client no longer wishes to receive events for new
+        workspace groups. However the compositor may emit further workspace
+        events, until the finished event is emitted.
+
+        The client must not send any more requests after this one.
+      </description>
+    </request>
+  </interface>
+
+  <interface name="zcosmic_workspace_group_handle_v1" version="2">
+    <description summary="a workspace group assigned to a set of outputs">
+      A zcosmic_workspace_group_handle_v1 object represents a a workspace group
+      that is assigned a set of outputs and contains a number of workspaces.
+
+      The set of outputs assigned to the workspace group is conveyed to the client via
+      output_enter and output_leave events, and its workspaces are conveyed with
+      workspace events.
+
+      For example, a compositor which has a set of workspaces for each output may
+      advertise a workspace group (and its workspaces) per output, whereas a compositor
+      where a workspace spans all outputs may advertise a single workspace group for all
+      outputs.
+    </description>
+
+    <enum name="zcosmic_workspace_group_capabilities_v1">
+      <entry name="create_workspace" value="1" summary="create_workspace request is available"/>
+    </enum>
+
+    <event name="capabilities">
+      <description summary="compositor capabilities">
+        This event advertises the capabilities supported by the compositor. If
+        a capability isn't supported, clients should hide or disable the UI
+        elements that expose this functionality. For instance, if the
+        compositor doesn't advertise support for creating workspaces, a button
+        triggering the create_workspace request should not be displayed.
+
+        The compositor will ignore requests it doesn't support. For instance,
+        a compositor which doesn't advertise support for creating workspaces will ignore
+        create_workspace requests.
+
+        Compositors must send this event once after creation of an
+        zcosmic_workspace_group_handle_v1 . When the capabilities change, compositors
+        must send this event again.
+
+        The capabilities are sent as an array of 32-bit unsigned integers in
+        native endianness.
+      </description>
+      <arg name="capabilities" type="array" summary="array of 32-bit capabilities"/>
+    </event>
+
+    <event name="output_enter">
+      <description summary="output assigned to workspace group">
+        This event is emitted whenever an output is assigned to the workspace
+        group.
+      </description>
+      <arg name="output" type="object" interface="wl_output"/>
+    </event>
+
+    <event name="output_leave">
+      <description summary="output removed from workspace group">
+        This event is emitted whenever an output is removed from the workspace
+        group.
+      </description>
+      <arg name="output" type="object" interface="wl_output"/>
+    </event>
+
+    <event name="workspace">
+      <description summary="workspace added to workspace group">
+        This event is emitted whenever a new workspace has been created.
+        A workspace can only be a member of a single workspace group and cannot
+        be re-assigned.
+
+        All initial details of the workspace (name, coordinates, state) will
+        be sent immediately after this event via the corresponding events in
+        zcosmic_workspace_handle_v1.
+      </description>
+      <arg name="workspace" type="new_id" interface="zcosmic_workspace_handle_v1"/>
+    </event>
+
+    <event name="remove">
+      <description summary="this workspace group has been destroyed">
+        This event means the zcosmic_workspace_group_handle_v1 has been destroyed.
+        It is guaranteed there won't be any more events for this
+        zcosmic_workspace_group_handle_v1. The zext_workspace_group_handle_v1 becomes
+        inert so any requests will be ignored except the destroy request.
+
+        The compositor must remove all workspaces belonging to a workspace group
+        before removing the workspace group.
+      </description>
+    </event>
+
+    <request name="create_workspace">
+      <description summary="create a new workspace">
+        Request that the compositor create a new workspace with the given name.
+
+        There is no guarantee that the compositor will create a new workspace,
+        or that the created workspace will have the provided name.
+      </description>
+      <arg name="workspace" type="string"/>
+    </request>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the zcosmic_workspace_group_handle_v1 object">
+        Destroys the zcosmic_workspace_group_handle_v1 object.
+
+        This request should be called either when the client does not want to
+        use the workspace object any more or after the remove event to finalize
+        the destruction of the object.
+      </description>
+    </request>
+  </interface>
+
+  <interface name="zcosmic_workspace_handle_v1" version="2">
+    <description summary="a workspace handing a group of surfaces">
+      A zcosmic_workspace_handle_v1 object represents a a workspace that handles a
+      group of surfaces.
+
+      Each workspace has a name, conveyed to the client with the name event; a
+      list of states, conveyed to the client with the state event; and
+      optionally a set of coordinates, conveyed to the client with the
+      coordinates event. The client may request that the compositor activate or
+      deactivate the workspace.
+
+      Each workspace can belong to only a single workspace group.
+      Depepending on the compositor policy, there might be workspaces with
+      the same name in different workspace groups, but these workspaces are still
+      separate (e.g. one of them might be active while the other is not).
+    </description>
+
+    <event name="name">
+      <description summary="workspace name changed">
+        This event is emitted immediately after the zcosmic_workspace_handle_v1 is
+        created and whenever the name of the workspace changes.
+      </description>
+      <arg name="name" type="string"/>
+    </event>
+
+    <event name="coordinates">
+      <description summary="workspace coordinates changed">
+        This event is used to organize workspaces into an N-dimensional grid
+        within a workspace group, and if supported, is emitted immediately after
+        the zcosmic_workspace_handle_v1 is created and whenever the coordinates of
+        the workspace change. Compositors may not send this event if they do not
+        conceptually arrange workspaces in this way. If compositors simply
+        number workspaces, without any geometric interpretation, they may send
+        1D coordinates, which clients should not interpret as implying any
+        geometry. Sending an empty array means that the compositor no longer
+        orders the workspace geometrically.
+
+        Coordinates have an arbitrary number of dimensions N with an uint32
+        position along each dimension. By convention if N > 1, the first
+        dimension is X, the second Y, the third Z, and so on. The compositor may
+        chose to utilize these events for a more novel workspace layout
+        convention, however. No guarantee is made about the grid being filled or
+        bounded; there may be a workspace at coordinate 1 and another at
+        coordinate 1000 and none in between. Within a workspace group, however,
+        workspaces must have unique coordinates of equal dimensionality.
+      </description>
+      <arg name="coordinates" type="array"/>
+    </event>
+
+    <event name="state">
+      <description summary="the state of the workspace changed">
+        This event is emitted immediately after the zcosmic_workspace_handle_v1 is
+        created and each time the workspace state changes, either because of a
+        compositor action or because of a request in this protocol.
+      </description>
+      <arg name="state" type="array"/>
+    </event>
+
+    <enum name="state">
+      <description summary="types of states on the workspace">
+        The different states that a workspace can have.
+      </description>
+
+      <entry name="active" value="0" summary="the workspace is active"/>
+      <entry name="urgent" value="1" summary="the workspace requests attention"/>
+      <entry name="hidden" value="2">
+        <description summary="the workspace is not visible">
+          The workspace is not visible in its workspace group, and clients
+          attempting to visualize the compositor workspace state should not
+          display such workspaces.
+        </description>
+      </entry>
+    </enum>
+
+    <enum name="zcosmic_workspace_capabilities_v1">
+      <entry name="activate" value="1" summary="activate request is available"/>
+      <entry name="deactivate" value="2" summary="deactivate request is available"/>
+      <entry name="remove" value="3" summary="remove request is available"/>
+      <entry name="rename" value="4" since="2" summary="rename request is available"/>
+      <entry name="set_tiling_state" value="5" since="2" summary="set_tiling_state request is available"/>
+    </enum>
+
+    <event name="capabilities">
+      <description summary="compositor capabilities">
+        This event advertises the capabilities supported by the compositor. If
+        a capability isn't supported, clients should hide or disable the UI
+        elements that expose this functionality. For instance, if the
+        compositor doesn't advertise support for removing workspaces, a button
+        triggering the remove request should not be displayed.
+
+        The compositor will ignore requests it doesn't support. For instance,
+        a compositor which doesn't advertise support for remove will ignore
+        remove requests.
+
+        Compositors must send this event once after creation of an
+        zcosmic_workspace_handle_v1 . When the capabilities change, compositors
+        must send this event again.
+
+        The capabilities are sent as an array of 32-bit unsigned integers in
+        native endianness.
+      </description>
+      <arg name="capabilities" type="array" summary="array of 32-bit capabilities"/>
+    </event>
+
+    <event name="remove">
+      <description summary="this workspace has been destroyed">
+        This event means the zcosmic_workspace_handle_v1 has been destroyed. It is
+        guaranteed there won't be any more events for this
+        zcosmic_workspace_handle_v1. The zext_workspace_handle_v1 becomes inert so
+        any requests will be ignored except the destroy request.
+      </description>
+    </event>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the zcosmic_workspace_handle_v1 object">
+        Destroys the zcosmic_workspace_handle_v1 object.
+
+        This request should be called either when the client does not want to
+        use the workspace object any more or after the remove event to finalize
+        the destruction of the object.
+      </description>
+    </request>
+
+    <request name="activate">
+      <description summary="activate the workspace">
+        Request that this workspace be activated.
+
+        There is no guarantee the workspace will be actually activated, and
+        behaviour may be compositor-dependent. For example, activating a
+        workspace may or may not deactivate all other workspaces in the same
+        group.
+      </description>
+    </request>
+
+    <request name="deactivate">
+      <description summary="activate the workspace">
+        Request that this workspace be deactivated.
+
+        There is no guarantee the workspace will be actually deactivated.
+      </description>
+    </request>
+
+    <request name="remove">
+      <description summary="remove the workspace">
+        Request that this workspace be removed.
+
+        There is no guarantee the workspace will be actually removed.
+      </description>
+    </request>
+
+    <event name="tiling_state" since="2">
+      <description summary="indicates if tiling behavior is enabled for this workspace">
+        This event is emitted immediately after the zcosmic_workspace_handle_v1 is created
+        and each time the workspace tiling state changes, either because of a
+        compositor action or because of a request in this protocol.
+      </description>
+      <arg name="state" type="uint" enum="tiling_state"/>
+    </event>
+
+    <enum name="tiling_state" since="2">
+      <description summary="types of tiling state a workspace may have"/>
+
+      <entry name="floating_only" value="0" summary="The workspace has no active tiling properties"/>
+      <entry name="tiling_enabled" value="1" summary="Tiling behavior is enabled for the workspace"/>
+    </enum>
+
+    <request name="rename" since="2">
+      <description summary="rename this workspace">
+        Request that this workspace is renamed.
+
+        There is no guarantee the workspace will actually be renamed.
+      </description>
+      <arg name="name" type="string" summary="new name of the workspace"/>
+    </request>
+
+    <request name="set_tiling_state" since="2">
+      <description summary="change the tiling state of this workspace">
+        Request that this workspace's tiling state is changed.
+
+        There is no guarantee the workspace will actually change it's tiling state.
+      </description>
+      <arg name="state" type="uint" enum="tiling_state" summary="the new tiling state of the workspace"/>
+    </request>
+  </interface>
+</protocol>
+
+
+unstable/cosmic-workspace-unstable-v2.xml
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="cosmic_workspace_unstable_v2">
+  <copyright>
+    Copyright © 2025 System76
+
+    Permission to use, copy, modify, distribute, and sell this
+    software and its documentation for any purpose is hereby granted
+    without fee, provided that the above copyright notice appear in
+    all copies and that both that copyright notice and this permission
+    notice appear in supporting documentation, and that the name of
+    the copyright holders not be used in advertising or publicity
+    pertaining to distribution of the software without specific,
+    written prior permission.  The copyright holders make no
+    representations about the suitability of this software for any
+    purpose.  It is provided "as is" without express or implied
+    warranty.
+
+    THE COPYRIGHT HOLDERS DISCLAIM ALL WARRANTIES WITH REGARD TO THIS
+    SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+    FITNESS, IN NO EVENT SHALL THE COPYRIGHT HOLDERS BE LIABLE FOR ANY
+    SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+    WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+    AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+    ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
+    THIS SOFTWARE.
+  </copyright>
+
+  <interface name="zcosmic_workspace_manager_v2" version="2">
+    <description summary="list and control workspaces">
+      This protocol extends `ext-workspace-v1` with addtional requests and events.
+
+      The caller should call `get_cosmic_workspace` whenever a new ext workspace is
+      created.
+    </description>
+
+    <request name="get_cosmic_workspace" since="2">
+      <description summary="get cosmic workspace extension object">
+        Request a `zcosmic_workspace_handle_v2` extension object for an existing
+        `ext_workspace_handle_v1`.
+
+        If a `zcosmic_workspace_handle_v2` already exists for the `ext_workspace_handle_v1`, this
+        will raise a `workspace_exists` protocol error.
+      </description>
+      <arg name="cosmic_workspace" type="new_id" interface="zcosmic_workspace_handle_v2"/>
+      <arg name="workspace" type="object" interface="ext_workspace_handle_v1"/>
+    </request>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the zcosmic_workspace_manager_v2 object">
+        This request should be called either when the client will no longer
+        use the `zcosmic_workspace_manager_v2`.
+      </description>
+    </request>
+
+    <enum name="error">
+      <entry name="workspace_exists" value="0" summary="zcosmic_workspace_handle_v2 already exists for ext_workspace_handle_v1"/>
+    </enum>
+  </interface>
+
+  <interface name="zcosmic_workspace_handle_v2" version="2">
+    <description summary="a workspace handing a group of surfaces">
+      A zcosmic_workspace_handle_v2 object represents a a workspace that handles a
+      group of surfaces.
+
+      Each workspace has a name, conveyed to the client with the name event; a
+      list of states, conveyed to the client with the state event; and
+      optionally a set of coordinates, conveyed to the client with the
+      coordinates event. The client may request that the compositor activate or
+      deactivate the workspace.
+
+      Each workspace can belong to only a single workspace group.
+      Depepending on the compositor policy, there might be workspaces with
+      the same name in different workspace groups, but these workspaces are still
+      separate (e.g. one of them might be active while the other is not).
+    </description>
+
+    <request name="destroy" type="destructor">
+      <description summary="destroy the zcosmic_workspace_handle_v1 object">
+        This request should be called either when the client will no longer
+        use the `zcosmic_workspace_handle_v1`.
+      </description>
+    </request>
+
+    <enum name="workspace_capabilities" bitfield="true">
+      <entry name="rename" value="1" summary="rename request is available"/>
+      <entry name="set_tiling_state" value="2" summary="set_tiling_state request is available"/>
+      <entry name="pin" value="3" since="2" summary="pin and unpin requests are available"/>
+      <entry name="move" value="4" since="2" summary="move_before and move_after requests are available"/>
+    </enum>
+
+    <event name="capabilities">
+      <description summary="compositor capabilities">
+        This event advertises the capabilities supported by the compositor. If
+        a capability isn't supported, clients should hide or disable the UI
+        elements that expose this functionality. For instance, if the
+        compositor doesn't advertise support for removing workspaces, a button
+        triggering the remove request should not be displayed.
+
+        The compositor will ignore requests it doesn't support. For instance,
+        a compositor which doesn't advertise support for remove will ignore
+        remove requests.
+
+        Compositors must send this event once after creation of a
+        `zcosmic_workspace_handle_v2`. When the capabilities change, compositors
+        must send this event again.
+      </description>
+      <arg name="capabilities" type="uint" summary="capabilities" enum="workspace_capabilities"/>
+    </event>
+
+    <event name="tiling_state">
+      <description summary="indicates if tiling behavior is enabled for this workspace">
+        This event is emitted immediately after the zcosmic_workspace_handle_v2 is created
+        and each time the workspace tiling state changes, either because of a
+        compositor action or because of a request in this protocol.
+      </description>
+      <arg name="state" type="uint" enum="tiling_state"/>
+    </event>
+
+    <event name="state" since="2">
+      <description summary="the state of the workspace changed">
+        This event is emitted immediately after the zcosmic_workspace_handle_v2 is
+        created and each time the workspace state changes, either because of a
+        compositor action or because of a request in this protocol.
+      </description>
+      <arg name="state" type="uint" enum="state"/>
+    </event>
+
+    <enum name="tiling_state">
+      <description summary="types of tiling state a workspace may have"/>
+
+      <entry name="floating_only" value="0" summary="The workspace has no active tiling properties"/>
+      <entry name="tiling_enabled" value="1" summary="Tiling behavior is enabled for the workspace"/>
+    </enum>
+
+    <enum name="state" bitfield="true" since="2">
+      <description summary="state of the workspace, extending the ext workspace state"/>
+      <entry name="pinned" value="1" summary="the workspace is pinned"/>
+    </enum>
+
+    <request name="rename">
+      <description summary="rename this workspace">
+        Request that this workspace is renamed.
+
+        There is no guarantee the workspace will actually be renamed.
+      </description>
+      <arg name="name" type="string" summary="new name of the workspace"/>
+    </request>
+
+    <request name="set_tiling_state">
+      <description summary="change the tiling state of this workspace">
+        Request that this workspace's tiling state is changed.
+
+        There is no guarantee the workspace will actually change it's tiling state.
+      </description>
+      <arg name="state" type="uint" enum="tiling_state" summary="the new tiling state of the workspace"/>
+    </request>
+
+    <request name="move_before" since="2">
+      <description summary="move before a different workspace">
+        Move a workspace to be before another workspace along a given axis.
+
+        `other_workspace` may be on the same workspace group, or on a different group.
+        If it's a different set, the workspace will also be moved to that group.
+
+        `axis` should be a valid index in the coordinates on the workspace group
+        `other_workspace` is on. The workspace will be positioned on the target group
+        to have a coordinate with this component less than the value of the component for
+        `other_workspace`. The exact coordinate values, or how other workspaces are moved
+        to accommodate the workspace, is unspecified.
+
+        The request will be ignored if `axis` is invalid or the compositor is otherwise
+        unable to move the workspace.
+
+        There is no guarantee the workspace will actually be moved.
+      </description>
+      <arg name="other_workspace" type="object" interface="ext_workspace_handle_v1"/>
+      <arg name="axis" type="uint"/>
+    </request>
+
+    <request name="move_after" since="2">
+      <description summary="move after a different workspace">
+        Move a workspace to be after another workspace along a given axis.
+
+        See `move_before`.
+      </description>
+      <arg name="other_workspace" type="object" interface="ext_workspace_handle_v1"/>
+      <arg name="axis" type="uint"/>
+    </request>
+
+    <request name="pin" since="2">
+      <description summary="pin the workspace">
+        Request that this workspace be pinned.
+
+        There is no guarantee the workspace will be actually pinned.
+      </description>
+    </request>
+
+    <request name="unpin" since="2">
+      <description summary="pin the workspace">
+        Request that this workspace be unpinned.
+
+        There is no guarantee the workspace will be actually unpinned.
+      </description>
+    </request>
+  </interface>
+</protocol>

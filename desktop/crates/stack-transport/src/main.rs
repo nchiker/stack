@@ -11,7 +11,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
     let (command, rest) = args.split_first().ok_or(usage())?;
     let output = match (command.as_str(), rest) {
-        ("identity-init", [root]) => serde_json::json!({"fingerprint_sha256":stack_transport::identity_init(Path::new(root))?}),
+        ("identity-init", [root]) => {
+            serde_json::json!({"fingerprint_sha256":stack_transport::identity_init(Path::new(root))?})
+        }
         ("identity-show", [root]) => {
             let cert = stack_transport::identity_certificate(Path::new(root))?;
             serde_json::json!({"fingerprint_sha256":stack_transport::fingerprint(&cert),"certificate_der_base64":null,"certificate_path":Path::new(root).join("pairing/identity.der")})
@@ -24,8 +26,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             stack_transport::peer_revoke(Path::new(root))?;
             serde_json::json!({"revoked":true})
         }
-        ("listen-once", [root, address]) => stack_transport::listen_once(Path::new(root), address.parse::<SocketAddr>()?)?,
-        ("sync-now", [root, address]) => stack_transport::sync_now(Path::new(root), address.parse::<SocketAddr>()?)?,
+        ("listen-once", [root, address]) => {
+            stack_transport::listen_once(Path::new(root), address.parse::<SocketAddr>()?)?
+        }
+        ("sync-now", [root, address]) => {
+            stack_transport::sync_now(Path::new(root), address.parse::<SocketAddr>()?)?
+        }
         _ => return Err(usage().into()),
     };
     println!("{}", serde_json::to_string_pretty(&output)?);

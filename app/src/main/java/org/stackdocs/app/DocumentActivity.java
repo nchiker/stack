@@ -168,7 +168,7 @@ public final class DocumentActivity extends LibraryActivity {
     private void load() {
         String requested=requestedPageId;
         int currentPage=page;
-        work(() -> new Details(app().library.document(documentId),app().library.stacks(),
+        read(() -> new Details(app().library.document(documentId),app().library.stacks(),
                 requested == null ? currentPage : app().library.pagePosition(documentId,requested)), details -> {
             requestedPageId=null;
             page=details.position;
@@ -225,7 +225,7 @@ public final class DocumentActivity extends LibraryActivity {
         next.setEnabled(page + 1 < document.pageCount);
         progress.setVisibility(View.VISIBLE);
         image.release();
-        work(() -> PdfCopies.prepare(app().library,new File(getCacheDir(),"pdf_plans"),snapshot.id),plan -> previews.execute(() -> {
+        read(() -> PdfCopies.prepare(app().library,new File(getCacheDir(),"pdf_plans"),snapshot.id),plan -> previews.execute(() -> {
             android.graphics.Bitmap bitmap=null;
             try(plan) {
                 if(generation!=renderGeneration||!app().access.allowed())return;
@@ -254,7 +254,7 @@ public final class DocumentActivity extends LibraryActivity {
     private void refreshTextStatus() {
         if (document == null) return;
         int selected=page, generation=++textStatusGeneration;
-        work(() -> app().library.ocrStatus(documentId,selected), status -> {
+        read(() -> app().library.ocrStatus(documentId,selected), status -> {
             if (generation != textStatusGeneration) return;
             textStatus.setText(status.label());
             boolean retry = status.failed > 0;

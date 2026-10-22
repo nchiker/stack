@@ -1,80 +1,52 @@
-# Move a phone library to Stack desktop
+# Sync your phone and computer
 
-The current desktop app can import and export portable `.stackbackup` libraries.
-Automatic or bidirectional phone/desktop synchronization is not implemented yet.
-These instructions refer to the independent Stack Android app in this repository.
+1. On the computer, open **Settings → Sync** and select **Connect phone**.
+2. Keep Stack open on the unlocked phone, on the same Wi-Fi network.
+3. On the phone, select **Approve connection** for your computer.
 
-## First transfer from your phone
+Stack combines the existing libraries and automatically synchronizes documents,
+saved edits and stacks in both directions. Existing documents are kept. When both
+devices were restored from the same backup, their shared document identities are
+matched; unrelated documents with similar titles remain separate. Matching stack
+names are combined without generating duplicate starter stacks. On startup, Stack
+also repairs verified old generated duplicates when their starter copy is unused,
+keeping the populated stack and all its document memberships.
 
-1. On the phone, save any unfinished scans and let text recognition finish for
-   documents whose text you want to search on desktop.
-2. Open Stack's menu → **Backup & restore** → **Backup library**. Choose a location
-   and wait for the backup to finish. Use a fresh backup to include recent edits.
-3. Copy the completed `.stackbackup` file to your computer, for example using USB
-   file transfer.
-4. Open the desktop app with your normal persistent library. The UI review launcher
-   under `/tmp/stack-ui-refinement/visual-final/` is a disposable sample library;
-   use a separate normal library for your documents. From the Stack project root:
+The Sync page shows the connected device, connection status, last sync, **Sync
+now** and **Disconnect**. There is no separate library adoption, direction choice,
+file exchange or transport configuration screen. A genuine conflicting edit shows
+the phone and desktop versions with **Keep phone version** and **Keep desktop
+version** choices. Other documents continue synchronizing while you decide.
 
-   ```sh
-   STACK_PDFIUM_LIBRARY="$PWD/desktop/runtime/pdfium/lib/libpdfium.so" \
-     desktop/target/debug/stack-desktop
-   ```
+Keep the desktop app running to receive changes. The phone checks automatically
+while Stack is open and schedules background work when Android permits it.
+Android may defer background work to save battery. Saved phone changes request
+sync automatically. **Sync now** on the phone requests an immediate attempt; on
+desktop it makes the receiver ready for the phone's next automatic connection.
+Leaving Settings does not cancel everyday synchronization.
 
-   The default library is `$XDG_DATA_HOME/org.stackdocs.desktop`, or
-   `~/.local/share/org.stackdocs.desktop` when `XDG_DATA_HOME` is unset. An absolute
-   `--library /path/to/library` selects a different persistent library.
-5. In the left sidebar choose **Backup & restore** → **Import backup…** and select
-   the copied file. Read the document counts and collision information, then choose
-   **Import reviewed copies** once.
+If either device goes offline, documents remain available and Stack retries.
+Changing Wi-Fi addresses does not require another pairing. The verified device
+identity is retained across restarts. Both devices must be on a reachable local
+network; a network that blocks communication between devices prevents sync.
+**Disconnect** stops future synchronization and keeps documents on both devices.
+Reconnecting requires fresh approval on the phone.
 
-The portable archive carries saved originals, page order/appearance, names, notes,
-stack memberships, typed details, recognized text and retained review decisions.
-The source phone library is unchanged. Unfinished scans and device security settings
-are excluded. The archive itself is not encrypted.
+The connection uses the existing mutually authenticated, certificate-pinned TLS
+transport. Device names and discovery responses do not authorize a connection.
+Private keys stay on their devices and are not included in backups.
 
-Restore is additive: it keeps existing desktop documents and adds imported copies.
-Selecting the same backup again starts another import and can duplicate documents.
-Import one chosen current snapshot; importing an older overlapping snapshot as well
-does not reconcile the copies.
+## Backup, restore and reset
 
-## Searching the transferred documents
+Backup and restore remain in **Backup & restore**. Reset is a deliberate recovery
+action with local confirmation, not a normal synchronization step. Never erase
+both devices unless you have checked an independent backup. A backup imported
+into a populated library adds copies; restoring the same backup into empty
+libraries preserves the identities that the initial connection can match.
+Resetting an identity requires a fresh connection and approval. A reset on one
+device never remotely erases the other device.
 
-Desktop search includes names, notes, saved details and current recognized page
-text. An OCR hit opens the matching saved page. Stale OCR from an earlier page
-appearance is preserved but excluded from current search.
+## Implementation and validation
 
-New desktop imports now enter an offline text queue. Untransformed readable PDFs
-extract embedded text; images/scanned or transformed pages use the pinned English
-OCR runtime. Saved crops/removals constrain searchable text. The **Document text**
-section shows queued/reading/ready/no-text/failed states and retry/cancel controls.
-Already valid text in phone backups remains searchable without reprocessing.
-Prepare the packaged runtime described in [desktop instructions](../desktop/README.md).
-English OCR coverage and the recorded Ubuntu24.04 x86-64 ABI are explicit; embedded
-extraction and the small authored OCR accuracy scenario are separate observations.
-
-## Keeping both copies up to date
-
-There is currently no **Sync now** workflow. Backup export/import transfers a
-snapshot and adds copies; it does not match subsequent edits, propagate deletions
-or reconcile conflicts. Until exchange is implemented, keep one device as the main
-editing library rather than repeatedly restoring full snapshots to both devices.
-Avoid sharing the live SQLite/library directory between devices.
-
-The remaining planned stages are:
-
-- **M3:** stable shared identity, causal merge, retained deletions and conflict review.
-- **M4:** bidirectional file/folder exchange between desktop libraries.
-- **M5:** the same exchange and merge rules in the Android companion.
-- **M6:** explicit pairing and authenticated, encrypted local-network transfer.
-
-M5 is needed for phone/desktop synchronization through exchange files; M6 adds the
-convenience of a direct local connection. Existing phone and desktop copies will
-need an explicit reviewed identity-adoption step rather than automatic matching by
-filename or original-file hash. See the [project plan](STACK_DESKTOP_PLAN.md) and
-[draft sync contract](desktop/INTEROP_SYNC_CONTRACT_V0_1.md).
-
-This guide was checked against the Android backup and desktop transfer handlers.
-No private archive was opened or imported while preparing it. Synthetic Rust and
-host-Java archive checks are recorded separately from the still-pending deliberate
-transfer of the user's phone library.
+See [automatic sync validation](desktop/AUTOMATIC_SYNC_20261021.md) for the tested
+implementation, artifacts and qualified runtime results.

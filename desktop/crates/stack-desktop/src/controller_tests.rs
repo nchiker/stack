@@ -2,6 +2,7 @@
 //! but deliberately is not native picker, layout or pointer/keyboard evidence.
 use crate::{
     Flags, Message, Stack,
+    sync_ui::Action as SyncAction,
     transfers_ui::{Action, Phase, Pick},
 };
 use cosmic::{Application, Core, iced};
@@ -15,6 +16,114 @@ use std::{
 };
 
 static CONTROLLERS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[test]
+fn sync_settings_exposes_only_connection_and_everyday_actions() {
+    let _serial = CONTROLLERS.lock().unwrap();
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let root = tempfile::tempdir().unwrap();
+            let mut driver = Driver::new(root.path().join("library"));
+            driver.settle().await;
+            driver.send(Message::Sync(SyncAction::Settings));
+            driver.settle().await;
+            for size in [iced::Size::new(640., 780.), iced::Size::new(1080., 780.)] {
+                let actions = click_workspace(&driver.app, "Sync", size);
+                assert!(actions.iter().any(|m| matches!(
+                    m,
+                    Message::Sync(SyncAction::Page(crate::sync_ui::Page::Overview))
+                )));
+            }
+            driver.send(Message::Sync(SyncAction::Page(
+                crate::sync_ui::Page::Overview,
+            )));
+            let actions =
+                click_workspace(&driver.app, "Connect phone", iced::Size::new(1080., 780.));
+            assert!(actions.iter().any(|m| matches!(
+                m,
+                Message::Sync(SyncAction::Network(crate::network_ui::Action::Nearby(
+                    crate::pairing_ui::Action::Start
+                )))
+            )));
+            let tree = navigation_snapshot(&driver.app, "simple-sync-disconnected");
+            let _ = tree;
+            driver.app.sync.network.status =
+                serde_json::json!({"enrolled":true,"labels":{"peer_name":"Authored phone"}});
+            assert!(
+                !click_workspace(&driver.app, "Sync now", iced::Size::new(1080., 780.)).is_empty()
+            );
+            assert!(
+                !click_workspace(&driver.app, "Disconnect", iced::Size::new(1080., 780.))
+                    .is_empty()
+            );
+            driver.send(Message::Back);
+            driver.settle().await;
+            assert!(driver.app.sync.open && driver.app.sync.page == crate::sync_ui::Page::Settings);
+            driver.send(Message::Back);
+            driver.settle().await;
+            assert!(!driver.app.sync.open);
+            driver.send(Message::Close);
+            driver.settle().await;
+        });
+}
+
+#[test]
+fn simple_sync_comparison_dispatches_readable_phone_and_desktop_choices() {
+    let _serial = CONTROLLERS.lock().unwrap();
+    tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+        let root=tempfile::tempdir().unwrap();let mut driver=Driver::new(root.path().join("library"));driver.settle().await;
+        driver.send(Message::Sync(SyncAction::Open));driver.settle().await;
+        driver.app.sync.status=Some(serde_json::json!({"replica":"desktop","document_names":{"authored":"Authored document"},"conflicts":{
+            "documents/[\"authored\"]/notes":[
+                {"id":{"replica":"desktop","sequence":1},"value":{"notes":"Exact desktop notes 🦀"},"evidence":{"internal":"must stay internal"}},
+                {"id":{"replica":"phone","sequence":1},"value":{"notes":"Exact phone notes 00024.500"},"evidence":{"internal":"must stay internal"}}
+            ]}}));
+        for (label,index) in [("Keep desktop version",0),("Keep phone version",1)] {
+            let messages=click_workspace(&driver.app,label,iced::Size::new(1080.,1200.));
+            assert!(messages.iter().any(|m| matches!(m,Message::Sync(SyncAction::Resolve(_,i)) if *i==index)));
+        }
+        driver.send(Message::Close);driver.settle().await;
+    });
+}
+
+#[test]
+fn automatic_sync_preserves_the_open_document_and_exact_unsaved_edit() {
+    let _serial = CONTROLLERS.lock().unwrap();
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let root = tempfile::tempdir().unwrap();
+            let fixtures = root.path().join("fixtures");
+            stack_render::fixtures::create(&fixtures).unwrap();
+            let mut driver = Driver::new(root.path().join("library"));
+            driver.settle().await;
+            driver
+                .pick(Pick::Documents, vec![fixtures.join("corners.png")])
+                .await;
+            let id = driver.app.hits[0].document_id.clone();
+            driver.send(Message::OpenDocument(id.clone()));
+            driver.settle().await;
+            driver.send(Message::Editor(crate::editor::Action::Open));
+            driver.send(Message::Editor(crate::editor::Action::Title(
+                "Exact unsaved title 🦀".into(),
+            )));
+            let task = driver.app.after_automatic_sync();
+            driver.push(task);
+            driver.settle().await;
+            assert!(driver.app.editor_open);
+            assert_eq!(driver.app.selected.as_ref().unwrap().token.id, id);
+            assert_eq!(driver.app.drafts[&id].title, "Exact unsaved title 🦀");
+            assert!(driver.app.drafts[&id].has_unsaved_changes());
+            driver.send(Message::Close);
+            driver.send(Message::DiscardAndQuit);
+            driver.settle().await;
+        });
+}
 
 #[test]
 fn first_saved_page_thumbnails_refresh_after_reorder_and_ignore_obsolete_results() {
@@ -2417,5 +2526,69 @@ fn ordinary_desktop_import_reads_text_offline_and_preserves_typed_draft() {
                 1
             );
             assert_eq!(std::fs::read(input).unwrap(), bytes);
+        });
+}
+
+#[test]
+fn local_reset_requires_all_warnings_exact_phrase_and_can_be_canceled_without_scheduling() {
+    use crate::reset_ui::Action as Reset;
+    let _serial = CONTROLLERS.lock().unwrap();
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let temp = tempfile::tempdir().unwrap();
+            let root = temp.path().join("library");
+            let mut driver = Driver::new(root.clone());
+            driver.settle().await;
+            driver.send(Message::Reset(Reset::Open));
+            driver.settle().await;
+            assert_eq!(driver.app.reset.phase, 1);
+            assert!(driver.app.dialog().is_some());
+            driver.send(Message::Reset(Reset::Commit));
+            assert!(!root.join("reset-request.json").exists());
+            driver.send(Message::Reset(Reset::Choose(
+                stack_core::reset::Mode::Erase,
+            )));
+            assert_eq!(driver.app.reset.phase, 2);
+            driver.send(Message::Reset(Reset::Next));
+            assert_eq!(driver.app.reset.phase, 3);
+            driver.send(Message::Reset(Reset::Typed("ERASE THIS COMPUTER".into())));
+            driver.send(Message::Reset(Reset::Commit));
+            assert!(
+                !root.join("reset-request.json").exists(),
+                "recovery warning cannot be skipped by typing early"
+            );
+            driver.send(Message::Reset(Reset::Next));
+            assert_eq!(driver.app.reset.phase, 4);
+            driver.send(Message::Reset(Reset::Typed("erase this computer".into())));
+            driver.send(Message::Reset(Reset::Commit));
+            assert!(
+                !root.join("reset-request.json").exists(),
+                "phrase must match exactly"
+            );
+            driver.send(Message::Reset(Reset::Cancel));
+            assert_eq!(driver.app.reset.phase, 0);
+            assert!(!root.join("reset-request.json").exists());
+            driver.send(Message::Reset(Reset::Open));
+            driver.settle().await;
+            driver.send(Message::Reset(Reset::Choose(
+                stack_core::reset::Mode::Erase,
+            )));
+            driver.send(Message::Reset(Reset::Next));
+            driver.send(Message::Reset(Reset::Next));
+            driver.send(Message::Reset(Reset::Typed("ERASE THIS COMPUTER".into())));
+            driver.send(Message::Reset(Reset::Commit));
+            driver.settle().await;
+            let request: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(root.join("reset-request.json")).unwrap())
+                    .unwrap();
+            assert_eq!(request["mode"], "erase");
+            assert_eq!(request["phase"], "requested");
+            assert!(
+                driver.app.closing,
+                "accepted reset closes/drains owners before a later cold startup applies it"
+            );
         });
 }

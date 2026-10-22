@@ -280,8 +280,11 @@ requirements and all unrelated edits.
 
 ## One consolidated user-dependent checklist for implementation closeout
 
-These checks are deferred until the corresponding capability exists; none blocks
-the current planning deliverable or independent implementation work.
+Engineering artifacts and synthetic desktop/spare-phone evidence are prepared.
+Android H1–H8 is completed and the app is in production use. This remaining review
+is limited to desktop and the new sync integration. No personal content was used
+as regression input. Fresh package-backed disposable launchers and the sequence
+are in the [focused review](desktop/M2_REVIEW.md).
 
 - [ ] Complete the final [M2 visual/interface review](desktop/M2_REVIEW.md) after
   headless engineering checks: actual chooser import/save/cancel and focus return,
@@ -292,9 +295,28 @@ the current planning deliverable or independent implementation work.
   enlarged layouts and any frame/shutdown failure. The agent has completed the
   readable-PDF/native screenshot comparison recorded in that review. The user
   performs final interaction acceptance; report failures before full M2 acceptance.
-- [ ] Review later M4 exchange/conflict presentation when implemented.
-- [ ] Perform deliberate pairing/permission and real unlock interactions after M6;
-  review offline, cancel/retry, revoked-peer and conflict presentation.
-- [ ] Choose any real library transfer or installation only after a runnable build,
-  complete compatibility evidence and concrete instructions are ready. Use personal
-  content only for that chosen operation, never as regression fixtures.
+- [ ] Review **Sync with phone** in the sidebar footer above Backup & restore:
+  friendly names, nearby selection and QR camera acquisition, matching-code approval
+  on both screens, canceled/retried setup and separate library review. Check stale
+  adoption review, distinct versus explicitly matched identities, catalog choices,
+  paged conflict alternatives, file publication versus acknowledgment and drafts.
+- [ ] Review **Connect over Wi-Fi → Allow one connection** with the spare phone's
+  **Sync now**, foreground cancel/retry, address refresh through Computer settings,
+  lock/relock or rotation and saved receipts. The isolated Android/Rust runtime
+  proof is separate from these physical interaction observations.
+- [ ] On disposable fixture libraries only, review **Backup & restore → Reset or
+  rebuild library…**: local scope, three erase warnings, checked recovery-copy
+  warning, exact confirmation phrase, cancellation and recovery choices after
+  restart. The connection-only choice must describe keeping documents. Never erase
+  both copies without a separate backup; never use the retained spare library for
+  a destructive review. See the focused review for safe fixture launchers.
+
+Operating boundaries, not additional acceptance tasks: keep the primary protected.
+Only the disposable Pixel4a, serial0A121JEC203530, was authorized for replacement.
+Normal org.stackdocs.app builds use the permanent development key; Recovery is
+retired. The old-signed primary cannot receive these as ordinary updates. Current
+[signing procedures](STACK_ANDROID_SIGNING.md) and [spare evidence](p0/TEST_DEVICE_CONTINUATION_20261020.md)
+remain authoritative. Any chosen personal transfer follows the
+[transfer guide](STACK_DESKTOP_PHONE_TRANSFER.md); personal content is never a
+regression fixture. Other Android/API and maximum-library performance claims remain
+qualified to existing evidence, not a reopened Android acceptance backlog.

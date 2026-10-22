@@ -1,4 +1,25 @@
-# Desktop evidence — M2 refinement and user feedback
+# Desktop evidence — continuation, 2026-10-20
+
+Current engineering and exact headless results are recorded in
+[remaining evidence](desktop/REMAINING_EVIDENCE.md) and
+[machine-readable results](desktop/REMAINING_RESULTS.json). Desktop now includes
+offline PDF/English OCR, reviewed existing-library adoption, whole page/catalog
+order conflicts, native file exchange and explicit paired TLS controls with
+cancel/revoke. Durable original retention, replay and receipt/publication recovery
+have synthetic repository/process-stop evidence. A supplied spare Pixel4a now
+passes [actual Android/Rust file and Keystore mTLS LAN checks](desktop/ANDROID_SYNC_EVIDENCE.md),
+including migrations, reviewed nonempty adoption, conflicts, replay, originals,
+8 LAN recovery checks and5 actual apply-stop boundaries. Foreground Android controls
+are implemented. Normal Android update awaits its original signing key; physical
+interface/security acceptance remains open. Prepared installation,
+source and dependency notices are tracked in those current results.
+
+All continuation tests are headless. No private archive, primary-phone operation or
+user window was used. Standard final checks were delegated to lower-model verifier
+tasks at the user's request; the main agent retains implementation and decisions.
+Follow the [current resume prompt](STACK_DESKTOP_REMAINING_START_PROMPT.md).
+
+## Historical M2 refinement and user feedback
 
 Latest import follow-up: backup menu outside clicks now dismiss it, and active
 imports show native busy/progress feedback. User confirmed Escape recovered the old

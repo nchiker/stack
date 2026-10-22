@@ -23,6 +23,13 @@ public final class SyncGolden {
                 if(!before.equals(SyncProtocol.canonical(state.saved())))throw new AssertionError("failed batch mutated state");
             }
         }
-        System.out.println(new JSONObject().put("status","passed").put("cases",cases.length()).put("android_runtime",false));
+        JSONArray rejects=golden.getJSONArray("reject_cases");
+        for(int n=0;n<rejects.length();n++) {
+            JSONObject test=rejects.getJSONObject(n);List<String> ids=new ArrayList<>();JSONArray members=test.getJSONArray("members");for(int i=0;i<members.length();i++)ids.add(members.getString(i));
+            SyncProtocol.State state=new SyncProtocol.State(test.getString("library"),ids);String before=SyncProtocol.canonical(state.saved());
+            try{state.receive(Collections.singletonList(new SyncProtocol.Operation(test.getJSONObject("operation"))));throw new AssertionError(test.getString("name"));}catch(java.io.IOException expected){}
+            if(!before.equals(SyncProtocol.canonical(state.saved())))throw new AssertionError("rejected vector mutated state");
+        }
+        System.out.println(new JSONObject().put("status","passed").put("cases",cases.length()).put("rejected_cases",rejects.length()).put("android_runtime",false));
     }
 }

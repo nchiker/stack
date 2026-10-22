@@ -28,7 +28,8 @@ final class DocumentThumbnails {
             @Override public void onViewAttachedToWindow(View view) {
                 Bitmap existing = cache.get(document.id);
                 if (existing != null) { image.setImageBitmap(existing); return; }
-                pending = activity.app().io.submit(() -> {
+                // Reads, not the writer: sync keeps the IO executor busy while open.
+                pending = activity.app().reads.submit(() -> {
                     Bitmap bitmap;
                     try { bitmap = activity.app().library.renderPage(document, 0, 360); }
                     catch (Exception error) { return; } // A thumbnail failure must leave the document accessible.

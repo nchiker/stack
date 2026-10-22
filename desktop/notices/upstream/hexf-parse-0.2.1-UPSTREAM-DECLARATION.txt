@@ -1,0 +1,11 @@
+The published package omits a standalone license file. Its unchanged Cargo.toml and source are included in the source archive. This standard SPDX license text supplements, rather than replaces, all available upstream attribution.
+
+{
+  "name": "hexf-parse",
+  "version": "0.2.1",
+  "authors": [
+    "Kang Seonghoon <public+rust@mearie.org>"
+  ],
+  "license": "CC0-1.0",
+  "repository": "https://github.com/lifthrasiir/hexf"
+}

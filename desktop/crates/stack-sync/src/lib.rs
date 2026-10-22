@@ -6,6 +6,7 @@ pub mod graph;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 pub type Frontier = BTreeMap<String, u64>;
 pub const MAX_SEQUENCE: u64 = 9_007_199_254_740_991;
@@ -50,10 +51,10 @@ pub struct Operation {
 pub struct Alternative {
     pub id: Dot,
     pub value: Value,
-    pub evidence: Value,
+    pub evidence: Arc<Value>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct State {
     pub version: u32,
@@ -64,7 +65,88 @@ pub struct State {
     /// Keep all accepted history, including superseded decisions and tombstones.
     pub history: BTreeMap<String, Operation>,
     pub pending: BTreeMap<String, Operation>,
+    // Registers are a derived index. In particular, a library adoption review
+    // must not be serialized again for every field in that library.
+    #[serde(skip_serializing)]
     pub registers: BTreeMap<String, Vec<Alternative>>,
+}
+
+impl<'de> Deserialize<'de> for State {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Saved {
+            version: u32,
+            library: String,
+            epoch: u64,
+            members: BTreeSet<String>,
+            frontier: Frontier,
+            history: BTreeMap<String, Operation>,
+            pending: BTreeMap<String, Operation>,
+            // Read legacy caches without allocating their repeated evidence.
+            #[serde(default, rename = "registers")]
+            _registers: Option<serde::de::IgnoredAny>,
+        }
+        let saved = Saved::deserialize(deserializer)?;
+        let restore = || -> Result<Self> {
+            if saved.version != 1 || saved.epoch != 1 {
+                return Err(Error::Invalid("unsupported local state version or epoch"));
+            }
+            let mut state = Self::new(saved.library, saved.members)?;
+            let history_len = saved.history.len();
+            let pending_len = saved.pending.len();
+            let mut history = saved.history;
+            let mut known = Frontier::new();
+            while !history.is_empty() {
+                let mut batch = Vec::with_capacity(MAX_OPERATIONS.min(history.len()));
+                while batch.len() < MAX_OPERATIONS {
+                    let ready = state.members.iter().find_map(|replica| {
+                        let id = Dot {
+                            replica: replica.clone(),
+                            sequence: known.get(replica).copied().unwrap_or(0) + 1,
+                        };
+                        let key = operation_key(&id);
+                        history
+                            .get(&key)
+                            .filter(|op| {
+                                op.id == id
+                                    && op
+                                        .context
+                                        .iter()
+                                        .all(|(r, n)| known.get(r).copied().unwrap_or(0) >= *n)
+                            })
+                            .map(|_| key)
+                    });
+                    let Some(key) = ready else { break };
+                    let op = history.remove(&key).expect("selected history operation");
+                    known.insert(op.id.replica.clone(), op.id.sequence);
+                    batch.push(op);
+                }
+                if batch.is_empty() {
+                    return Err(Error::Invalid("local history has missing dependencies"));
+                }
+                state.receive(&batch)?;
+            }
+            let mut pending = Vec::new();
+            for (key, op) in saved.pending {
+                if key != operation_key(&op.id) {
+                    return Err(Error::Invalid("local operation key mismatch"));
+                }
+                pending.push(op);
+            }
+            state.receive(&pending)?;
+            if state.frontier != saved.frontier
+                || state.history.len() != history_len
+                || state.pending.len() != pending_len
+            {
+                return Err(Error::Invalid("local history and frontier disagree"));
+            }
+            Ok(state)
+        };
+        restore().map_err(serde::de::Error::custom)
+    }
 }
 
 pub fn entity_base(key: &str) -> bool {
@@ -304,6 +386,17 @@ impl State {
             if op.id.sequence <= next.frontier.get(&op.id.replica).copied().unwrap_or(0) {
                 return Err(Error::Invalid("missing retained history"));
             }
+            if op.context.iter().any(|(origin, sequence)| {
+                *sequence
+                    > next
+                        .frontier
+                        .get(origin)
+                        .copied()
+                        .unwrap_or(0)
+                        .saturating_add(MAX_OPERATIONS as u64)
+            }) {
+                return Err(Error::Invalid("pending dependency gap limit exceeded"));
+            }
             if next.pending.len() >= MAX_OPERATIONS
                 || op.id.sequence
                     > next
@@ -336,6 +429,7 @@ impl State {
                 .pending
                 .remove(&key)
                 .expect("selected pending operation");
+            let evidence = Arc::new(op.evidence.clone());
             for (field, value) in &op.changes {
                 let values = next.registers.entry(field.clone()).or_default();
                 values.retain(|a| {
@@ -344,7 +438,7 @@ impl State {
                 values.push(Alternative {
                     id: op.id.clone(),
                     value: value.clone(),
-                    evidence: op.evidence.clone(),
+                    evidence: Arc::clone(&evidence),
                 });
                 values.sort_by(|a, b| a.id.cmp(&b.id));
             }
@@ -388,7 +482,7 @@ impl State {
                     review.push(Alternative {
                         id: op.id.clone(),
                         value: value.clone(),
-                        evidence: op.evidence.clone(),
+                        evidence: Arc::new(op.evidence.clone()),
                     });
                 }
             }
@@ -453,7 +547,7 @@ impl State {
                         review.push(Alternative {
                             id: op.id.clone(),
                             value: Value::Array(candidate),
-                            evidence: op.evidence.clone(),
+                            evidence: Arc::new(op.evidence.clone()),
                         });
                     }
                 }
@@ -465,26 +559,84 @@ impl State {
         }
         // A page removal is a whole-order decision. An unseen edit of a page
         // that decision omits requires review of the editor's observed order.
-        for (key, alternatives) in self.registers.iter().filter(|(key,_)|key.starts_with("page_order/")) {
-            let document=key.strip_prefix("page_order/").expect("prefix");
-            let mut review=alternatives.clone();
+        for (key, alternatives) in self
+            .registers
+            .iter()
+            .filter(|(key, _)| key.starts_with("page_order/"))
+        {
+            let document = key.strip_prefix("page_order/").expect("prefix");
+            let mut review = alternatives.clone();
             for decision in alternatives {
-                let Some(order)=decision.value.as_array() else {continue};
-                let replace=&self.history[&operation_key(&decision.id)];
-                for op in self.history.values().filter(|op|op.id!=replace.id && op.context.get(&replace.id.replica).copied().unwrap_or(0)<replace.id.sequence && replace.context.get(&op.id.replica).copied().unwrap_or(0)<op.id.sequence && op.evidence["kind"]!="page.text.commit") {
-                    if review.iter().any(|a|a.id==op.id){continue;}
-                    let observed=self.history.values().filter(|past|op.context.get(&past.id.replica).copied().unwrap_or(0)>=past.id.sequence).filter_map(|past|past.changes.get(key).and_then(Value::as_array).map(|value|(past,value))).filter(|(past,_)|!self.history.values().any(|later|op.context.get(&later.id.replica).copied().unwrap_or(0)>=later.id.sequence && later.context.get(&past.id.replica).copied().unwrap_or(0)>=past.id.sequence && later.changes.contains_key(key))).last().map(|(_,order)|order);
-                    let Some(observed)=observed else {continue};
-                    let touched=op.changes.keys().any(|field| {
-                        let Some(raw)=field.strip_prefix("pages/") else {return false};
-                        let raw=raw.split_once("]/").map_or(raw,|(base,_)|base);
-                        let raw=if raw.ends_with(']'){raw.to_owned()}else{format!("{raw}]")};
-                        serde_json::from_str::<Vec<String>>(&raw).ok().and_then(|ids|ids.first().cloned()).is_some_and(|page|observed.contains(&Value::String(page.clone()))&&!order.contains(&Value::String(page)))
+                let Some(order) = decision.value.as_array() else {
+                    continue;
+                };
+                let replace = &self.history[&operation_key(&decision.id)];
+                for op in self.history.values().filter(|op| {
+                    op.id != replace.id
+                        && op.context.get(&replace.id.replica).copied().unwrap_or(0)
+                            < replace.id.sequence
+                        && replace.context.get(&op.id.replica).copied().unwrap_or(0)
+                            < op.id.sequence
+                        && op.evidence["kind"] != "page.text.commit"
+                }) {
+                    if review.iter().any(|a| a.id == op.id) {
+                        continue;
+                    }
+                    let observed = self
+                        .history
+                        .values()
+                        .filter(|past| {
+                            op.context.get(&past.id.replica).copied().unwrap_or(0)
+                                >= past.id.sequence
+                        })
+                        .filter_map(|past| {
+                            past.changes
+                                .get(key)
+                                .and_then(Value::as_array)
+                                .map(|value| (past, value))
+                        })
+                        .rfind(|(past, _)| {
+                            !self.history.values().any(|later| {
+                                op.context.get(&later.id.replica).copied().unwrap_or(0)
+                                    >= later.id.sequence
+                                    && later.context.get(&past.id.replica).copied().unwrap_or(0)
+                                        >= past.id.sequence
+                                    && later.changes.contains_key(key)
+                            })
+                        })
+                        .map(|(_, order)| order);
+                    let Some(observed) = observed else { continue };
+                    let touched = op.changes.keys().any(|field| {
+                        let Some(raw) = field.strip_prefix("pages/") else {
+                            return false;
+                        };
+                        let raw = raw.split_once("]/").map_or(raw, |(base, _)| base);
+                        let raw = if raw.ends_with(']') {
+                            raw.to_owned()
+                        } else {
+                            format!("{raw}]")
+                        };
+                        serde_json::from_str::<Vec<String>>(&raw)
+                            .ok()
+                            .and_then(|ids| ids.first().cloned())
+                            .is_some_and(|page| {
+                                observed.contains(&Value::String(page.clone()))
+                                    && !order.contains(&Value::String(page))
+                            })
                     });
-                    if touched {review.push(Alternative{id:op.id.clone(),value:Value::Array(observed.clone()),evidence:op.evidence.clone()});}
+                    if touched {
+                        review.push(Alternative {
+                            id: op.id.clone(),
+                            value: Value::Array(observed.clone()),
+                            evidence: Arc::new(op.evidence.clone()),
+                        });
+                    }
                 }
             }
-            if review.iter().skip(1).any(|a|a.value!=review[0].value){review.sort_by(|a,b|a.id.cmp(&b.id));conflicts.insert(format!("page_order/{document}"),review);}
+            if review.iter().skip(1).any(|a| a.value != review[0].value) {
+                review.sort_by(|a, b| a.id.cmp(&b.id));
+                conflicts.insert(format!("page_order/{document}"), review);
+            }
         }
         conflicts
     }
@@ -504,12 +656,11 @@ impl State {
                     } else {
                         a.value.clone()
                     };
-                    if let Some(field) = derived_counter(key) {
-                        if let Some(maximum) =
+                    if let Some(field) = derived_counter(key)
+                        && let Some(maximum) =
                             values.iter().filter_map(|a| a.value[field].as_i64()).max()
-                        {
-                            selected = serde_json::json!({field:maximum});
-                        }
+                    {
+                        selected = serde_json::json!({field:maximum});
                     }
                     if let Some(document) = edited_filing(values) {
                         // These edited CSV rows are projections of independently
@@ -541,13 +692,21 @@ impl State {
         }) {
             return Err(Error::Invalid("acknowledgment is beyond durable history"));
         }
-        Ok(self
-            .history
-            .values()
-            .filter(|op| op.id.sequence > ack.get(&op.id.replica).copied().unwrap_or(0))
-            .take(MAX_OPERATIONS)
-            .cloned()
-            .collect())
+        let mut known = ack.clone();
+        let mut result = Vec::new();
+        while result.len() < MAX_OPERATIONS {
+            let Some(op) = self.history.values().find(|op| {
+                op.id.sequence == known.get(&op.id.replica).copied().unwrap_or(0) + 1
+                    && op.context.iter().all(|(origin, sequence)| {
+                        known.get(origin).copied().unwrap_or(0) >= *sequence
+                    })
+            }) else {
+                break;
+            };
+            known.insert(op.id.replica.clone(), op.id.sequence);
+            result.push(op.clone());
+        }
+        Ok(result)
     }
 }
 
@@ -572,6 +731,122 @@ mod tests {
     fn change(key: &str, value: Value) -> BTreeMap<String, Value> {
         BTreeMap::from([(key.to_owned(), value)])
     }
+    #[test]
+    fn populated_adoption_cache_shares_evidence_and_restores_legacy_history_exactly() {
+        let (lib, ids) = ids();
+        let mut state = State::new(lib, ids.iter().cloned().collect()).unwrap();
+        let evidence = json!({"kind":"baseline.adopt.local","review":{"notes":"Exact 🦀\n00024.500 ".repeat(4096)}});
+        let changes = (0..256)
+            .map(|i| (format!("field/{i:03}"), json!(format!("value {i} 🦀"))))
+            .collect();
+        let baseline = state.local(&ids[0], changes, evidence.clone()).unwrap();
+        let first = &state.registers["field/000"][0].evidence;
+        assert!(
+            state
+                .registers
+                .values()
+                .all(|v| Arc::ptr_eq(first, &v[0].evidence))
+        );
+        let mut peer = State::new(state.library.clone(), state.members.clone()).unwrap();
+        let concurrent = peer
+            .local(
+                &ids[1],
+                change("field/000", json!("concurrent")),
+                json!({"kind":"manual"}),
+            )
+            .unwrap();
+        state.receive(&[concurrent]).unwrap();
+        let mut legacy = serde_json::to_value(&state).unwrap();
+        legacy["registers"] = serde_json::to_value(&state.registers).unwrap();
+        let legacy_bytes = serde_json::to_vec(&legacy).unwrap();
+        let compact = serde_json::to_vec(&state).unwrap();
+        assert!(legacy_bytes.len() > compact.len() * 100);
+        assert!(compact.len() < serde_json::to_vec(&baseline).unwrap().len() * 2);
+        for bytes in [&legacy_bytes, &compact] {
+            let mut restored: State = serde_json::from_slice(bytes).unwrap();
+            assert_eq!(restored.history, state.history);
+            assert_eq!(restored.frontier, state.frontier);
+            assert_eq!(restored.values(), state.values());
+            assert_eq!(restored.conflicts(), state.conflicts());
+            assert_eq!(*restored.registers["field/001"][0].evidence, evidence);
+            assert_eq!(
+                restored.receive(std::slice::from_ref(&baseline)).unwrap(),
+                0
+            );
+            let mut changed = baseline.clone();
+            changed.evidence = json!({"kind":"tampered"});
+            assert!(restored.receive(&[changed]).is_err());
+            assert_eq!(serde_json::to_vec(&restored).unwrap(), compact);
+        }
+    }
+
+    #[test]
+    fn restore_rebuilds_registers_and_preserves_pending_gaps() {
+        let (lib, ids) = ids();
+        let mut source = State::new(lib, ids.iter().cloned().collect()).unwrap();
+        let first = source
+            .local(&ids[0], change("title", json!("first")), json!(null))
+            .unwrap();
+        let second = source
+            .local(&ids[0], change("title", json!("second")), json!(null))
+            .unwrap();
+        let mut waiting = State::new(source.library.clone(), source.members.clone()).unwrap();
+        waiting.receive(std::slice::from_ref(&second)).unwrap();
+        let mut restored: State =
+            serde_json::from_slice(&serde_json::to_vec(&waiting).unwrap()).unwrap();
+        assert_eq!(restored.pending, waiting.pending);
+        assert!(restored.values().is_empty());
+        restored.receive(&[first]).unwrap();
+        assert_eq!(restored.values(), source.values());
+        let mut legacy = serde_json::to_value(&source).unwrap();
+        legacy["registers"] = json!({"stale cache":"ignored in favor of validated history"});
+        let restored: State = serde_json::from_value(legacy).unwrap();
+        assert_eq!(restored.values(), source.values());
+        let mut corrupt = serde_json::to_value(&source).unwrap();
+        corrupt["frontier"][&ids[0]] = json!(3);
+        assert!(serde_json::from_value::<State>(corrupt).is_err());
+    }
+
+    #[test]
+    fn restore_replays_large_history_in_causal_order_across_replica_keys() {
+        let (lib, mut ids) = ids();
+        ids.sort();
+        let mut state = State::new(lib, ids.iter().cloned().collect()).unwrap();
+        let operations: Vec<_> = (1..=MAX_OPERATIONS as u64 + 1)
+            .map(|sequence| Operation {
+                version: 1,
+                library: state.library.clone(),
+                epoch: 1,
+                id: Dot {
+                    replica: ids[1].clone(),
+                    sequence,
+                },
+                context: if sequence == 1 {
+                    Frontier::new()
+                } else {
+                    Frontier::from([(ids[1].clone(), sequence - 1)])
+                },
+                changes: change("title", json!(sequence)),
+                evidence: Value::Null,
+            })
+            .collect();
+        for batch in operations.chunks(MAX_OPERATIONS) {
+            state.receive(batch).unwrap();
+        }
+        // This sorts before its >4096 dependencies in the persisted history map.
+        state
+            .local(
+                &ids[0],
+                change("notes", json!("after the whole history")),
+                Value::Null,
+            )
+            .unwrap();
+        let restored: State = serde_json::from_slice(&serde_json::to_vec(&state).unwrap()).unwrap();
+        assert_eq!(restored.history, state.history);
+        assert_eq!(restored.values(), state.values());
+        assert_eq!(restored.frontier, state.frontier);
+    }
+
     #[test]
     fn permutations_forwarding_resolution_gaps_and_exact_replay_converge() {
         let (lib, ids) = ids();

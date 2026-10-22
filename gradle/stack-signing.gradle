@@ -1,0 +1,84 @@
+// Signing credentials live outside the repository. No build creates a key.
+import java.nio.file.Files
+import java.nio.file.attribute.PosixFilePermission
+import java.security.KeyStore
+import java.security.MessageDigest
+
+def profile = project.ext.stackSigningProfile
+def unsignedRelease = project.ext.stackUnsignedRelease
+def policy = new groovy.json.JsonSlurper().parse(rootProject.file('gradle/signing-policy.json'))
+def configFile = file(providers.gradleProperty('stackSigningConfig').orElse(
+        new File(System.getProperty('user.home'), ".config/stack-signing/${profile}.properties").path).get())
+def credentials = new Properties()
+if (configFile.isFile()) configFile.withInputStream { credentials.load(it) }
+def storePath = credentials.getProperty('storeFile', new File(System.getProperty('user.home'), ".local/share/stack-signing/${profile}.p12").path)
+
+android {
+    signingConfigs {
+        // A custom config avoids AGP's implicit Android debug-key generator.
+        stackManaged {
+            storeFile file(storePath)
+            storeType 'PKCS12'
+            keyAlias policy[profile].key_alias
+            storePassword credentials.getProperty('storePassword', '')
+            keyPassword credentials.getProperty('keyPassword', '')
+        }
+    }
+    buildTypes {
+        debug { signingConfig unsignedRelease ? null : signingConfigs.stackManaged }
+        release { signingConfig unsignedRelease ? null : signingConfigs.stackManaged }
+    }
+}
+
+def verify = tasks.register('verifyStackSigning') {
+    group = 'verification'
+    description = 'Require the pinned signing key and its encrypted backup; never generate a key.'
+    // Deliberately not up-to-date/cacheable: check external credentials on every build.
+    doLast {
+        if (unsignedRelease) {
+            if (gradle.taskGraph.allTasks.any { it.name.toLowerCase(Locale.ROOT).contains('debug') }) {
+                throw new GradleException('stackUnsignedRelease permits only an explicitly unsigned release candidate')
+            }
+            logger.lifecycle('Explicit unsigned release candidate: cannot install or update an app.')
+            return
+        }
+        def reject = { String message -> throw new GradleException("Stack signing: ${message}. See docs/STACK_ANDROID_SIGNING.md") }
+        def privateFile = { File entry ->
+            if (!entry.isFile() || Files.isSymbolicLink(entry.toPath())) reject('missing or symlinked private signing file')
+            def path = entry.canonicalFile.toPath()
+            if (['/tmp', '/var/tmp', '/dev/shm'].any { path.startsWith(it) }) reject('signing files must be outside temporary directories')
+            if (path.startsWith(rootProject.projectDir.canonicalFile.toPath())) reject('signing files must be outside the source repository')
+            def allowed = [PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE] as Set
+            if (!allowed.containsAll(Files.getPosixFilePermissions(path))) reject('signing files must be private (chmod 600)')
+            def parentAllowed = allowed + PosixFilePermission.OWNER_EXECUTE
+            if (!parentAllowed.containsAll(Files.getPosixFilePermissions(path.parent))) reject('signing directories must be private (chmod 700)')
+        }
+        if (!configFile.isFile()) reject("missing ${profile} signing configuration; restore the permanent managed key instead of generating another")
+        privateFile(configFile)
+        if (!['storeFile', 'backupFile', 'storePassword', 'keyPassword'].every { credentials.getProperty(it) }) reject('incomplete signing configuration')
+        if (!new File(storePath).isAbsolute() || !new File(credentials.getProperty('backupFile')).isAbsolute()) reject('keystore paths must be absolute')
+        File primary = file(storePath), backup = file(credentials.getProperty('backupFile'))
+        def applicationId = android.defaultConfig.applicationId
+        if (profile == 'development' && !policy.development.application_ids.any { allowed ->
+            allowed.endsWith('.*') ? applicationId.startsWith(allowed.substring(0, allowed.length() - 1)) : applicationId == allowed
+        }) reject('application ID is outside the reviewed development signing policy')
+        privateFile(primary); privateFile(backup)
+        if (primary.canonicalPath == backup.canonicalPath || Files.isSameFile(primary.toPath(), backup.toPath())) reject('backup must be an independent file')
+        def sha = { byte[] bytes -> MessageDigest.getInstance('SHA-256').digest(bytes).encodeHex().toString() }
+        if (sha(primary.bytes) != sha(backup.bytes)) reject('encrypted keystore and backup differ')
+        try {
+            KeyStore store = KeyStore.getInstance('PKCS12')
+            primary.withInputStream { store.load(it, credentials.getProperty('storePassword').toCharArray()) }
+            def alias = policy[profile].key_alias
+            def cert = store.getCertificate(alias)
+            if (!store.isKeyEntry(alias) || cert == null || sha(cert.encoded) != policy[profile].certificate_sha256) reject('certificate differs from the reviewed signing-policy.json pin')
+            if (!(store.getKey(alias, credentials.getProperty('keyPassword').toCharArray()) instanceof java.security.PrivateKey)) reject('private signing key unavailable')
+            cert.checkValidity()
+        } catch (GradleException failure) { throw failure }
+          catch (Exception failure) { reject('keystore could not be verified; credentials are not logged') }
+        logger.lifecycle("Verified Stack ${profile} signing certificate ${policy[profile].certificate_sha256} and encrypted backup")
+    }
+}
+tasks.matching { it.name == 'preBuild' || it.name.startsWith('validateSigning') || it.name == 'signingReport' }.configureEach {
+    dependsOn verify
+}

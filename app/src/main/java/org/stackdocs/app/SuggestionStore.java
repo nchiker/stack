@@ -26,8 +26,16 @@ final class SuggestionStore {
     }
     void recover() {
         SQLiteDatabase db=database.get();
-        db.execSQL("UPDATE suggestions SET status='pending',claim='',generation=generation+1 WHERE status='running' OR rule<>?",new Object[]{SuggestionRules.VERSION});
+        // Restore used to create 62-bit queue incarnations. These are local work
+        // tokens, not saved decisions; requeue old oversized tokens before sync
+        // captures portable rows. Keep headroom for ordinary generation bumps.
+        List<String> oversized=new ArrayList<>();try(Cursor rows=db.rawQuery("SELECT document_id FROM suggestions WHERE generation>?",new String[]{Long.toString(SyncProtocol.MAX_SEQUENCE-10000)})){while(rows.moveToNext())oversized.add(rows.getString(0));}
+        for(String id:oversized){ContentValues values=new ContentValues();values.put("generation",newGeneration());values.put("status","pending");values.put("claim","");db.update("suggestions",values,"document_id=?",new String[]{id});}
+        // Pending work already has no active claim. Reopening it must not create
+        // another generation (and another portable sync edit) on every launch.
+        db.execSQL("UPDATE suggestions SET status='pending',claim='',generation=generation+1 WHERE status='running' OR (status<>'pending' AND rule<>?)",new Object[]{SuggestionRules.VERSION});
     }
+    static long newGeneration(){return UUID.randomUUID().getMostSignificantBits()&0x000fffffffffffffL;}
     private static final class Digest {
         final MessageDigest digest;
         Digest() { try { digest=MessageDigest.getInstance("SHA-256"); } catch(NoSuchAlgorithmException error) { throw new AssertionError(error); } }

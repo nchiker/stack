@@ -1,10 +1,10 @@
 # Stack
 
-An independent, open-source document library for Android. The goal is a simple, completely offline successor to Google Stack: scan, recognize, organize, search, and export documents. This project is not affiliated with Google and does not include the original application's code, assets, or models.
+An independent, open-source document library for Android. The goal is a simple successor to Google Stack with offline scanning, recognition, organization, search and export, plus optional automatic local-network sync with its desktop companion. This project is not affiliated with Google and does not include the original application's code, assets, or models.
 
 Development follows the [P0 playbook](docs/STACK_P0_PLAYBOOK.md) and [P1 runbook](docs/STACK_P1_RUNBOOK.md), with acceptance tracked in the [feature matrix](docs/STACK_FEATURE_MATRIX.md). The delivered OCR phase is tracked in the [offline OCR playbook](docs/STACK_OCR_PLAYBOOK.md). [Local naming, classification and filing](docs/STACK_SUGGESTIONS_EVIDENCE.md) are implemented; [0.6.1-dev follow-up evidence](docs/STACK_WORKFLOW_EVIDENCE.md) records address-safe names and additional P0 workflow checks. Broad acceptance remains open. The [final P0 evidence](docs/STACK_P0_FINAL_EVIDENCE.md) records implemented backup/restore, completed final verification and remaining acceptance gates; the [runbook](docs/STACK_P0_REMAINING_RUNBOOK.md) preserves the execution ledger; the [next-session prompt](docs/STACK_NEXT_SESSION_PROMPT.md) carries that continuous work order. The [reference audit](docs/STACK_REFERENCE_AUDIT.md) records verified observations and unresolved behavior from the supplied APKs.
 
-**Current build: 0.8.9-dev / code 22 / schema 8.** The
+**Current build: 0.9.0 / code 23 / schema 9.** The
 [P1 evidence](docs/STACK_P1_EVIDENCE.md) records all 14 rows, consolidated automated
 verification and preservation. The user reports the [H1–H8 session completed](docs/p1/HANDSON_CHECKLIST.md);
 [completion evidence](docs/p1/USER_COMPLETION.json) stays separate from automated runs.
@@ -33,15 +33,13 @@ defaults for custom stacks. Install it as an update; the existing library does n
 need another restore. Native authentication of the entry flow remains a separate
 hands-on check; the earlier H1–H8 report remains completed.
 
-The [next-session desktop work order](docs/STACK_DESKTOP_NEXT_SESSION_PROMPT.md)
-defines a native Rust COSMIC app with phone-compatible transfer and a path to
-opt-in bidirectional sync. The [desktop source and CLI](desktop/README.md) now include
-the native preview foundation and M1 durable library/archive backend. [M1 evidence](docs/desktop/M1_EVIDENCE.md)
-records 19 tests, Java/Rust format-1/2/3 checks and 13 process-stop recovery cases,
-with explicit compatibility limits. The COSMIC window still shows the M0 demo;
-M2 will connect the persistent workflow. Merge, Android sync and LAN follow later.
-The [project plan](docs/STACK_DESKTOP_PLAN.md), [draft sync contract](docs/desktop/INTEROP_SYNC_CONTRACT_V0_1.md)
-and [execution ledger](docs/desktop/EXECUTION_LEDGER.md) track the remaining gates.
+The [native Rust COSMIC desktop companion](desktop/README.md) includes persistent
+libraries and automatic bidirectional synchronization with Android. Open desktop
+**Settings → Sync → Connect phone**, then approve on the phone. Documents, saved
+edits and stacks synchronize automatically thereafter. The Sync page shows the
+device, status, last sync, **Sync now** and **Disconnect**, with readable choices
+for genuine conflicting edits. See the [sync guide](docs/STACK_DESKTOP_PHONE_TRANSFER.md)
+and [validation](docs/desktop/AUTOMATIC_SYNC_20261021.md).
 
 ## Current development slice
 
@@ -64,7 +62,7 @@ The current development build implements:
 - Automatic page-corner proposals and perspective correction for new camera captures, with manual four-corner correction, rotation and page removal.
 - New camera pages default to black-and-white cleanup. Color choices are Black & white, Original color, Color · Medium and Color · Bright; changing color preserves crop/rotation and the original JPEG.
 - Save/share multipage PDF: untouched imported PDFs are copied intact; edited documents and scans are rendered to PDF.
-- Explicit exclusion from automatic cloud backup/device transfer and no network permission.
+- Explicit exclusion from automatic cloud backup/device transfer. INTERNET supports opt-in paired local-network sync; no connection starts at launch.
 
 The interface now follows Stack's white/blue visual style: circular stack tiles, document thumbnail grids, a floating add menu and a document details sheet. See the [interface reference notes](docs/STACK_UI_REFERENCE.md) for the patterns reproduced, independent artwork and remaining differences. Scan review also offers stack selection before saving.
 
@@ -122,13 +120,13 @@ Set `ANDROID_HOME` to your SDK, or create an ignored `local.properties` file con
 ./gradlew :app:lintDebug
 ```
 
-The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. With an authorized connected device:
+These commands build **Stack** (`org.stackdocs.app`) with the permanent pinned development signer. The disposable test phone was authorized for one-time replacement; the primary phone remains protected. The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. Follow the [signing preflight](docs/STACK_ANDROID_SIGNING.md#device-targeting-and-installation) for the exact device before installing:
 
 ```sh
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb -P 5693 -s 0A121JEC203530 install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The first build downloads Gradle and build dependencies. Once cached, `./gradlew --offline :app:assembleDebug` can build without network access. The app itself declares no network permission. Development signing is automatic; release signing and public distribution are separate tasks.
+The first build downloads Gradle and build dependencies. Once cached, the same command with `--offline` builds without network access. The app declares INTERNET for explicit paired local-network sync. [Managed signing](docs/STACK_ANDROID_SIGNING.md) requires a permanent pinned key and verified encrypted backup; builds never create a replacement key. Current builds use the original package name and the permanent development key. They cannot update an old-signed primary installation; do not uninstall that primary app. Stack Recovery is retired. Release signing and public distribution remain separate tasks.
 
 ### Isolated scanner checks
 

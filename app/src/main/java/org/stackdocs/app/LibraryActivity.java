@@ -33,9 +33,19 @@ abstract class LibraryActivity extends Activity {
     }
 
     final <T> void work(Callable<T> operation, Consumer<T> success, Runnable failure) {
-        if(!app().access.allowed()){deferred.add(() -> work(operation,success,failure));return;}
-        app().io.execute(() -> {
-            if(!app().access.allowed()){runOnUiThread(() -> deferred.add(() -> work(operation,success,failure)));return;}
+        dispatch(app().io,operation,success,failure);
+    }
+
+    final <T> void read(Callable<T> operation,Consumer<T> success,Runnable failure){
+        dispatch(app().reads,()->{app().libraryReady.await();return operation.call();},success,failure);
+    }
+    final <T> void read(Callable<T> operation,Consumer<T> success){read(operation,success,()->{});}
+
+    private <T> void dispatch(java.util.concurrent.Executor executor,Callable<T> operation,Consumer<T> success,Runnable failure) {
+        if(app().resetRequested){new AlertDialog.Builder(this).setTitle("Reset pending").setMessage("Close and reopen Stack to finish the reset.").setPositiveButton("OK",null).show();return;}
+        if(!app().access.allowed()){deferred.add(() -> dispatch(executor,operation,success,failure));return;}
+        executor.execute(() -> {
+            if(!app().access.allowed()){runOnUiThread(() -> deferred.add(() -> dispatch(executor,operation,success,failure)));return;}
             try {
                 T result = operation.call();
                 runOnUiThread(() -> {

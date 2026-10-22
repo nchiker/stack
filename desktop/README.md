@@ -7,7 +7,12 @@ search, editors and portable archive import/export. Read the
 [M2 handoff](../docs/desktop/M2_HANDOFF.md) and
 [M2 rulebook](../docs/desktop/M2_RULEBOOK.md). For a first phone transfer and current
 search limitations, use the [phone transfer guide](../docs/STACK_DESKTOP_PHONE_TRANSFER.md).
-Merge and sync follow in M3–M6; backup import is additive, not synchronization.
+Open **Settings → Sync → Connect phone**, then approve on the phone. Documents,
+saved edits and organization synchronize automatically in both directions. The
+same page shows device, status, last sync, **Sync now** and **Disconnect**. Initial
+connection keeps existing documents and combines matching stacks. Genuine
+conflicting edits offer readable phone and desktop versions. See the
+[automatic sync validation](../docs/desktop/AUTOMATIC_SYNC_20261021.md).
 Remaining implementation is organized in the
 [playbook](../docs/STACK_DESKTOP_REMAINING_PLAYBOOK.md), with a
 [kickoff prompt](../docs/STACK_DESKTOP_REMAINING_START_PROMPT.md) for autonomous
@@ -467,7 +472,51 @@ python3 ~/.local/lib/stack-desktop/install.py --uninstall
 
 The wrapper sets packaged PDF/OCR paths and keeps the normal persistent XDG data
 root; it never selects sample data. Updates retain one `.previous` installation.
-The current prepared debug artifact passed an isolated install/uninstall test,
-but dependency notices and later sync/release gates remain open. Read
+The current automatic-sync delivery lives at
+`../.artifacts/stack-automatic-sync-resume-20261021/desktop` (Git-ignored).
+From the Stack project root, deliberate installation is:
+
+```sh
+python3 .artifacts/stack-automatic-sync-resume-20261021/desktop/install.py
+~/.local/bin/stack
+```
+
+Packages include dependency notices and a complete offline Cargo source archive.
+The installer is checked with disposable prefixes and preserves library data.
+Later phone/runtime/release gates remain open. Read
 [current results](../docs/desktop/REMAINING_RESULTS.json) before treating an artifact
 as a release. Source and runtime ABI limitations are explicit.
+
+## Synchronization
+
+Open **Settings → Sync**, select **Connect phone**, and approve on the phone.
+Existing libraries merge automatically and saved changes synchronize both ways.
+Leave the desktop app running. Android retries foreground work automatically and
+schedules background work subject to the operating system's battery policy.
+There is no repeated setup for ordinary restarts or network address changes.
+
+The [shared guide](../docs/STACK_DESKTOP_PHONE_TRANSFER.md) describes the complete
+interaction. The existing pinned TLS transport uses TCP45873; discovery and
+initial approval use45874. Internal protocol and command-line diagnostics remain
+available to developers, without interactive routes in the application.
+
+## Reset or rebuild a local library
+
+**Backup & restore → Reset or rebuild library…** first shows the current local
+counts. **Start a new connection — keep documents** clears enrollment and sync
+history and requires `RESET CONNECTION`. Full erase has three warning stages,
+a recovery-copy warning and exact `ERASE THIS COMPUTER` confirmation. It removes
+this library's saved data and discards unsaved editor drafts. The other device and
+backup files outside the library are kept. Never erase both copies without an
+independent checked backup.
+
+Stack closes after final confirmation. On reopening the same library it completes
+the reset under the persistent writer lock before starting database work, then
+offers **Import backup…** or **Connect phone**. To resync an erased computer from
+its populated phone, reset only the phone's connection while keeping its documents,
+then connect and approve again. Resetting always needs local consent on each device.
+See the transfer guide for the corresponding phone controls.
+
+Physical camera QR acquisition, native chooser/focus/screen-reader and compositor
+observations remain distinct from automated decoding, controller, layout, storage
+and cross-platform transport tests. No cloud account or dynamic group membership is introduced.

@@ -56,7 +56,7 @@ def main():
     header = 'package org.stackdocs.app;\nimport org.json.*;\nimport java.io.*;\nimport java.util.*;\nimport java.nio.*;\nimport java.nio.charset.*;\nimport java.security.*;\n'
     source = sources['LibraryArchive']
     constants = source[source.index('    static final byte[] MAGIC='):source.index('    private final File root, originals;')]
-    signatures = ['static final class Progress', 'static final class Snapshot', 'static void write(',
+    signatures = ['static class Progress', 'static final class Snapshot', 'static void write(',
                   'private static int filesIndex(', 'static void validate(', 'private static void upgradeOlder(',
                   'private static void decision(', 'private static void name(', 'private static JSONArray array(',
                   'private static long number(', 'private static String str(', 'private static void keys(',
@@ -80,7 +80,8 @@ def main():
     shutil.copyfile(Path(__file__).parent / 'java/ArchiveHost.java', package / 'ArchiveHost.java')
     classes = args.new_output / 'classes'
     classes.mkdir()
-    subprocess.run(['javac', '-encoding', 'UTF-8', '-d', str(classes), *map(str, sorted(src.rglob('*.java')))], check=True)
+    compiler = ['javac'] if shutil.which('javac') else ['java', '-m', 'jdk.compiler/com.sun.tools.javac.Main']
+    subprocess.run([*compiler, '-encoding', 'UTF-8', '-d', str(classes), *map(str, sorted(src.rglob('*.java')))], check=True)
     report = {'scope': 'Unchanged production validator/writer/helper bodies; host envelope reader. No Android native/runtime restore claim.',
               'java': subprocess.check_output(['java', '-version'], stderr=subprocess.STDOUT, text=True).strip(),
               'production_sha256': {name + '.java': hashlib.sha256(text.encode()).hexdigest() for name, text in sources.items()},

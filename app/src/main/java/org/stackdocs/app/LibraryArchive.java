@@ -50,7 +50,7 @@ final class LibraryArchive {
         this.context=context.getApplicationContext();this.repository=repository;this.db=db;
         root=new File(context.getFilesDir(),"archive_operations"); originals=new File(context.getFilesDir(),"documents");
     }
-    static final class Progress {
+    static class Progress {
         volatile boolean canceled;
         volatile String label="Preparing…";
         void check() throws IOException {if(canceled || Thread.currentThread().isInterrupted())throw new InterruptedIOException("Operation canceled. Existing documents are unchanged.");}
@@ -227,7 +227,7 @@ final class LibraryArchive {
                     JSONObject row=new JSONObject();row.put("document_id",plan.documents.get(original.getString("document_id")));row.put("stack_id",plan.stacks.get(original.getString("stack_id")));insert("document_stacks",row,MEMBER);
                 }
                 for(JSONObject original:objects(staged.manifest.getJSONArray("suggestions"))) {
-                    JSONObject row=new JSONObject(original.toString());row.put("document_id",plan.documents.get(row.getString("document_id")));row.put("status","pending");row.put("generation",UUID.randomUUID().getMostSignificantBits() & 0x3fffffffffffffffL);
+                    JSONObject row=new JSONObject(original.toString());row.put("document_id",plan.documents.get(row.getString("document_id")));row.put("status","pending");row.put("generation",SuggestionStore.newGeneration());
                     ContentValues values=values(row,SUGGESTION);values.put("claim","");db.update("suggestions",values,"document_id=?",new String[]{row.getString("document_id")});
                 }
                 JSONObject oldEvidence=staged.manifest.getJSONObject("decision_evidence");

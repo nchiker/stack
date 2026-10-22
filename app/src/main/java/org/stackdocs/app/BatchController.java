@@ -16,6 +16,7 @@ final class BatchController {
     private volatile java.io.Closeable currentInput;
     private volatile String copying="";
     BatchController(StackApplication app){this.app=app;}
+    boolean busy(){return !active.isEmpty();}
     void recover(){app.library.batches.recover();for(String id:app.library.batches.pending())run(id);}
     void importUris(List<Uri> uris,java.util.function.Consumer<String> started){
         if(uris.isEmpty()||uris.size()>BatchStore.LIMIT){started.accept("");return;}
