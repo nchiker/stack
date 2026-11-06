@@ -25,10 +25,25 @@ public final class SettingsActivity extends LibraryActivity {
                 .setMessage("Get a notification when Stack saves a document. Document names stay hidden on the lock screen.").setNegativeButton("Cancel",null).setPositiveButton(notifications?"Turn off":"Turn on",(d,w) -> {getSharedPreferences("local_policy",MODE_PRIVATE).edit().putBoolean("import_notifications",!notifications).commit();if(!notifications&&Build.VERSION.SDK_INT>=33)requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},NOTIFICATIONS);refresh();}).show()));
         line();boolean locked=app().access.enabled();
         body.addView(Ui.actionRow(this,Icons.Symbol.DOCUMENTS,"App lock",locked?"On · Unlock when you return":"Off · Android screen lock",0xFFDCEADB,() -> app().access.change(this,!app().access.enabled(),this::refresh)));
+        line();body.addView(Ui.actionRow(this,Icons.Symbol.CHECK,"Update check",UpdateCheck.status(this),0xFFF7E1A3,this::updateCheck));
         Button about=Ui.button(this,"About these settings",() -> new AlertDialog.Builder(this).setTitle("About these settings")
                 .setMessage("Photo import checks new Camera photos for documents. Existing photos stay untouched. Android controls timing and which photos Stack can access. You can import missed photos yourself.\n\nApp lock uses Android security and hides Stack in Recents. It does not encrypt backups or copies you have shared.")
                 .setPositiveButton("Got it",null).show());
         LinearLayout.LayoutParams help=new LinearLayout.LayoutParams(-2,-2);help.topMargin=Ui.dp(this,16);help.leftMargin=-Ui.dp(this,16);body.addView(about,help);
+    }
+    private void updateCheck(){
+        if(!UpdateCheck.enabled(this)){
+            new AlertDialog.Builder(this).setTitle("Look for new versions?")
+                    .setMessage("Stack can ask github.com once a day whether a newer version is available. The request carries no documents or identifiers; GitHub sees your network address, as any website does.\n\nStack only tells you. It never downloads or installs anything by itself.")
+                    .setNegativeButton("Cancel",null).setPositiveButton("Turn on",(d,w) -> {UpdateCheck.setEnabled(this,true);UpdateCheck.checkNow(app(),null);refresh();}).show();
+            return;
+        }
+        boolean available=UpdateCheck.available(this)||(!UpdateCheck.latest(this).isEmpty()&&UpdateCheck.newer(UpdateCheck.latest(this),UpdateCheck.installed(this)));
+        AlertDialog.Builder dialog=new AlertDialog.Builder(this).setTitle("Update check").setMessage(UpdateCheck.status(this)+"\n\nYou have version "+UpdateCheck.installed(this)+".")
+                .setNeutralButton("Turn off",(d,w) -> {UpdateCheck.setEnabled(this,false);refresh();}).setNegativeButton("Close",null);
+        if(available&&!UpdateCheck.page(this).isEmpty())dialog.setPositiveButton("Open release page",(d,w) -> startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(UpdateCheck.page(this)))));
+        else dialog.setPositiveButton("Check now",(d,w) -> {UpdateCheck.checkNow(app(),null);Toast.makeText(this,"Checking for updates",Toast.LENGTH_SHORT).show();});
+        dialog.show();
     }
     private void line(){body.addView(Ui.divider(this),new LinearLayout.LayoutParams(-1,Ui.dp(this,1)));}
     private void photoOptions(){boolean enabled=app().photos.enabled();new AlertDialog.Builder(this).setTitle("Photo import")

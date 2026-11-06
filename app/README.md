@@ -20,6 +20,21 @@ Android 7.0 (API 24) or later, target SDK 36.
   document provider, including Filen Files' Filen Drive, Google Drive or a USB drive; Stack stores no account.
   After each write it lists the folder to check the file arrived with the right size, because a cloud app may take
   the file first and upload it later. Backups are not encrypted by Stack.
+- Duplicate warning: before a PDF or image is added, Stack compares it with the originals it already holds
+  (by size first, then SHA-256 of the bytes) and asks whether to skip, open the existing document or add it
+  anyway. The same file chosen twice in one selection is caught as well. Scanned documents are not matched.
+- Update check (Settings, off by default): once a day while Stack is open it asks the public GitHub release list
+  whether a newer Android version exists and shows a notice. It sends no documents or identifiers and never
+  downloads or installs anything; the notice opens the release page.
+- Recently deleted: deleting a document (one or a selection) moves it to Recently deleted for 30 days (menu >
+  Recently deleted: restore, delete for good, or empty). It disappears from lists, search and stack counts but is
+  not removed, so nothing syncs: with a computer paired, the document stays there until it is deleted for good here.
+  The list is local only (not in backups); a restored backup shows such documents as normal ones. Library database
+  version 10 adds the `trash` table.
+- Find duplicates (menu): lists documents whose saved originals are identical, keeps the oldest of each set and moves
+  ticked extra copies to Recently deleted. A set can never have every copy ticked.
+- Backup reminder: a row at the bottom of Home when documents exist and there is no backup yet or the last one is over
+  30 days old and automatic backup is off; "Remind me in a week" hides it.
 - Sync with the desktop app over Wi-Fi: see
   [Sync your phone and computer](../docs/STACK_DESKTOP_PHONE_TRANSFER.md).
 

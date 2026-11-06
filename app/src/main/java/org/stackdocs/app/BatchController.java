@@ -52,7 +52,7 @@ final class BatchController {
                     app.io.submit(() -> atomic(item,() -> {check(id);if(!app.library.batches.exists(item.document))app.library.importDocument(Uri.fromFile(source),item.document,sourceName(Uri.parse(item.source)));return true;})).get();
                     app.photos.notifyImport(item.document);
                     source.delete();
-                } else if(op.kind.equals("delete"))app.io.submit(() -> {check(id);app.library.deleteDocument(item.document);return true;}).get();
+                } else if(op.kind.equals("delete"))app.io.submit(() -> {check(id);app.library.trashDocument(item.document);return true;}).get();
                 else if(op.kind.startsWith("file-"))app.io.submit(() -> atomic(item,() -> {
                     check(id);org.json.JSONObject selected=new org.json.JSONObject(item.source);long expected=selected.getLong("revision");
                     try(android.database.Cursor row=app.library.database().rawQuery("SELECT filing_decision FROM documents WHERE id=?",new String[]{item.document})){if(!row.moveToFirst()||row.getLong(0)!=expected)throw new IOException("Filing changed. Review this document again.");}

@@ -8,7 +8,7 @@ import android.graphics.Color;
 
 final class LibraryDatabase extends SQLiteOpenHelper {
     LibraryDatabase(Context context) {
-        super(context, "library.db", null, 9);
+        super(context, "library.db", null, 10);
         setWriteAheadLoggingEnabled(true);
     }
 
@@ -43,6 +43,7 @@ final class LibraryDatabase extends SQLiteOpenHelper {
         addP1Schema(db);
         addStackOrder(db);
         addSyncSchema(db);
+        addTrash(db);
         String[] ids = {"bills", "banking", "ids", "house", "medical", "receipts", "starred"};
         String[] names = {"Bills", "Banking", "IDs", "House", "Medical", "Receipts", "Starred"};
         String[] colors = {"#DCEADB", "#E5E8FA", "#F7E6D2", "#F1DDE8", "#DCECF2", "#F7EDCA", "#E2E5E0"};
@@ -57,7 +58,7 @@ final class LibraryDatabase extends SQLiteOpenHelper {
     }
 
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 1 || oldVersion > 8 || newVersion != 9) {
+        if (oldVersion < 1 || oldVersion > 9 || newVersion != 10) {
             throw new IllegalStateException("No migration from library version " + oldVersion);
         }
         if (oldVersion < 2) {
@@ -73,7 +74,18 @@ final class LibraryDatabase extends SQLiteOpenHelper {
         if (oldVersion < 6) db.execSQL("CREATE TABLE restore_commits (id TEXT PRIMARY KEY)");
         if (oldVersion < 7) addP1Schema(db);
         if (oldVersion < 8) addStackOrder(db);
-        addSyncSchema(db);
+        if (oldVersion < 9) addSyncSchema(db);
+        if (oldVersion < 10) addTrash(db);
+    }
+
+    /**
+     * Recently deleted. Local only: it has no sync triggers, so the desktop protocol never sees it, and it is not in
+     * backups. A trashed document stays in every synced table until it is deleted for good; the trigger forgets the
+     * trash entry whenever the document goes away (permanent delete, or a deletion arriving from the computer).
+     */
+    static void addTrash(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE trash (document_id TEXT PRIMARY KEY, deleted_at INTEGER NOT NULL)");
+        db.execSQL("CREATE TRIGGER trash_cleanup AFTER DELETE ON documents BEGIN DELETE FROM trash WHERE document_id=OLD.id; END");
     }
 
     /** Raw before/after rows survive a process stop even if no exchange is prepared. */

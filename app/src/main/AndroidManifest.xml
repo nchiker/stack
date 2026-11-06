@@ -35,6 +35,8 @@
         <activity android:name=".MetadataEditorActivity" android:exported="false" />
         <activity android:name=".LibraryResetActivity" android:exported="false" />
         <activity android:name=".BackupActivity" android:exported="false" />
+        <activity android:name=".TrashActivity" android:exported="false" />
+        <activity android:name=".DuplicatesActivity" android:exported="false" />
         <activity android:name=".PairingQrActivity" android:exported="false" />
         <activity android:name=".SyncActivity" android:exported="false" />
         <activity android:name=".DocumentActivity" android:exported="false" />

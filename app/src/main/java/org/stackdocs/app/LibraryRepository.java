@@ -98,7 +98,7 @@ final class LibraryRepository {
     List<StackCategory> stacks() {
         List<StackCategory> result = new ArrayList<>();
         try (Cursor cursor = db().rawQuery("SELECT s.*, COUNT(ds.document_id) AS total "
-                + "FROM stacks s LEFT JOIN document_stacks ds ON ds.stack_id=s.id "
+                + "FROM stacks s LEFT JOIN document_stacks ds ON ds.stack_id=s.id AND ds.document_id NOT IN (SELECT document_id FROM trash) "
                 + "GROUP BY s.id ORDER BY s.sort_order,s.rowid", null)) {
             while (cursor.moveToNext()) result.add(new StackCategory(string(cursor, "id"),
                     string(cursor, "name"), integer(cursor, "color"), integer(cursor, "visible") == 1,
@@ -120,7 +120,7 @@ final class LibraryRepository {
         sql.append(searching ? "snippet(search_index, '', '', ' … ', 2, 18)" : "''");
         sql.append(" AS excerpt FROM documents d ");
         if (searching) sql.append("JOIN search_index ON search_index.document_id=d.id ");
-        sql.append("WHERE 1=1 ");
+        sql.append("WHERE d.id NOT IN (SELECT document_id FROM trash) ");
         List<String> arguments = new ArrayList<>();
         if (searching) {
             sql.append("AND search_index MATCH ? ");
@@ -144,7 +144,7 @@ final class LibraryRepository {
 
     java.util.LinkedHashMap<String,String> organizations() {
         java.util.LinkedHashMap<String,String> out=new java.util.LinkedHashMap<>();
-        try(Cursor rows=db().rawQuery("SELECT DISTINCT t.id,t.name FROM tags t JOIN document_tags d ON d.tag_id=t.id ORDER BY t.name COLLATE NOCASE",null)){while(rows.moveToNext())out.put(rows.getString(0),rows.getString(1));}return out;
+        try(Cursor rows=db().rawQuery("SELECT DISTINCT t.id,t.name FROM tags t JOIN document_tags d ON d.tag_id=t.id WHERE d.document_id NOT IN (SELECT document_id FROM trash) ORDER BY t.name COLLATE NOCASE",null)){while(rows.moveToNext())out.put(rows.getString(0),rows.getString(1));}return out;
     }
 
     private Document searchContext(Document document, String match) {
@@ -548,6 +548,55 @@ final class LibraryRepository {
         }
         if(!db().inTransaction())ocrChanged.run();
     }
+
+    /** Documents in the library, not counting Recently deleted. */
+    int documentCount() {
+        try (Cursor c = db().rawQuery("SELECT count(*) FROM documents WHERE id NOT IN (SELECT document_id FROM trash)", null)) { return c.moveToFirst() ? c.getInt(0) : 0; }
+    }
+
+    /** A document in Recently deleted. */
+    static final class Trashed {
+        final String id, title; final long deletedAt;
+        Trashed(String id, String title, long deletedAt) { this.id = id; this.title = title; this.deletedAt = deletedAt; }
+    }
+    /** How long a deleted document stays recoverable. */
+    static final long TRASH_KEEP_MILLIS = 30L * 24 * 60 * 60 * 1000;
+
+    /** Hides a document from the library for 30 days; nothing is removed and nothing syncs. */
+    void trashDocument(String id) {
+        if (!UUID.fromString(id).toString().equals(id)) throw new IllegalArgumentException("Invalid document identifier.");
+        SQLiteDatabase database = db();
+        if (!exists(database, id)) return;
+        database.execSQL("INSERT OR IGNORE INTO trash(document_id,deleted_at) VALUES(?,?)", new Object[]{id, System.currentTimeMillis()});
+    }
+
+    /** Puts a trashed document back exactly as it was. */
+    void restoreDocument(String id) { db().execSQL("DELETE FROM trash WHERE document_id=?", new Object[]{id}); }
+
+    boolean isTrashed(String id) {
+        try (Cursor c = db().rawQuery("SELECT 1 FROM trash WHERE document_id=?", new String[]{id})) { return c.moveToFirst(); }
+    }
+
+    /** Newest first. */
+    List<Trashed> trashed() {
+        List<Trashed> out = new ArrayList<>();
+        try (Cursor c = db().rawQuery("SELECT d.id,d.title,t.deleted_at FROM trash t JOIN documents d ON d.id=t.document_id ORDER BY t.deleted_at DESC,d.id", null)) {
+            while (c.moveToNext()) out.add(new Trashed(c.getString(0), c.getString(1), c.getLong(2)));
+        }
+        return out;
+    }
+
+    /** Deletes for good, through the ordinary delete, everything trashed before {@code cutoff}. Returns how many. */
+    int purgeTrash(long cutoff) {
+        List<String> doomed = new ArrayList<>();
+        try (Cursor c = db().rawQuery("SELECT document_id FROM trash WHERE deleted_at<=?", new String[]{Long.toString(cutoff)})) {
+            while (c.moveToNext()) doomed.add(c.getString(0));
+        }
+        for (String id : doomed) deleteDocument(id);
+        return doomed.size();
+    }
+
+    int purgeExpiredTrash() { return purgeTrash(System.currentTimeMillis() - TRASH_KEEP_MILLIS); }
 
     void createStack(String name) {
         ContentValues values = new ContentValues();

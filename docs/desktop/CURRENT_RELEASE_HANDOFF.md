@@ -1,4 +1,4 @@
-# Current release — 2026-11-06 (Android 0.11.0, Flatpak 0.2.0)
+# Current release — 2026-11-06 (Android 0.12.0 prepared, 0.11.0 published; Flatpak 0.2.0)
 
 ## Android 0.11.0 (versionCode 25): automatic backup
 
@@ -21,7 +21,17 @@ Details that matter later:
   offline run, retention, and a real 215 MB library (written in about 16 s, confirmed within 33 s).
 - Test tips: `am force-stop` cancels the scheduled job; use `am crash <pkg>` to end the process, edit
   `shared_prefs/auto_backup.xml` with `run-as` (debug builds only), then `cmd jobscheduler run -f <pkg> 1094863696`.
-- Not built yet: a Home reminder when the last backup is old, backup encryption, an update check.
+- Added in 0.12.0 (versionCode 26, signed APK built and smoke-tested on the Pixel 4a as an in-place update from 0.11.0 incl. DB 9 to 10; NOT yet published): duplicate warning on import (`DuplicateCheck`, size first then SHA-256, no
+  stored state), optional update check (`UpdateCheck`, off by default, one request a day to the GitHub release list, never
+  installs), Recently deleted (`TrashActivity`, library DB v10 `trash` table + trigger, local only, 30 days, deleted
+  documents stay in the synced tables and on the computer until purged), Find duplicates (`DuplicatesActivity`), and the
+  Home backup reminder (`BackupNudge`, a header row at the end of Home; a banner above the list broke the `convenience`
+  check because it pushed "Recent documents" off screen).
+- Test notes: suite flag `features` covers all of the above (12 groups). `convenience` needs a backup date from an earlier
+  process: run `backupUi` then `convenience` in the plain `org.stackdocs.app.checks` copy without clearing in between.
+  `stackEditor` asserts DB version 10. The `P1BatchChecks` delete check now expects trashed, not removed, documents.
+- Not built yet: backup encryption (a passphrase envelope around the archive stream, chunked AES-GCM, would need the
+  passphrase kept safe for scheduled runs).
 
 
 Release v0.10.0 on GitHub: `Stack-0.10.0.apk` (versionCode 24, signer

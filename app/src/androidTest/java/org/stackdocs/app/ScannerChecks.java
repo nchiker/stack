@@ -40,7 +40,7 @@ public final class ScannerChecks extends Instrumentation {
     private String suggestionCorpusAsset;
     private String p1Restart="",p1Boundary="",stackRestart="";
     private boolean p1Only,p1Corpus,p1Ui,p1Batch,p1Performance,googleMigration,stackEditor,lockUi,convenience;
-    private boolean backupLayout,navigationOnly,backupUi,archivePerformance,archiveOnly,archivePrepare,archiveResume;
+    private boolean features,backupLayout,navigationOnly,backupUi,archivePerformance,archiveOnly,archivePrepare,archiveResume;
     private String archiveBoundary;
     private Bundle syncArguments;
     private boolean longWorkflow,workflowOnly,providerWorkflow,workflowUi,namingOnly;
@@ -58,6 +58,7 @@ public final class ScannerChecks extends Instrumentation {
         backupLayout=arguments!=null && "true".equals(arguments.getString("backupLayout"));
         navigationOnly=arguments!=null && "true".equals(arguments.getString("navigationOnly"));
         backupUi=arguments!=null && "true".equals(arguments.getString("backupUi"));
+        features=arguments!=null && "true".equals(arguments.getString("features"));
         archivePerformance=arguments!=null && "true".equals(arguments.getString("archivePerformance"));
         archiveOnly=arguments!=null && "true".equals(arguments.getString("archiveOnly"));
         longWorkflow=arguments!=null && "true".equals(arguments.getString("longWorkflow"));
@@ -148,6 +149,7 @@ public final class ScannerChecks extends Instrumentation {
             else if(backupLayout) BackupLayoutChecks.run(this,new IsolatedContext(getTargetContext(),"backup-layout"),this::mark);
             else if(navigationOnly) NavigationChecks.run(this,this::mark);
             else if(backupUi) BackupUiChecks.run(this,this::mark);
+            else if(features) FeatureChecks.run(this,this::mark);
             else if(archivePerformance) ArchivePerformanceChecks.run(new IsolatedContext(getTargetContext()),this::mark);
             else if(archiveOnly) {ArchiveChecks.run(new IsolatedContext(getTargetContext()),this::mark);PdfExportChecks.run(new IsolatedContext(getTargetContext()),this::mark);}
             else if(longWorkflow) LongDocumentChecks.run(new IsolatedContext(getTargetContext()),this::mark);
@@ -351,7 +353,8 @@ public final class ScannerChecks extends Instrumentation {
         }
         try (LibraryDatabase helper = new LibraryDatabase(context)) {
             SQLiteDatabase db = helper.getWritableDatabase();
-            check(db.getVersion() == 9, "Real SQLiteOpenHelper migration ran");
+            check(db.getVersion() == 10, "Real SQLiteOpenHelper migration ran");
+            try(Cursor trash=db.rawQuery("SELECT count(*) FROM trash",null)) {check(trash.moveToFirst()&&trash.getInt(0)==0,"Recently deleted table exists and starts empty after migration");}
             try(Cursor sync=db.rawQuery("SELECT enabled,applying FROM sync_control WHERE singleton=1",null)) {
                 check(sync.moveToFirst()&&sync.getInt(0)==0&&sync.getInt(1)==0,"Additive sync journal starts disabled before explicit baseline");
             }

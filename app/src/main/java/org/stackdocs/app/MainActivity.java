@@ -39,6 +39,7 @@ public final class MainActivity extends LibraryActivity {
     private String stackId;
     private final java.util.LinkedHashSet<String> selected=new java.util.LinkedHashSet<>();
     private android.widget.Button selection;
+    private android.widget.Button updateNotice;
     private String organization;
     private String documentSort="newest";
     private FrameLayout filters;
@@ -187,6 +188,7 @@ public final class MainActivity extends LibraryActivity {
             @Override public void afterTextChanged(Editable value) {}
         });
         selection=Ui.button(this,"Selected documents",this::selectionActions);selection.setVisibility(View.GONE);root.addView(selection);
+        updateNotice=Ui.button(this,"",this::updateNoticeActions);updateNotice.setVisibility(View.GONE);root.addView(updateNotice);
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setProgressTintList(android.content.res.ColorStateList.valueOf(Ui.BLUE));
         progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Ui.BLUE));
@@ -285,9 +287,12 @@ public final class MainActivity extends LibraryActivity {
             String org=orgs.containsKey(orgFilter)?orgFilter:null;
             boolean recent=homeTab&&(!present||filter==null)&&org==null&&query.isEmpty();
             String order=recent?"newest":selectedOrder;
-            return new Snapshot(catalog,app().library.documents(query,present?filter:null,org,order),orgs,org);
+            return new Snapshot(catalog,app().library.documents(query,present?filter:null,org,order),orgs,org,app().library.documentCount());
         }, snapshot -> {
             if (generation != requestGeneration) return;
+            boolean update=UpdateCheck.available(this);
+            if(update)updateNotice.setText("Stack "+UpdateCheck.latest(this)+" is available");
+            updateNotice.setVisibility(update?View.VISIBLE:View.GONE);
             selection.setText(selected.size()+" selected · Actions");
             selection.setVisibility(selected.isEmpty()?View.GONE:View.VISIBLE);
             categories = snapshot.categories;organization=snapshot.organization;
@@ -319,6 +324,11 @@ public final class MainActivity extends LibraryActivity {
                 for (Document document : snapshot.documents) rows.add(document);
             } else for (int start = 0; start < max; start += columns) {
                 rows.add(new DocumentRow(new ArrayList<>(snapshot.documents.subList(start, Math.min(start + columns, max))), columns));
+            }
+            if (showingStacks) {
+                // After the recent documents, so nothing above them moves; low priority on purpose.
+                String reminder = BackupNudge.message(this, snapshot.total);
+                if (!reminder.isEmpty()) rows.add(new Header(reminder, "Back up", this::backupNoticeActions));
             }
             if (snapshot.documents.isEmpty() && !showingStacks) rows.add(query.isEmpty()
                     ? "No documents yet" : "No documents found");
@@ -429,6 +439,8 @@ public final class MainActivity extends LibraryActivity {
         menu.getMenu().add("Settings").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,SettingsActivity.class));return true;});
         menu.getMenu().add("Imports & batch actions").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,BatchActivity.class));return true;});
         menu.getMenu().add("Edit stacks").setOnMenuItemClickListener(item -> { manageStacks(); return true; });
+        menu.getMenu().add("Find duplicates").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,DuplicatesActivity.class));return true;});
+        menu.getMenu().add("Recently deleted").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,TrashActivity.class));return true;});
         menu.getMenu().add("Backup & restore").setOnMenuItemClickListener(item -> {
             startActivity(new Intent(this,BackupActivity.class));return true;
         });
@@ -470,7 +482,59 @@ public final class MainActivity extends LibraryActivity {
         }
     }
 
-    private void importBatch(List<Uri> uris){if(!app().access.allowed()){whenAllowed(() -> importBatch(uris));return;}if(uris.size()>BatchStore.LIMIT){new AlertDialog.Builder(this).setMessage("Select at most 50 files per import.").setPositiveButton("OK",null).show();return;}app().batches.importUris(uris,id -> {if(!id.isEmpty())startActivity(new Intent(this,BatchActivity.class).putExtra("operation_id",id));});}
+    private void importBatch(List<Uri> uris){
+        if(!app().access.allowed()){whenAllowed(() -> importBatch(uris));return;}
+        if(uris.size()>BatchStore.LIMIT){new AlertDialog.Builder(this).setMessage("Select at most 50 files per import.").setPositiveButton("OK",null).show();return;}
+        checkedImport(uris,this::startBatch);
+    }
+    private void startBatch(List<Uri> uris){app().batches.importUris(uris,id -> {if(!id.isEmpty())startActivity(new Intent(this,BatchActivity.class).putExtra("operation_id",id));});}
+    /** Looks for files Stack already has before anything is added; a failed check never blocks an import. */
+    private void checkedImport(List<Uri> uris,java.util.function.Consumer<List<Uri>> proceed){
+        new Thread(() -> {
+            List<DuplicateCheck.Match> found;
+            try{found=DuplicateCheck.find(app(),uris);}catch(Exception error){found=java.util.Collections.emptyList();}
+            List<DuplicateCheck.Match> matches=found;
+            runOnUiThread(() -> {
+                if(matches.isEmpty()||isFinishing()||isDestroyed()){proceed.accept(uris);return;}
+                confirmDuplicates(uris,matches,proceed);
+            });
+        },"Stack duplicate check").start();
+    }
+    private void confirmDuplicates(List<Uri> uris,List<DuplicateCheck.Match> matches,java.util.function.Consumer<List<Uri>> proceed){
+        java.text.DateFormat date=java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM);
+        if(uris.size()==1){
+            DuplicateCheck.Match match=matches.get(0);
+            new AlertDialog.Builder(this).setTitle("Already in Stack")
+                    .setMessage("This file has the same contents as \u201c"+match.label+"\u201d, added "+date.format(new java.util.Date(match.addedAt))+".")
+                    .setPositiveButton("Add anyway",(d,w) -> proceed.accept(uris))
+                    .setNeutralButton("Open that one",(d,w) -> startActivity(new Intent(this,DocumentActivity.class).putExtra("document_id",match.documentId)))
+                    .setNegativeButton("Cancel",null).show();
+            return;
+        }
+        java.util.Set<Uri> duplicates=new java.util.HashSet<>();for(DuplicateCheck.Match match:matches)duplicates.add(match.uri);
+        List<Uri> fresh=new ArrayList<>();for(Uri uri:uris)if(!duplicates.contains(uri))fresh.add(uri);
+        StringBuilder text=new StringBuilder(matches.size()+" of "+uris.size()+" files are already in Stack or selected twice:");
+        List<String> names=DuplicateCheck.names(matches,5);
+        for(String name:names)text.append("\n\u2022 ").append(name);
+        if(matches.size()>names.size())text.append("\n\u2022 and ").append(matches.size()-names.size()).append(" more");
+        AlertDialog.Builder dialog=new AlertDialog.Builder(this).setTitle("Some files are already in Stack").setMessage(text.toString())
+                .setNeutralButton("Add all",(d,w) -> proceed.accept(uris)).setNegativeButton("Cancel",null);
+        if(fresh.isEmpty())dialog.setPositiveButton("Add none",null);
+        else dialog.setPositiveButton("Skip duplicates",(d,w) -> proceed.accept(fresh));
+        dialog.show();
+    }
+    private void backupNoticeActions(){
+        new AlertDialog.Builder(this).setTitle("Back up your library?")
+                .setMessage(BackupNudge.message(this,1)+". A backup is a single file you keep somewhere safe, so a lost or reset phone does not lose your documents. You can also set up automatic backups to a folder, such as Filen Drive.")
+                .setPositiveButton("Open Backup & restore",(d,w) -> startActivity(new Intent(this,BackupActivity.class)))
+                .setNeutralButton("Remind me in a week",(d,w) -> {BackupNudge.snooze(this);refresh();}).setNegativeButton("Close",null).show();
+    }
+    private void updateNoticeActions(){
+        new AlertDialog.Builder(this).setTitle("Stack "+UpdateCheck.latest(this)+" is available")
+                .setMessage("You have version "+UpdateCheck.installed(this)+". The release page has the download and what changed. Updating keeps your documents.")
+                .setPositiveButton("Open release page",(d,w) -> startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(UpdateCheck.page(this)))))
+                .setNeutralButton("Not for this version",(d,w) -> {UpdateCheck.dismiss(this);refresh();}).setNegativeButton("Close",null).show();
+    }
     private void toggle(String id){if(!selected.remove(id)){if(selected.size()>=BatchStore.LIMIT){android.widget.Toast.makeText(this,"Select up to 50 documents",android.widget.Toast.LENGTH_SHORT).show();return;}selected.add(id);}refresh();}
     private void selectionActions(){
         if(selected.isEmpty()){
@@ -482,7 +546,7 @@ public final class MainActivity extends LibraryActivity {
         new AlertDialog.Builder(this).setTitle(selected.size()+" selected · selection order").setItems(new String[]{"Add to stacks","Replace all selected filing…","Share PDFs","Share ZIP of PDFs","Delete selected…","Clear selection"},(d,w) -> {
             if(w<=1)work(() -> app().library.stacks(),stacks -> StackPicker.show(this,stacks,java.util.Collections.emptyList(),ids -> batch(w==0?"file-add":"file-replace",ids)));
             else if(w<=3)batch(w==2?"pdf":"zip",java.util.Collections.emptyList());
-            else if(w==4)new AlertDialog.Builder(this).setTitle("Delete "+selected.size()+" selected documents?").setMessage("Remove these documents, their details, notes, memberships and owned originals from this device. Other documents stay saved.").setPositiveButton("Delete selected",(confirm,action) -> batch("delete",java.util.Collections.emptyList())).setNegativeButton("Cancel",null).show();
+            else if(w==4)new AlertDialog.Builder(this).setTitle("Move "+selected.size()+" selected documents to Recently deleted?").setMessage("You can restore them for 30 days, then they are deleted for good. Until then a copy stays on your computer if you sync. Other documents stay saved.").setPositiveButton("Move selected",(confirm,action) -> batch("delete",java.util.Collections.emptyList())).setNegativeButton("Cancel",null).show();
             else{selected.clear();refresh();}
         }).setNegativeButton("Cancel",null).show();
     }
@@ -490,6 +554,10 @@ public final class MainActivity extends LibraryActivity {
 
     private void importUri(Uri uri) {
         if(!app().access.allowed()){whenAllowed(() -> importUri(uri));return;}
+        if(app().imports.busy)return;
+        checkedImport(java.util.Collections.singletonList(uri),list -> startImport(list.get(0)));
+    }
+    private void startImport(Uri uri) {
         if(app().imports.busy)return;
         app().imports.start(uri);importing=true;refresh();
     }
@@ -537,7 +605,8 @@ public final class MainActivity extends LibraryActivity {
         final List<StackCategory> categories;
         final List<Document> documents;
         final java.util.LinkedHashMap<String,String> orgs;final String organization;
-        Snapshot(List<StackCategory> categories, List<Document> documents,java.util.LinkedHashMap<String,String> orgs,String organization) { this.categories = categories; this.documents = documents;this.orgs=orgs;this.organization=organization; }
+        final int total;
+        Snapshot(List<StackCategory> categories, List<Document> documents,java.util.LinkedHashMap<String,String> orgs,String organization,int total) { this.categories = categories; this.documents = documents;this.orgs=orgs;this.organization=organization;this.total=total; }
     }
     private static final class Header {
         final String title, action;

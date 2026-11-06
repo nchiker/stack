@@ -286,7 +286,7 @@ public final class DocumentActivity extends LibraryActivity {
         menu.getMenu().add("Save PDF to device").setOnMenuItemClickListener(item -> { save(); return true; });
         menu.getMenu().add("Crop, rotate & color").setOnMenuItemClickListener(item -> { editPage(); return true; });
         menu.getMenu().add("Remove this page").setOnMenuItemClickListener(item -> { removePage(); return true; });
-        menu.getMenu().add("Delete document").setOnMenuItemClickListener(item -> { deleteDocument(); return true; });
+        menu.getMenu().add("Move to Recently deleted").setOnMenuItemClickListener(item -> { deleteDocument(); return true; });
         menu.show();
     }
 
@@ -315,10 +315,10 @@ public final class DocumentActivity extends LibraryActivity {
     }
 
     private void deleteDocument() {
-        new AlertDialog.Builder(this).setTitle("Delete this document?")
-                .setMessage("The original and its information will be removed from this device.")
-                .setPositiveButton("Delete", (confirm, action) -> work(() -> {
-                    app().library.deleteDocument(documentId); return true;
+        new AlertDialog.Builder(this).setTitle("Move to Recently deleted?")
+                .setMessage("You can restore it for 30 days, then it is deleted for good. Until then a copy stays on your computer if you sync.")
+                .setPositiveButton("Move", (confirm, action) -> work(() -> {
+                    app().library.trashDocument(documentId); return true;
                 }, ignored -> finish())).setNegativeButton("Cancel", null).show();
     }
 
