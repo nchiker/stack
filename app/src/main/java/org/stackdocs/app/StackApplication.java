@@ -29,6 +29,7 @@ public final class StackApplication extends Application {
     private final Runnable automaticSync=new Runnable(){public void run(){
         if(foreground!=null&&access.allowed()&&!resetRequested){
             if(!SyncJob.preferences(StackApplication.this).getString("sync_peer_name","").isEmpty())SyncJob.kick(StackApplication.this,null);
+            AutoBackup.kickIfDue(StackApplication.this);
             if(foreground instanceof LibraryActivity&&finding.compareAndSet(false,true)){
                 android.app.Activity owner=foreground;
                 new Thread(()->{try{org.json.JSONArray found=NearbyPairing.find(new NearbyPairing.Control(),NearbyPairing.PORT);boolean invitation=false;for(int i=0;i<found.length();i++)if(found.optJSONObject(i).optInt("port")==NearbyPairing.PORT)invitation=true;if(invitation)ui.post(()->{if(foreground==owner&&!owner.isFinishing()&&access.allowed()){if(owner instanceof SyncActivity)((SyncActivity)owner).connectionRequested();else owner.startActivity(new android.content.Intent(owner,SyncActivity.class));}});}catch(Exception ignored){}finally{finding.set(false);}},"Stack connection discovery").start();
@@ -57,6 +58,6 @@ public final class StackApplication extends Application {
         suggestions = new SuggestionWorker(library.suggestions,io,this::notifyLibraryChanged,access::allowed);
         library.setSuggestionChanged(() -> { suggestions.kick(); metadata.kick(); notifyLibraryChanged(); });
         library.setOcrChanged(() -> { ocr.kick(); suggestions.kick(); metadata.kick(); notifyLibraryChanged(); });
-        io.execute(() -> { try { new LibraryReset(this).initialize(library);new SyncStore(this,library).cleanLegacyStacks(); } catch(Exception error){library.blockAfterResetFailure(error);return;} finally{libraryReady.countDown();} try{SyncJob.restoreConnection(this,new PairingTransport(this,library).connectionStatus());}catch(Exception ignored){} SyncJob.schedule(this); batches.recover(); ocr.kick(); suggestions.kick(); metadata.kick(); new android.os.Handler(android.os.Looper.getMainLooper()).post(photos::configure); });
+        io.execute(() -> { try { new LibraryReset(this).initialize(library);new SyncStore(this,library).cleanLegacyStacks(); } catch(Exception error){library.blockAfterResetFailure(error);return;} finally{libraryReady.countDown();} try{SyncJob.restoreConnection(this,new PairingTransport(this,library).connectionStatus());}catch(Exception ignored){} SyncJob.schedule(this); AutoBackup.schedule(this); batches.recover(); ocr.kick(); suggestions.kick(); metadata.kick(); new android.os.Handler(android.os.Looper.getMainLooper()).post(photos::configure); });
     }
 }

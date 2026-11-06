@@ -1,4 +1,28 @@
-# Current release — 2026-10-22 (Android 0.10.0, Flatpak 0.2.0)
+# Current release — 2026-11-06 (Android 0.11.0, Flatpak 0.2.0)
+
+## Android 0.11.0 (versionCode 25): automatic backup
+
+Backup & restore has a new **Automatic backup** row. The user picks a folder once (Android folder picker, so any
+document provider works: Filen Files' Filen Drive, Google Drive, USB) and Stack writes `Stack-auto-<time>.stackbackup`
+about weekly, keeping the newest five (only that name pattern is ever pruned). Code: `AutoBackup` (policy, schedule,
+upload check), `AutoBackupJob` (daily JobScheduler wake-up, id `0x41424b50` = 1094863696), `ArchiveController.exportToFolder`.
+Details that matter later:
+
+- A first backup runs when the folder is chosen. A run waits while app lock is locked and also fires from the foreground
+  hook (`StackApplication.automaticSync`) when due. After a failure it retries after 6 hours.
+- After each write Stack compares the size the provider reports with the bytes written (mismatch is reported, the file is
+  never deleted) and lists the folder: a settled row with the right size = confirmed; a row whose document id contains
+  `pending` = a cloud app still uploading; summary text starting `Upload failed` or a day without arrival = failed, which
+  clears `last_ok` so the next run retries. This relies on standard document-provider queries only.
+- Cloud side: the Filen Files documents provider (0.3.x) falls back to an expedited WorkManager job when Android refuses its
+  foreground service for a background write, lists in-flight uploads with `COLUMN_SUMMARY`, and answers listings offline
+  from a cache. Filen Files with its own App lock locked refuses every provider call, so unattended backups need that off.
+- Device-tested on the Pixel 4a (Filen Files 0.3.0): manual backup and restore, 11 scheduled cold runs with the phone locked,
+  offline run, retention, and a real 215 MB library (written in about 16 s, confirmed within 33 s).
+- Test tips: `am force-stop` cancels the scheduled job; use `am crash <pkg>` to end the process, edit
+  `shared_prefs/auto_backup.xml` with `run-as` (debug builds only), then `cmd jobscheduler run -f <pkg> 1094863696`.
+- Not built yet: a Home reminder when the last backup is old, backup encryption, an update check.
+
 
 Release v0.10.0 on GitHub: `Stack-0.10.0.apk` (versionCode 24, signer
 `e873f2fd…e311`, SHA-256 `854ae450…`; both phones run exactly this file) and `Stack-0.2.0-x86_64.flatpak` (branch `stable`, built from

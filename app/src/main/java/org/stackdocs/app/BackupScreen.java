@@ -17,12 +17,13 @@ final class BackupScreen {
     private final Activity activity;
     private final LinearLayout body;
     private final View backup,restore;
+    private View automatic;private TextView automaticCaption;
     private final LinearLayout operation;
     private final TextView heading,status,summary,backupDate;
     private final ProgressBar progress;
     private final ScrollView scroll;
     private final Button commit,cancel;
-    private String lastMessage="",lastState="";
+    private String lastMessage="",lastState="";private int autoAnchor;
 
     BackupScreen(Activity activity,Runnable back,Runnable save,Runnable open,Runnable add,Runnable stop,Runnable help) {
         this.activity=activity;
@@ -44,6 +45,7 @@ final class BackupScreen {
         body.addView(backup);
         backupDate=muted(activity,BackupHistory.label(activity),14);
         backupDate.setPadding(0,0,0,Ui.dp(activity,12));body.addView(backupDate);
+        autoAnchor=body.getChildCount();
         body.addView(Ui.divider(activity),new LinearLayout.LayoutParams(-1,Ui.dp(activity,1)));body.addView(restore);
 
         operation=Ui.column(activity);operation.setPadding(Ui.dp(activity,16),Ui.dp(activity,16),Ui.dp(activity,16),Ui.dp(activity,12));
@@ -69,10 +71,19 @@ final class BackupScreen {
         TextView text=Ui.text(activity,value,size,false);text.setTextColor(Ui.MUTED);text.setLineSpacing(Ui.dp(activity,3),1);return text;
     }
     void reset(Runnable open){body.addView(Ui.divider(activity));body.addView(Ui.actionRow(activity,Icons.Symbol.TUNE,"Reset or rebuild library…","Careful local erase or a fresh sync connection",0xFFF0E3EF,open));}
+    /** Adds the "Automatic backup" row between Backup and Restore; call once. */
+    void automatic(String caption,Runnable open){
+        automatic=Ui.actionRow(activity,Icons.Symbol.FOLDER,"Automatic backup",caption,0xFFF7E1A3,open);
+        // actionRow = [badge, column(title, caption), arrow]; keep a handle on the caption to update it in place.
+        automaticCaption=(TextView)((LinearLayout)((LinearLayout)automatic).getChildAt(1)).getChildAt(1);
+        body.addView(Ui.divider(activity),autoAnchor,new LinearLayout.LayoutParams(-1,Ui.dp(activity,1)));
+        body.addView(automatic,autoAnchor+1);
+    }
+    void automaticCaption(String caption){if(automaticCaption!=null&&!automaticCaption.getText().toString().equals(caption)){automaticCaption.setText(caption);automatic.setContentDescription("Automatic backup. "+caption);}}
     void history(String label){if(!backupDate.getText().toString().equals(label))backupDate.setText(label);}
     void render(String state,String label,String message,String reviewSummary,boolean canceled) {
         boolean busy=state.equals("exporting")||state.equals("validating")||state.equals("restoring"),review=state.equals("review");
-        backup.setEnabled(!busy&&!review);restore.setEnabled(!busy&&!review);
+        backup.setEnabled(!busy&&!review);restore.setEnabled(!busy&&!review);if(automatic!=null){automatic.setEnabled(!busy&&!review);automatic.setAlpha(busy||review?.45f:1);}
         backup.setAlpha(busy||review?.45f:1);restore.setAlpha(busy||review?.45f:1);
         operation.setVisibility(busy||review||!message.isEmpty()?View.VISIBLE:View.GONE);
         heading.setText(review?"Review backup":state.equals("exporting")?"Saving backup":state.equals("validating")?"Checking backup":state.equals("restoring")?"Restoring documents":state.equals("failed")?"Couldn't finish":state.equals("canceled")?"Canceled":"Finished");

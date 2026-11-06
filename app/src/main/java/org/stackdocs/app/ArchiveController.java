@@ -28,21 +28,72 @@ final class ArchiveController {
         progress=new LibraryArchive.Progress();state="exporting";message="";
         transfers.execute(() -> {
             try {
-              try(LibraryArchive.Snapshot snapshot=app.io.submit(() -> app.library.archive().snapshot(progress)).get()) {
-                try(OutputStream output=app.getContentResolver().openOutputStream(destination,"wt")) {
-                    if(output==null)throw new IOException("The destination could not be opened. Choose another location.");stream=output;
-                    LibraryArchive.write(snapshot,output,progress);output.flush();
-                } finally {stream=null;}
-              }
+                writeArchive(destination);
                 boolean recorded;
                 try{recorded=BackupHistory.completed(app,System.currentTimeMillis());}catch(RuntimeException ignored){recorded=false;}
                 message="Library backup saved. Keep it private; the archive is not encrypted."+(recorded?"":" The backup date could not be saved.");state="success";
             } catch(Exception error) {
                 // A selected provider may not permit deletion or atomic replacement.
+                if(error instanceof SizeMismatch){failure(error,"");return;}
                 boolean removed=false;try{removed=DocumentsContract.deleteDocument(app.getContentResolver(),destination);}catch(Exception ignored){}
                 failure(error," The destination "+(removed?"was removed.":"may contain an incomplete file. Delete it before using a retry."));
             }
         });
+    }
+    /** Receives the outcome of a scheduled backup on the transfer thread. */
+    interface Done { void finished(boolean ok,String message,String name,long size); }
+    /**
+     * Scheduled backup: creates a new timestamped file in a folder the user picked earlier, checks the size the
+     * folder reports, then removes older scheduled copies beyond {@code keep}. Returns false when another archive
+     * operation is running, so the caller can retry later.
+     */
+    boolean exportToFolder(Uri tree,int keep,Done done) {
+        if(busy()||state.equals("review"))return false;
+        progress=new LibraryArchive.Progress();state="exporting";message="";
+        transfers.execute(() -> {
+            Uri file=null;long size=0;
+            try {
+                android.content.ContentResolver resolver=app.getContentResolver();
+                Uri folder=DocumentsContract.buildDocumentUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree));
+                String name=AutoBackup.newName(System.currentTimeMillis());
+                file=DocumentsContract.createDocument(resolver,folder,"application/octet-stream",name);
+                if(file==null)throw new IOException("The folder does not accept new files. Choose another folder.");
+                size=writeArchive(file);
+                int removed=AutoBackup.prune(resolver,tree,name,keep);
+                try{BackupHistory.completed(app,System.currentTimeMillis());}catch(RuntimeException ignored){}
+                message="Library backup saved as "+name+"."+(removed>0?" Removed "+removed+" older automatic "+(removed==1?"backup.":"backups."):"")
+                        +" Keep it private; the archive is not encrypted. If the folder belongs to a cloud app, that app finishes the upload.";
+                state="success";done.finished(true,message,name,size);
+            } catch(Exception error) {
+                boolean kept=error instanceof SizeMismatch,removed=false;if(file!=null&&!kept)try{removed=DocumentsContract.deleteDocument(app.getContentResolver(),file);}catch(Exception ignored){}
+                failure(error,file==null||kept?"":" The incomplete file "+(removed?"was removed.":"may still be in the folder."));
+                done.finished(false,message,"",0);
+            }
+        });
+        return true;
+    }
+    /** Streams a consistent snapshot to {@code destination}, then checks that the provider kept every byte. */
+    private long writeArchive(Uri destination) throws Exception {
+        long written;
+        try(LibraryArchive.Snapshot snapshot=app.io.submit(() -> app.library.archive().snapshot(progress)).get()) {
+            try(OutputStream raw=app.getContentResolver().openOutputStream(destination,"wt")) {
+                if(raw==null)throw new IOException("The destination could not be opened. Choose another location.");stream=raw;
+                CountingOutput output=new CountingOutput(raw);
+                LibraryArchive.write(snapshot,output,progress);output.flush();written=output.count;
+            } finally {stream=null;}
+        }
+        // Some providers (Google Drive) report 0 right after a write; only a non-zero mismatch is a failure.
+        long reported=AutoBackup.reportedSize(app.getContentResolver(),destination);
+        if(reported>0&&reported!=written)throw new SizeMismatch("The destination reports "+reported+" bytes but Stack wrote "+written+". The file was left in place; check it before relying on it.");
+        return written;
+    }
+    /** The file may well be fine (providers report stale sizes), so it is never deleted on this failure. */
+    private static final class SizeMismatch extends IOException { SizeMismatch(String message){super(message);} }
+    private static final class CountingOutput extends java.io.FilterOutputStream {
+        long count;
+        CountingOutput(OutputStream out){super(out);}
+        @Override public void write(int b) throws IOException {out.write(b);count++;}
+        @Override public void write(byte[] b,int off,int len) throws IOException {out.write(b,off,len);count+=len;}
     }
     void validate(Uri source) {
         if(busy()||state.equals("review"))return;

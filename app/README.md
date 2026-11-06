@@ -15,6 +15,11 @@ Android 7.0 (API 24) or later, target SDK 36.
   details. Notes, tags and an optional app lock.
 - Export a document as PDF (untouched imported PDFs are copied byte for byte), and
   back up or restore the whole library as a `.stackbackup` file.
+- Automatic backup: choose a folder once (Backup & restore > Automatic backup) and Stack saves a new
+  `Stack-auto-<time>.stackbackup` about every week, keeping the newest five. The folder can be on any Android
+  document provider, including Filen Files' Filen Drive, Google Drive or a USB drive; Stack stores no account.
+  After each write it lists the folder to check the file arrived with the right size, because a cloud app may take
+  the file first and upload it later. Backups are not encrypted by Stack.
 - Sync with the desktop app over Wi-Fi: see
   [Sync your phone and computer](../docs/STACK_DESKTOP_PHONE_TRANSFER.md).
 

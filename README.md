@@ -10,7 +10,7 @@ Google's discontinued Stack app.
 
 | | Source | Current release | Read first |
 |---|---|---|---|
-| Android | [`app/`](app/) | 0.10.0 (code 24) | [app/README.md](app/README.md) |
+| Android | [`app/`](app/) | 0.11.0 (code 25) | [app/README.md](app/README.md) |
 | Desktop | [`desktop/`](desktop/) | Flatpak 0.2.0 | [desktop/README.md](desktop/README.md) |
 
 Releases with the APK and Flatpak are on
