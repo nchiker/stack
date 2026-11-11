@@ -1,6 +1,12 @@
-# Current release — 2026-11-06 (Android 0.12.0 prepared, 0.11.0 published; Flatpak 0.2.0)
+# Current release — 2026-11-11 (Android 0.13.0 published; Flatpak 0.2.0)
 
-## Unreleased (after 0.12.0): one-tap Filen Drive folder, keep time
+## Android 0.13.0 (versionCode 27): one-tap Filen Drive folder, keep time
+
+Release APK `Stack-0.13.0.apk` (SHA-256 `8519a91d…67d9`, signer `e873f2fd…e311`), staged in
+`.artifacts/stack-release-20261111-v0.13.0/`; installed on the 4a as an in-place update from a 0.12.0-code debug build
+(settings kept, Keep backups / Use Filen Drive shown, job still scheduled, no crash). Needs Filen Files 0.4.2+ for the
+one-tap folder; older Filen Files or none = the system folder picker only.
+
 
 - **Use Filen Drive** (Automatic backup, and Change folder): when Filen Files 0.4.2+ is installed, Stack calls
   `app.filenfiles.action.GRANT_BACKUP_FOLDER` (`FilenFolder`, `<queries>` entry) with `startActivityForResult`. Filen
@@ -44,7 +50,7 @@ Details that matter later:
   offline run, retention, and a real 215 MB library (written in about 16 s, confirmed within 33 s).
 - Test tips: `am force-stop` cancels the scheduled job; use `am crash <pkg>` to end the process, edit
   `shared_prefs/auto_backup.xml` with `run-as` (debug builds only), then `cmd jobscheduler run -f <pkg> 1094863696`.
-- Added in 0.12.0 (versionCode 26, signed APK built and smoke-tested on the Pixel 4a as an in-place update from 0.11.0 incl. DB 9 to 10; NOT yet published): duplicate warning on import (`DuplicateCheck`, size first then SHA-256, no
+- Added in 0.12.0 (versionCode 26, signed APK built and smoke-tested on the Pixel 4a as an in-place update from 0.11.0 incl. DB 9 to 10; published 2026-11-06): duplicate warning on import (`DuplicateCheck`, size first then SHA-256, no
   stored state), optional update check (`UpdateCheck`, off by default, one request a day to the GitHub release list, never
   installs), Recently deleted (`TrashActivity`, library DB v10 `trash` table + trigger, local only, 30 days, deleted
   documents stay in the synced tables and on the computer until purged), Find duplicates (`DuplicatesActivity`), and the
