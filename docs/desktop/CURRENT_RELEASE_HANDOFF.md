@@ -1,5 +1,28 @@
 # Current release — 2026-11-06 (Android 0.12.0 prepared, 0.11.0 published; Flatpak 0.2.0)
 
+## Unreleased (after 0.12.0): one-tap Filen Drive folder, keep time
+
+- **Use Filen Drive** (Automatic backup, and Change folder): when Filen Files 0.4.2+ is installed, Stack calls
+  `app.filenfiles.action.GRANT_BACKUP_FOLDER` (`FilenFolder`, `<queries>` entry) with `startActivityForResult`. Filen
+  Files shows one Allow screen (unlock first if its App lock is locked), creates or reuses "Stack backups" at the top of
+  Filen Drive, and returns a persistable READ|WRITE|PREFIX tree grant; the result goes through the normal
+  `folderChosen` path. Cancel codes: `app.filenfiles.extra.ERROR` = not_signed_in | offline | failed (+ `MESSAGE`)
+  are shown; user_cancelled / no_caller are silent. The Allow is the owner's consent: agents never tap it.
+  The Allow also puts Stack on Filen Files' locked-writer list: list/read/create file/write/delete inside that tree
+  work while Filen Files is locked (Settings > Security there turns it off).
+- **Keep backups** row (shown while automatic backup is on): 1 month (default) / 3 / 6 months / 1 year / Forever,
+  pref `keep_days` (-1 = forever, unknown values fall back to 30, survives Turn off). `AutoBackup.expired` removes
+  Stack-auto files whose NAME date is older than that; never the new file, never the newest older one, never an id
+  containing "pending" (deleting a Filen pending row cancels its upload), never an undated name. Replaces "newest 5".
+- Device-tested 2026-11-11 on the 4a with the Filen session (Filen Files 0.4.2 debug, owner tapped Allow): first
+  backup 217 MB confirmed; a second setup returned the same tree (filen:02280617-...); with Filen Files force-stopped
+  (cold = locked) and the screen off, job 1094863696 wrote and uploaded a new backup (Android refused Filen's
+  foreground service; its WorkManager fallback finished it) and pruned a planted 71-day-old file, keeping a 17-day one.
+  Suite flag `features` group 13 covers the keep rule.
+- Leftovers in the owner's real Filen Drive > Stack backups from that test: three 217 MB test-phone backups
+  (2026-11-11 175516, 175801, 180238) and a 4-byte `Stack-auto-2026-10-25-120000.stackbackup`. Retention removes them
+  in time; delete earlier only if the owner asks.
+
 ## Android 0.11.0 (versionCode 25): automatic backup
 
 Backup & restore has a new **Automatic backup** row. The user picks a folder once (Android folder picker, so any
@@ -144,5 +167,12 @@ Other:
 - Cargo cache `CARGO_HOME=~/.cache/stack-cargo-home`; Flatpak SDK 25.08 with
   `rust-stable` (Rust 1.98.1) installed for the user.
 - adb: `/tmp/stack-platform-tools/platform-tools/adb` (also in the SDK's
-  `platform-tools`). Signing keys stay in `~/.local/share/stack-signing/`.
+  `platform-tools`). Signing keys stay in `~/.local/share/stack-signing/`
+  (properties in `~/.config/stack-signing/`). A backup copy of both folders is in
+  `~/APK-Keys/stack/` (`share/` and `config/`), which Key Vault encrypts to Filen.
+  If the key changes, refresh that copy and ask the owner to click Back up now.
+- Repository: Stack has its own git repo in `~/Projects/Stack` (split out of the
+  old shared `~/Projects` repo on 2026-11-11, history kept). Its `origin` is
+  nchiker/stack, but that public history is separate snapshot commits: never
+  `git push` directly; publish only with the command below.
 - Publish source: `python3 tools/backup_github.py --mirror ~/.cache/stack-source-backup --push --public`.

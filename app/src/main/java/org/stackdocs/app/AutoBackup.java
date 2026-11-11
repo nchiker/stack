@@ -27,7 +27,10 @@ import java.util.function.Consumer;
  * Only files named {@code Stack-auto-<timestamp>.stackbackup} are ever pruned, so nothing else in the folder is touched.
  */
 final class AutoBackup {
-    static final int KEEP = 5;
+    /** How long automatic backups are kept, in days; -1 = forever. The first entry is the default. */
+    static final int[] KEEP_DAYS = {30, 90, 180, 365, -1};
+    static final String[] KEEP_LABELS = {"1 month", "3 months", "6 months", "1 year", "Forever"};
+    private static final long DAY = 24L * 60 * 60 * 1000;
     static final long INTERVAL = 7L * 24 * 60 * 60 * 1000;
     /** After a failed attempt, wait before trying again so a broken destination is not hammered. */
     private static final long RETRY_AFTER = 6L * 60 * 60 * 1000;
@@ -66,6 +69,20 @@ final class AutoBackup {
         return out.toString();
     }
 
+    static int keepDays(Context context) {
+        int days = prefs(context).getInt("keep_days", KEEP_DAYS[0]);
+        for (int choice : KEEP_DAYS) if (choice == days) return days;
+        return KEEP_DAYS[0]; // an unknown value never means "forever" or "nothing"
+    }
+
+    static String keepLabel(Context context) {
+        int days = keepDays(context);
+        for (int i = 0; i < KEEP_DAYS.length; i++) if (KEEP_DAYS[i] == days) return KEEP_LABELS[i];
+        return KEEP_LABELS[0];
+    }
+
+    static void setKeepDays(Context context, int days) { prefs(context).edit().putInt("keep_days", days).commit(); }
+
     static String lastError(Context context) { return prefs(context).getString("last_error", ""); }
 
     /** Keeps the permission Android grants for the picked folder across restarts and starts the schedule. */
@@ -82,7 +99,8 @@ final class AutoBackup {
     static void disable(Context context) {
         Uri previous = tree(context);
         if (previous != null) release(context.getContentResolver(), previous);
-        prefs(context).edit().clear().commit();
+        int keep = keepDays(context); // turning off keeps the chosen keep time for next time
+        prefs(context).edit().clear().putInt("keep_days", keep).commit();
         JobScheduler jobs = context.getSystemService(JobScheduler.class);
         if (jobs != null) jobs.cancel(JOB);
     }
@@ -137,7 +155,7 @@ final class AutoBackup {
         p.edit().putLong("last_attempt", System.currentTimeMillis()).apply();
         boolean started;
         try {
-            started = app.archives.exportToFolder(tree, KEEP, (ok, message, name, size) -> {
+            started = app.archives.exportToFolder(tree, keepDays(app), (ok, message, name, size) -> {
                 SharedPreferences.Editor edit = p.edit();
                 if (ok) edit.putLong("last_ok", System.currentTimeMillis()).remove("last_error").putString("upload_name", name).putLong("upload_size", size).putString("upload_state", "checking");
                 else edit.putString("last_error", message == null || message.isEmpty() ? "The backup failed." : message);
@@ -225,8 +243,12 @@ final class AutoBackup {
         return 0;
     }
 
-    /** Deletes automatic backups beyond the newest {@code keep}, never the one just written. Returns how many went. */
-    static int prune(ContentResolver resolver, Uri tree, String justWritten, int keep) {
+    /**
+     * Deletes automatic backups older than {@code keepDays} (-1 = keep forever). Never deletes the one just written,
+     * the newest older one (so a long pause can't empty the folder), a file a cloud app is still uploading (its id
+     * contains "pending"; deleting it would cancel the upload) or a name without a readable date. Returns how many went.
+     */
+    static int prune(ContentResolver resolver, Uri tree, String justWritten, int keepDays) {
         ArrayList<String[]> mine = new ArrayList<>(); // {name, document id}
         Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree));
         try (Cursor c = resolver.query(children, new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null)) {
@@ -236,14 +258,41 @@ final class AutoBackup {
                 if (name != null && name.startsWith(PREFIX) && name.endsWith(SUFFIX) && !name.equals(justWritten)) mine.add(new String[]{name, c.getString(0)});
             }
         } catch (RuntimeException error) { return 0; }
-        // Names carry the timestamp, so a name sort is newest-first when reversed. The new file is one of the kept.
-        Collections.sort(mine, (a, b) -> b[0].compareTo(a[0]));
         int removed = 0;
-        for (int i = Math.max(0, keep - 1); i < mine.size(); i++) {
+        for (String id : expired(mine, keepDays, System.currentTimeMillis())) {
             try {
-                if (DocumentsContract.deleteDocument(resolver, DocumentsContract.buildDocumentUriUsingTree(tree, mine.get(i)[1]))) removed++;
+                if (DocumentsContract.deleteDocument(resolver, DocumentsContract.buildDocumentUriUsingTree(tree, id))) removed++;
             } catch (Exception ignored) { /* best effort; the provider may forbid deletes */ }
         }
         return removed;
+    }
+
+    /** The retention rule on its own: document ids (from {name, id} pairs, the new file left out) that may go. */
+    static ArrayList<String> expired(ArrayList<String[]> files, int keepDays, long now) {
+        ArrayList<String> out = new ArrayList<>();
+        if (keepDays < 0) return out;
+        ArrayList<String[]> sorted = new ArrayList<>(files);
+        // Names carry the timestamp, so a reversed name sort is newest first.
+        Collections.sort(sorted, (a, b) -> b[0].compareTo(a[0]));
+        long cutoff = now - keepDays * DAY;
+        for (int i = 1; i < sorted.size(); i++) {
+            String name = sorted.get(i)[0], id = sorted.get(i)[1];
+            if (id == null || id.contains("pending")) continue;
+            long made = madeAt(name);
+            if (made > 0 && made < cutoff) out.add(id);
+        }
+        return out;
+    }
+
+    /** Time from a Stack-auto-yyyy-MM-dd-HHmmss.stackbackup name, or 0 when it can't be read. */
+    static long madeAt(String name) {
+        if (name == null || !name.startsWith(PREFIX) || !name.endsWith(SUFFIX)) return 0;
+        String stamp = name.substring(PREFIX.length(), name.length() - SUFFIX.length());
+        try {
+            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd-HHmmss", Locale.ROOT);
+            format.setLenient(false);
+            Date date = format.parse(stamp);
+            return date == null ? 0 : date.getTime();
+        } catch (java.text.ParseException error) { return 0; }
     }
 }

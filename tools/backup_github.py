@@ -2,7 +2,7 @@
 """Snapshot only Stack source into a separate GitHub source checkout.
 
 Includes tracked and nonignored source, including unfinished edits. Never stages
-or commits the shared parent repository. Refuses credentials, library archives,
+or commits the Stack repository itself. Refuses credentials, library archives,
 SQLite files, symbolic links, build outputs and repositories outside Stack.
 """
 import argparse

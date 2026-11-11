@@ -12,7 +12,7 @@ import java.util.Locale;
 
 /** Local storage-access flows. Selecting/validating a backup never mutates the library. */
 public final class BackupActivity extends LibraryActivity {
-    private static final int BACKUP=71,RESTORE=72,AUTO_FOLDER=73;
+    private static final int BACKUP=71,RESTORE=72,AUTO_FOLDER=73,FILEN_FOLDER=74;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private final Runnable tick=() -> {render();schedule();};
     private BackupScreen screen;
@@ -23,6 +23,7 @@ public final class BackupActivity extends LibraryActivity {
         screen=new BackupScreen(this,this::finish,() -> pick(true),() -> pick(false),
                 () -> {app().archives.restore();render();},() -> {app().archives.cancel();render();},this::aboutBackups);
         screen.automatic(AutoBackup.label(this),() -> whenAllowed(this::autoBackup));
+        screen.keep(() -> whenAllowed(this::keepFor));
         screen.reset(() -> whenAllowed(() -> startActivity(new Intent(this,LibraryResetActivity.class))));
         Ui.install(this,screen.root);removeBack=Ui.backHandler(this,this::finish);
         if(state!=null && state.getBoolean("active") && app().archives.state.equals("idle")) app().archives.message="The previous operation was interrupted. Existing data was kept; select the file or destination again. Startup recovery removes uncommitted restored files.";
@@ -37,6 +38,7 @@ public final class BackupActivity extends LibraryActivity {
         ArchiveController controller=app().archives;
         screen.history(BackupHistory.label(this));
         screen.automaticCaption(AutoBackup.label(this));
+        screen.keepCaption(AutoBackup.enabled(this),AutoBackup.keepLabel(this));
         screen.render(controller.state,controller.progress.label,controller.message,controller.review(),controller.progress.canceled);
     }
     private void aboutBackups() {
@@ -45,22 +47,43 @@ public final class BackupActivity extends LibraryActivity {
                 .setPositiveButton("Got it",null).show();
     }
     private void autoBackup() {
-        if(!AutoBackup.enabled(this)) {
-            new AlertDialog.Builder(this).setTitle("Automatic backup")
-                    .setMessage("Choose a folder and Stack saves a new backup there about once a week, keeping the newest "+AutoBackup.KEEP+". The folder can be on this phone, a USB drive or a cloud app such as Filen Files or Google Drive.\n\nStack does not encrypt backup files, so choose a private folder.")
-                    .setNegativeButton("Cancel",null).setPositiveButton("Choose folder",(d,w) -> pickFolder()).show();
-            return;
-        }
+        if(!AutoBackup.enabled(this)) {chooseDestination();return;}
         String error=AutoBackup.lastError(this);
         new AlertDialog.Builder(this).setTitle("Automatic backup")
                 .setMessage(AutoBackup.label(this)+(error.isEmpty()?"":"\n\n"+error))
                 .setPositiveButton("Back up now",(d,w) -> {AutoBackup.run(app(),null);render();})
-                .setNeutralButton("Change folder",(d,w) -> pickFolder())
+                .setNeutralButton("Change folder",(d,w) -> {if(FilenFolder.available(this))chooseDestination();else pickFolder();})
                 .setNegativeButton("Turn off",(d,w) -> {AutoBackup.disable(this);render();}).show();
+    }
+    /** Filen Drive in one tap when Filen Files offers it; otherwise the system folder picker. */
+    private void chooseDestination() {
+        String kept=AutoBackup.keepDays(this)<0?"kept forever":"kept for "+AutoBackup.keepLabel(this);
+        if(FilenFolder.available(this)) {
+            new AlertDialog.Builder(this).setTitle("Automatic backup")
+                    .setMessage("A backup every week in Filen Drive, each "+kept+".")
+                    .setPositiveButton("Use Filen Drive",(d,w) -> filenFolder())
+                    .setNeutralButton("Other folder",(d,w) -> pickFolder())
+                    .setNegativeButton("Cancel",null).show();
+            return;
+        }
+        new AlertDialog.Builder(this).setTitle("Automatic backup")
+                .setMessage("Choose a folder and Stack saves a new backup there about once a week, each "+kept+". The folder can be on this phone, a USB drive or a cloud app such as Filen Files or Google Drive.\n\nStack does not encrypt backup files, so choose a private folder.")
+                .setNegativeButton("Cancel",null).setPositiveButton("Choose folder",(d,w) -> pickFolder()).show();
     }
     private void pickFolder() {
         Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         try{startActivityForResult(intent,AUTO_FOLDER);}catch(ActivityNotFoundException error){new AlertDialog.Builder(this).setMessage("No folder picker is available on this phone.").setPositiveButton("OK",null).show();}
+    }
+    /** One choice, applied at the next backup. The newest backup is never removed by this. */
+    private void keepFor() {
+        int current=0;for(int i=0;i<AutoBackup.KEEP_DAYS.length;i++)if(AutoBackup.KEEP_DAYS[i]==AutoBackup.keepDays(this))current=i;
+        new AlertDialog.Builder(this).setTitle("Keep backups for")
+                .setSingleChoiceItems(AutoBackup.KEEP_LABELS,current,(d,which) -> {AutoBackup.setKeepDays(this,AutoBackup.KEEP_DAYS[which]);d.dismiss();render();})
+                .setNegativeButton("Cancel",null).show();
+    }
+    /** Asks Filen Files for its "Stack backups" folder: one Allow tap there, no browsing. */
+    private void filenFolder() {
+        try{startActivityForResult(FilenFolder.request(),FILEN_FOLDER);}catch(ActivityNotFoundException error){pickFolder();}
     }
     /** Keeps the folder permission (the provider may be slow, so off the UI thread), then makes the first backup. */
     private void folderChosen(Intent data) {
@@ -87,8 +110,14 @@ public final class BackupActivity extends LibraryActivity {
     }
     @Override protected void onActivityResult(int request,int result,Intent data) {
         super.onActivityResult(request,result,data);
+        if(request==FILEN_FOLDER && (result!=RESULT_OK||data==null||data.getData()==null)) {
+            String why=FilenFolder.reason(data);
+            if(!why.isEmpty()) new AlertDialog.Builder(this).setTitle("Filen Drive").setMessage(why)
+                    .setPositiveButton("OK",null).setNeutralButton("Other folder",(d,w) -> pickFolder()).show();
+            return;
+        }
         if(result!=RESULT_OK||data==null||data.getData()==null)return;
-        if(request==AUTO_FOLDER){whenAllowed(() -> folderChosen(data));return;}
+        if(request==AUTO_FOLDER||request==FILEN_FOLDER){whenAllowed(() -> folderChosen(data));return;}
         whenAllowed(() -> {if(request==BACKUP)app().archives.export(data.getData());if(request==RESTORE)app().archives.validate(data.getData());render();});
     }
 }

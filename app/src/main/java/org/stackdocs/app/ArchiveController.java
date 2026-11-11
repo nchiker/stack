@@ -47,7 +47,7 @@ final class ArchiveController {
      * folder reports, then removes older scheduled copies beyond {@code keep}. Returns false when another archive
      * operation is running, so the caller can retry later.
      */
-    boolean exportToFolder(Uri tree,int keep,Done done) {
+    boolean exportToFolder(Uri tree,int keepDays,Done done) {
         if(busy()||state.equals("review"))return false;
         progress=new LibraryArchive.Progress();state="exporting";message="";
         transfers.execute(() -> {
@@ -59,7 +59,7 @@ final class ArchiveController {
                 file=DocumentsContract.createDocument(resolver,folder,"application/octet-stream",name);
                 if(file==null)throw new IOException("The folder does not accept new files. Choose another folder.");
                 size=writeArchive(file);
-                int removed=AutoBackup.prune(resolver,tree,name,keep);
+                int removed=AutoBackup.prune(resolver,tree,name,keepDays);
                 try{BackupHistory.completed(app,System.currentTimeMillis());}catch(RuntimeException ignored){}
                 message="Library backup saved as "+name+"."+(removed>0?" Removed "+removed+" older automatic "+(removed==1?"backup.":"backups."):"")
                         +" Keep it private; the archive is not encrypted. If the folder belongs to a cloud app, that app finishes the upload.";

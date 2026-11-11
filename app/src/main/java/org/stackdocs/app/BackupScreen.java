@@ -18,6 +18,7 @@ final class BackupScreen {
     private final LinearLayout body;
     private final View backup,restore;
     private View automatic;private TextView automaticCaption;
+    private LinearLayout keepGroup;private TextView keepCaption;
     private final LinearLayout operation;
     private final TextView heading,status,summary,backupDate;
     private final ProgressBar progress;
@@ -78,6 +79,19 @@ final class BackupScreen {
         automaticCaption=(TextView)((LinearLayout)((LinearLayout)automatic).getChildAt(1)).getChildAt(1);
         body.addView(Ui.divider(activity),autoAnchor,new LinearLayout.LayoutParams(-1,Ui.dp(activity,1)));
         body.addView(automatic,autoAnchor+1);
+    }
+    /** Adds the "Keep backups" row right under Automatic backup; shown only while automatic backup is on. */
+    void keep(Runnable open){
+        View row=Ui.actionRow(activity,Icons.Symbol.DELETE,"Keep backups","",0xFFF7E1A3,open);
+        keepCaption=(TextView)((LinearLayout)((LinearLayout)row).getChildAt(1)).getChildAt(1);
+        keepGroup=new LinearLayout(activity);keepGroup.setOrientation(LinearLayout.VERTICAL);
+        keepGroup.addView(Ui.divider(activity),new LinearLayout.LayoutParams(-1,Ui.dp(activity,1)));keepGroup.addView(row);
+        body.addView(keepGroup,body.indexOfChild(automatic)+1);
+    }
+    void keepCaption(boolean shown,String caption){
+        if(keepGroup==null)return;
+        keepGroup.setVisibility(shown?View.VISIBLE:View.GONE);
+        if(!keepCaption.getText().toString().equals(caption)){keepCaption.setText(caption);keepGroup.getChildAt(1).setContentDescription("Keep backups. "+caption);}
     }
     void automaticCaption(String caption){if(automaticCaption!=null&&!automaticCaption.getText().toString().equals(caption)){automaticCaption.setText(caption);automatic.setContentDescription("Automatic backup. "+caption);}}
     void history(String label){if(!backupDate.getText().toString().equals(label))backupDate.setText(label);}

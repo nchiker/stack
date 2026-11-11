@@ -26,6 +26,7 @@ final class FeatureChecks {
         trashChecks(instrumentation, target, mark);
         scanChecks(target, mark);
         nudgeChecks(target, mark);
+        retentionChecks(target, mark);
     }
 
     private static void updateChecks(Consumer<String> mark) throws Exception {
@@ -213,6 +214,36 @@ final class FeatureChecks {
             target.getSharedPreferences("backup_nudge", Context.MODE_PRIVATE).edit().clear().commit();
             AutoBackup.prefs(target).edit().clear().commit();
         }
+    }
+
+    /** Time-based keep rule for automatic backups, and the stored choice. */
+    private static void retentionChecks(Context target, Consumer<String> mark) {
+        long day = 24L * 60 * 60 * 1000, now = System.currentTimeMillis();
+        java.util.ArrayList<String[]> files = new java.util.ArrayList<>();
+        files.add(new String[]{AutoBackup.newName(now - 2 * day), "recent"});
+        files.add(new String[]{AutoBackup.newName(now - 40 * day), "old40"});
+        files.add(new String[]{AutoBackup.newName(now - 100 * day), "old100"});
+        files.add(new String[]{AutoBackup.newName(now - 400 * day), "filen-pending:old400"});
+        files.add(new String[]{"Stack-auto-not-a-date.stackbackup", "odd"});
+        require(AutoBackup.expired(files, 30, now).equals(java.util.Arrays.asList("old40", "old100")), "1 month removes 40/100-day files, skips pending and odd names: " + AutoBackup.expired(files, 30, now));
+        require(AutoBackup.expired(files, 90, now).equals(java.util.Arrays.asList("old100")), "3 months removes only the 100-day file");
+        require(AutoBackup.expired(files, -1, now).isEmpty(), "forever removes nothing");
+        java.util.ArrayList<String[]> stale = new java.util.ArrayList<>();
+        stale.add(new String[]{AutoBackup.newName(now - 200 * day), "a"});
+        stale.add(new String[]{AutoBackup.newName(now - 300 * day), "b"});
+        require(AutoBackup.expired(stale, 30, now).equals(java.util.Arrays.asList("b")), "the newest older backup survives a long pause");
+        AutoBackup.prefs(target).edit().clear().commit();
+        try {
+            require(AutoBackup.keepDays(target) == 30 && AutoBackup.keepLabel(target).equals("1 month"), "default is 1 month");
+            AutoBackup.setKeepDays(target, -1);
+            require(AutoBackup.keepLabel(target).equals("Forever"), "forever is stored");
+            AutoBackup.prefs(target).edit().putInt("keep_days", 12345).commit();
+            require(AutoBackup.keepDays(target) == 30, "unknown value falls back to 1 month");
+            AutoBackup.setKeepDays(target, 180);
+            AutoBackup.disable(target);
+            require(AutoBackup.keepDays(target) == 180, "turning automatic backup off keeps the choice");
+            mark.accept("Backup retention: 1 month/3 months/forever/long pause/pending/odd names/stored choice");
+        } finally { AutoBackup.prefs(target).edit().clear().commit(); }
     }
 
     /** A version 9 library (no trash table) opens, upgrades to 10 and keeps its documents. */
