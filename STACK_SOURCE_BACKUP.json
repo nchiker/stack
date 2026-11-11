@@ -1,7 +1,7 @@
 {
   "format": "org.stackdocs.source-backup",
   "version": 1,
-  "source_base_commit": "c25d5b78e70c0e437d74932771186043413b6f89",
+  "source_base_commit": "54697804c470588d7dddf33711d373f4b9d65ad9",
   "qualification": "Source checkpoint including unfinished edits; not a verified release or personal document backup",
   "files_sha256": {
     ".gitattributes": "3383d326899ee0a8d15632c00b0f658292aa00127d9617fb83712853ef7250bb",
@@ -10,7 +10,7 @@
     "Mockup/stack-cosmic-desktop-mockup.html": "94874cc6e4c838ae8edf0062ca48ff8c8f44f4cd1100a01fdf2c4addc4f6c481",
     "README.md": "34684fd936e00501c3505fcd9fd32beaa0dd73926aee213db1d30a6053934fb4",
     "app/README.md": "334ceb2a061109eacdde328d515433e3d8231e52ce84e0578a30ac5c184375f6",
-    "app/build.gradle": "9601c428894f91f51fe1b4e317247fcba8d378b8ba52229e7c431fbc193118bd",
+    "app/build.gradle": "a82d5f446f8617eecd8c8806cb957481cdc6c59814a7d469d030781bd9db9604",
     "app/src/androidTest/AndroidManifest.xml": "fff08556f1323b1d4b36c5e69f83714abf125a63e9309955bb0af5292cc7cf65",
     "app/src/androidTest/assets/naming-followup-corpus.json": "347bec8e86a1e9bc537be8a3e5fea2cb2adbe2e35e97565124389da4fa133e41",
     "app/src/androidTest/assets/p0-final-corpus.json": "e899d68e5007bd31262b40a7f27a89f1e79186e262f25688b01a2ffe8b608852",
@@ -498,7 +498,7 @@
     "docs/STACK_ARCHIVE_FORMAT.md": "2e56c0605e140a74618f324ec29541472fea9832b6424fde69a7efe4e2261cbb",
     "docs/STACK_DESKTOP_PHONE_TRANSFER.md": "f55b1da01de4cef2af82315d6890a1def90a2a21e504ee49c7727a8a961e09d6",
     "docs/STACK_SOURCE_BACKUP.md": "ea34902a4e28e9f69aaa21b2bd432b7843c51026260bfec293083428b380ce10",
-    "docs/desktop/CURRENT_RELEASE_HANDOFF.md": "8a2451f63538a74a077c06bcc21e0873012f0df8bac6d5215e78c34329fa42fb",
+    "docs/desktop/CURRENT_RELEASE_HANDOFF.md": "7e04384d41125ca069d824e30c18bca06113d0599329e2103154c73f33dea1a7",
     "docs/desktop/INTEROP_SYNC_PROTOCOL_V1.md": "cdd127cbd59fafd28ae0e0c1b21140c4db3a163a68c9090c0a93c6c1679dd546",
     "docs/desktop/PAIRED_TRANSPORT.md": "73ebd1ceb92ee7b5605304d4bf045c33d17e03a50ebf5212a0e2bb7dedbebb27",
     "gradle.properties": "89414877122a9251c4d1b1e306efc81667ef95c7e0a02cf3ca26351c9b7623e0",
