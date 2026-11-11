@@ -531,9 +531,14 @@ public final class MainActivity extends LibraryActivity {
     }
     private void updateNoticeActions(){
         new AlertDialog.Builder(this).setTitle("Stack "+UpdateCheck.latest(this)+" is available")
-                .setMessage("You have version "+UpdateCheck.installed(this)+". The release page has the download and what changed. Updating keeps your documents.")
-                .setPositiveButton("Open release page",(d,w) -> startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(UpdateCheck.page(this)))))
-                .setNeutralButton("Not for this version",(d,w) -> {UpdateCheck.dismiss(this);refresh();}).setNegativeButton("Close",null).show();
+                .setMessage("You have "+UpdateCheck.installed(this)+". Tap Download, then open the file to update. Your documents stay.")
+                .setPositiveButton("Download",(d,w) -> openLink(UpdateCheck.download(this)))
+                .setNegativeButton("What's new",(d,w) -> openLink(UpdateCheck.page(this)))
+                .setNeutralButton("Not for this version",(d,w) -> {UpdateCheck.dismiss(this);refresh();}).show();
+    }
+    private void openLink(String url){
+        try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url)));}
+        catch(android.content.ActivityNotFoundException none){android.widget.Toast.makeText(this,"No browser is available",android.widget.Toast.LENGTH_SHORT).show();}
     }
     private void toggle(String id){if(!selected.remove(id)){if(selected.size()>=BatchStore.LIMIT){android.widget.Toast.makeText(this,"Select up to 50 documents",android.widget.Toast.LENGTH_SHORT).show();return;}selected.add(id);}refresh();}
     private void selectionActions(){

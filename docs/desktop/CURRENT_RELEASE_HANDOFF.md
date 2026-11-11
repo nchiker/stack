@@ -1,5 +1,15 @@
 # Current release — 2026-11-11 (Android 0.13.0 published; Flatpak 0.2.0)
 
+## Unreleased (after 0.13.0): updates like Filen Files
+
+- Update check is ON by default now (pref `updates/enabled`, default true; an explicit Off stays off). Same single
+  anonymous daily request. The Home notice and Settings offer **Download**: the release APK's own
+  `browser_download_url` (kept only if it is under `github.com/nchiker/stack/releases/download/` and names the same
+  `Stack-x.y.z.apk`; otherwise the release page), plus **What's new** (release page) and **Not for this version**.
+- Device-tested on the 4a with a temporary 0.12.9-labelled debug build: it found v0.13.0, showed the notice, and
+  Download opened Chrome on the APK (Chrome then asks "File might be harmful / Download anyway"; that is the owner's
+  tap). Phone put back on the 0.13.0 release. `features` group 1 covers the link rules.
+
 ## Android 0.13.0 (versionCode 27): one-tap Filen Drive folder, keep time
 
 Release APK `Stack-0.13.0.apk` (SHA-256 `8519a91d…67d9`, signer `e873f2fd…e311`), staged in

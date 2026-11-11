@@ -50,7 +50,14 @@ final class FeatureChecks {
         UpdateCheck.Release foreign = UpdateCheck.parse("{\"html_url\":\"https://example.com/evil\",\"assets\":[{\"name\":\"Stack-9.9.9.apk\"}]}");
         require(foreign != null && foreign.page.startsWith("https://github.com/nchiker/stack/releases/"), "link outside this repository is replaced");
         require(UpdateCheck.parse("{\"assets\":[{\"name\":\"Stack-1.0.0.apk.exe\"}]}") == null, "only exact Stack-x.y.z.apk names count");
-        mark.accept("Update check: version order, GitHub release parsing, desktop-only and foreign links");
+        String apk = "https://github.com/nchiker/stack/releases/download/v0.14.0/Stack-0.14.0.apk";
+        UpdateCheck.Release direct = UpdateCheck.parse("{\"html_url\":\"" + page + "\",\"assets\":[{\"name\":\"Stack-0.14.0.apk\",\"browser_download_url\":\"" + apk + "\"}]}");
+        require(direct != null && direct.apk.equals(apk), "direct APK download is read");
+        UpdateCheck.Release evil = UpdateCheck.parse("{\"html_url\":\"" + page + "\",\"assets\":[{\"name\":\"Stack-0.14.0.apk\",\"browser_download_url\":\"https://example.com/Stack-0.14.0.apk\"}]}");
+        require(evil != null && evil.apk.isEmpty(), "APK link outside this repository is dropped (Download falls back to the page)");
+        UpdateCheck.Release other = UpdateCheck.parse("{\"html_url\":\"" + page + "\",\"assets\":[{\"name\":\"Stack-0.14.0.apk\",\"browser_download_url\":\"https://github.com/nchiker/stack/releases/download/v0.14.0/Other.apk\"}]}");
+        require(other != null && other.apk.isEmpty(), "APK link must name the same file");
+        mark.accept("Update check: version order, GitHub release parsing, desktop-only and foreign links, direct APK link");
     }
 
     private static void duplicateChecks(Instrumentation instrumentation, Context target, Consumer<String> mark) throws Exception {
