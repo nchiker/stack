@@ -1,10 +1,9 @@
-# Current release — 2026-11-11 (Android 0.14.0 prepared, 0.13.0 published; Flatpak 0.2.0)
+# Current release — 2026-11-11 (Android 0.14.0 published; Flatpak 0.2.0)
 
-## Android 0.14.0 (versionCode 28, NOT yet published): updates like Filen Files
+## Android 0.14.0 (versionCode 28, published 2026-11-11): updates like Filen Files
 
 Release APK `Stack-0.14.0.apk` (SHA-256 `439b1939…4e87`, signer `e873f2fd…e311`), staged in
 `.artifacts/stack-release-20261111-v0.14.0/`; installed on the 4a over 0.13.0: Update check shows "On · Up to date", no crash.
-The GitHub release still needs the owner's explicit OK.
 
 
 - Update check is ON by default now (pref `updates/enabled`, default true; an explicit Off stays off). Same single
