@@ -1,4 +1,30 @@
-# Current release — 2026-11-11 (Android 0.15.0 published; Flatpak 0.2.0)
+# Current release — 2026-11-11 (Android 0.15.0, Desktop 0.3.0 via the Flatpak repository)
+
+## Desktop 0.3.0 (2026-11-11): signed Flatpak repository, updates through flatpak/app store
+
+- The desktop now updates like any Flatpak app. Signed OSTree repository on GitHub Pages:
+  https://nchiker.github.io/stack-flatpak/ (repo nchiker/stack-flatpak, branch main = the site; the owner created it,
+  agents are not allowed to create public repos/sites). First install anywhere:
+  `flatpak install --user https://nchiker.github.io/stack-flatpak/org.stackdocs.desktop.flatpakref`.
+- Signing key (ed25519, no passphrase, fingerprint FF1ECD6ADD57489266993D6FEBC51EADF30F5D58):
+  `~/APK-Keys/stack-flatpak/` (secret, public, fingerprint.txt). Backed up only when the owner clicks Key Vault's
+  Back up now. Losing it means installs must be re-pointed at a new key. Never print or copy the secret.
+- **Desktop release routine**: add the release to packaging/org.stackdocs.desktop.metainfo.xml; `python3
+  desktop/tools/build_flatpak.py --output .artifacts/stack-desktop-YYYYMMDD-vX.Y.Z` (needs `cargo fetch --locked` first
+  if new crates; every crate needs a license notice: add missing ones under desktop/notices/upstream + PROVENANCE.json);
+  then `python3 desktop/tools/publish_flatpak_repo.py --build <that folder> --push` (signs commit + summary in a
+  throwaway keyring, keeps 3 versions with static deltas, writes stack.flatpakrepo / .flatpakref / index.html, pushes;
+  the site checkout is ~/.cache/stack-flatpak-site). Check: Pages build "built", then a throwaway `ostree` remote with
+  the public key pulls the commit metadata with "Good signature". The bundle `.flatpak` + SHA256SUMS can still be
+  attached to a GitHub release, but mark a desktop-only release `--latest=false` so the phone's update check (which
+  reads releases/latest) keeps seeing the newest Android release.
+- 0.3.0 contents: rcgen certificates, TLS 1.3 only, safety copy before applying a sync (see 0.15.0 below). Bundle
+  `Stack-0.3.0-x86_64.flatpak` SHA-256 a6565e9e…3cc1, commit f2f0e173….
+- This computer: installed from remote `stack` (`flatpak install --user --reinstall stack org.stackdocs.desktop//stable`
+  replaced the bundle origin `desktop1-origin`, which Flatpak removed); library in ~/.local/share/org.stackdocs.desktop
+  untouched (417 MB). Owner opened 0.3.0 and synced with the real phone 2026-11-11 21:03; two pre-sync safety copies were written.
+- License notice added: asn1-rs-impl 0.2.0 (in cargo metadata through rcgen's optional x509-parser, not compiled) gets
+  the MIT/Apache files from the same upstream repository.
 
 ## Android 0.15.0 (versionCode 29, published 2026-11-11): sync hardening, fixed clocks, in-app update
 
