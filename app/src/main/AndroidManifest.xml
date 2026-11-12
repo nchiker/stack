@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- In-app updates (AppUpdater): Android still asks the person before installing. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <queries>
         <!-- Filen Files hands Stack a backup folder in Filen Drive (FilenFolder). -->
         <intent><action android:name="app.filenfiles.action.GRANT_BACKUP_FOLDER" /></intent>
@@ -67,5 +69,6 @@
             android:authorities="${applicationId}.exports"
             android:exported="false"
             android:grantUriPermissions="true" />
+        <receiver android:name=".InstallResultReceiver" android:exported="false" />
     </application>
 </manifest>

@@ -65,7 +65,7 @@ public final class ScanActivity extends LibraryActivity {
             ArrayList<String> savedStacks = state.getStringArrayList("stacks");
             if (savedStacks != null) selectedStacks = savedStacks;
         }
-        if (name == null) name = "Scan " + new SimpleDateFormat("yyyy-MM-dd HH.mm", Locale.ROOT).format(new Date());
+        if (name == null) name = "Scan " + new SimpleDateFormat("yyyy-MM-dd HH.mm", Locale.ROOT).format(new Date(Clock.now()));
         root = Ui.column(this);
         root.addView(Ui.text(this, "Opening scan…", 20, true));
         Ui.install(this, root);

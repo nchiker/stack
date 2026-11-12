@@ -29,6 +29,45 @@ final class SyncStore {
     static boolean retainsOriginal(SQLiteDatabase db,String id) {
         try(Cursor cursor=db.rawQuery("SELECT enabled FROM sync_control WHERE singleton=1",null)){return cursor.moveToFirst()&&cursor.getInt(0)==1;}
     }
+    static final String SNAPSHOTS="sync_snapshots";static final int SNAPSHOT_KEEP=3;
+    /**
+     * A copy of the library database (library.db plus its WAL file), taken before an
+     * incoming exchange is applied. The write lock is held while copying, so no commit
+     * or checkpoint can change either file and the pair is consistent. Originals are not
+     * copied: incoming originals are content-addressed and never overwrite a file.
+     * If the copy fails, the caller applies nothing. The newest three are kept.
+     */
+    File snapshotBeforeSync()throws IOException {
+        File dir=new File(context.getFilesDir(),SNAPSHOTS);
+        File partial=new File(dir,".partial");
+        try {
+            if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("no folder");
+            LibraryArchive.remove(partial);
+            String stamp=String.format(java.util.Locale.ROOT,"%016d",Clock.now());
+            File target=new File(dir,"library-"+stamp);for(int extra=1;target.exists();extra++)target=new File(dir,"library-"+stamp+"-"+extra);
+            if(!partial.mkdirs())throw new IOException("no partial folder");
+            File database=new File(db.getPath());
+            db.beginTransaction();
+            try {
+                copy(database,new File(partial,"library.db"));
+                File wal=new File(database.getPath()+"-wal");
+                if(wal.isFile())copy(wal,new File(partial,"library.db-wal"));
+                db.setTransactionSuccessful();
+            } finally {db.endTransaction();}
+            if(!partial.renameTo(target))throw new IOException("rename failed");
+            File[] kept=dir.listFiles((parent,name)->name.startsWith("library-"));
+            if(kept!=null){java.util.Arrays.sort(kept,(x,y)->y.getName().compareTo(x.getName()));for(int i=SNAPSHOT_KEEP;i<kept.length;i++)LibraryArchive.remove(kept[i]);}
+            return target;
+        } catch(IOException|RuntimeException error) {
+            LibraryArchive.remove(partial);
+            throw new IOException("Could not save a safety copy of the library before syncing; nothing was changed",error);
+        }
+    }
+    private static void copy(File from,File to)throws IOException {
+        try(FileInputStream in=new FileInputStream(from);java.io.FileOutputStream out=new java.io.FileOutputStream(to)) {
+            byte[] buffer=new byte[65536];int n;while((n=in.read(buffer))!=-1)out.write(buffer,0,n);out.getFD().sync();
+        }
+    }
     String replica() {
         try(Cursor cursor=db.rawQuery("SELECT value FROM sync_meta WHERE key='replica_id'",null)){if(cursor.moveToFirst())return cursor.getString(0);}
         String id=UUID.randomUUID().toString();ContentValues row=new ContentValues();row.put("key","replica_id");row.put("value",id);db.insertWithOnConflict("sync_meta",null,row,SQLiteDatabase.CONFLICT_IGNORE);

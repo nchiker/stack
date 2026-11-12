@@ -28,7 +28,7 @@ final class PhotoMonitor {
     boolean enabled(){return policy.getBoolean("photos",false);}
     boolean permission(){return app.checkSelfPermission(Build.VERSION.SDK_INT>=33?Manifest.permission.READ_MEDIA_IMAGES:Manifest.permission.READ_EXTERNAL_STORAGE)==PackageManager.PERMISSION_GRANTED||(Build.VERSION.SDK_INT>=34&&app.checkSelfPermission(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)==PackageManager.PERMISSION_GRANTED);}
     String scope(){if(!permission())return "Photo permission unavailable";return Build.VERSION.SDK_INT>=34&&app.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES)!=PackageManager.PERMISSION_GRANTED?"Selected photos only":"Local Camera photos";}
-    void enable(){synchronized(consent){policy.edit().putBoolean("photos",true).putLong("photo_cursor",0).putLong("photo_since",System.currentTimeMillis()/1000).putLong("photo_epoch",policy.getLong("photo_epoch",0)+1).putString("media_version",version()).commit();}configure();}
+    void enable(){synchronized(consent){policy.edit().putBoolean("photos",true).putLong("photo_cursor",0).putLong("photo_since",Clock.now()/1000).putLong("photo_epoch",policy.getLong("photo_epoch",0)+1).putString("media_version",version()).commit();}configure();}
     void disable(){synchronized(consent){policy.edit().putBoolean("photos",false).putLong("photo_epoch",policy.getLong("photo_epoch",0)+1).commit();}configure();}
     private String version(){return Build.VERSION.SDK_INT>=29?MediaStore.getVersion(app):"legacy";}
     void configure(){JobScheduler scheduler=app.getSystemService(JobScheduler.class);
@@ -51,7 +51,7 @@ final class PhotoMonitor {
         Uri collection=MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
         String[] columns={"_id","date_added","date_modified","_size","mime_type",Build.VERSION.SDK_INT>=29?"relative_path":"bucket_display_name"};
         String selection="date_added>? AND _size>0 AND date_modified<? AND _id>?"+(Build.VERSION.SDK_INT>=29?" AND is_pending=0":"")+(Build.VERSION.SDK_INT>=30?" AND is_trashed=0":"");
-        String[] arguments={Long.toString(since),Long.toString(System.currentTimeMillis()/1000-3),Long.toString(policy.getLong("photo_cursor",0))};
+        String[] arguments={Long.toString(since),Long.toString(Clock.now()/1000-3),Long.toString(policy.getLong("photo_cursor",0))};
         // At most 100 future rows per sweep; oldest unseen rows remain eligible on the next sweep.
         try(Cursor rows=query(collection,columns,selection,arguments)) {
             if(rows==null)return;int examined=0;long cursor=0;

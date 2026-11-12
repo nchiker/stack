@@ -66,12 +66,9 @@ pub struct Status {
     pub tombstones: i64,
 }
 
+/// Milliseconds since 1970, from the replaceable [`crate::clock`].
 pub fn now() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis()
-        .min(i64::MAX as u128) as i64
+    crate::clock::now_millis()
 }
 
 pub fn default_root() -> Result<PathBuf> {

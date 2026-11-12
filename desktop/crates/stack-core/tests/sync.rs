@@ -1127,3 +1127,100 @@ fn legacy_cleanup_retains_custom_labels_and_used_starter_stacks() {
     }
     assert_eq!(library.clean_legacy_sync_stacks().unwrap(), 0);
 }
+
+fn snapshots(root: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut found: Vec<_> = std::fs::read_dir(root.join("sync_snapshots"))
+        .map(|dir| dir.flatten().map(|e| e.path()).collect())
+        .unwrap_or_default();
+    found.sort();
+    found
+}
+fn documents_in(database: &std::path::Path) -> i64 {
+    rusqlite::Connection::open(database)
+        .unwrap()
+        .query_row("SELECT COUNT(*) FROM documents", [], |row| row.get(0))
+        .unwrap()
+}
+
+#[test]
+fn a_safety_copy_of_the_database_is_taken_before_each_incoming_sync_and_three_are_kept() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempfile::tempdir().unwrap();
+    let (mut a, mut b, _) = joined_two(root.path());
+    let broot = root.path().join("b");
+    assert_eq!(snapshots(&broot).len(), 1, "joining took one copy first");
+    assert_eq!(
+        documents_in(&snapshots(&broot)[0]),
+        0,
+        "taken before the baseline applied"
+    );
+    let source = root.path().join("second.png");
+    std::fs::write(&source, b"second original").unwrap();
+    a.import_original(
+        &source,
+        "Second",
+        &FixtureVerifier,
+        "image/png",
+        1,
+        &Control::default(),
+    )
+    .unwrap();
+    exchange(&a, &mut b, &root.path().join("a-b"));
+    assert_eq!(b.manifest().unwrap().rows("documents").len(), 2);
+    let newest = snapshots(&broot).pop().unwrap();
+    assert_eq!(
+        documents_in(&newest),
+        1,
+        "the copy holds the library as it was before this sync"
+    );
+    assert_eq!(
+        std::fs::metadata(&newest).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+    for round in 0..4 {
+        exchange(&a, &mut b, &root.path().join(format!("again-{round}")));
+    }
+    let kept = snapshots(&broot);
+    assert_eq!(kept.len(), 3, "only the newest three are kept: {kept:?}");
+    assert!(kept.iter().all(|p| {
+        p.file_name()
+            .unwrap()
+            .to_string_lossy()
+            .starts_with("library-")
+    }));
+}
+
+#[test]
+fn a_sync_is_refused_and_nothing_changes_when_the_safety_copy_cannot_be_written() {
+    let root = tempfile::tempdir().unwrap();
+    let (mut a, mut b, _) = joined_two(root.path());
+    let broot = root.path().join("b");
+    std::fs::remove_dir_all(broot.join("sync_snapshots")).unwrap();
+    std::fs::write(broot.join("sync_snapshots"), b"not a folder").unwrap();
+    let source = root.path().join("second.png");
+    std::fs::write(&source, b"second original").unwrap();
+    a.import_original(
+        &source,
+        "Second",
+        &FixtureVerifier,
+        "image/png",
+        1,
+        &Control::default(),
+    )
+    .unwrap();
+    let path = root.path().join("a-b");
+    a.sync_export(&b.status().unwrap().replica_id, &path)
+        .unwrap();
+    let before = b.sync_status().unwrap();
+    let error = b.sync_import(&path, None).unwrap_err().to_string();
+    assert!(error.contains("safety copy"), "{error}");
+    assert_eq!(b.sync_status().unwrap(), before);
+    assert_eq!(b.manifest().unwrap().rows("documents").len(), 1);
+    std::fs::remove_file(broot.join("sync_snapshots")).unwrap();
+    b.sync_import(&path, None).unwrap();
+    assert_eq!(
+        b.manifest().unwrap().rows("documents").len(),
+        2,
+        "a later retry applies"
+    );
+}

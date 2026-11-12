@@ -15,8 +15,6 @@ use std::io::{Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream};
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -28,6 +26,8 @@ const MAX_CONTROL: u64 = 16 * 1024;
 const CHUNK: usize = 64 * 1024;
 const MAGIC: &[u8; 9] = b"STACKLAN1";
 const TLS_NAME: &str = "stackdocs.local";
+/// TLS 1.3 only, on every connection (sync and pairing). Android 10+ supports it.
+pub(crate) const TLS_VERSIONS: &[&rustls::SupportedProtocolVersion] = &[&rustls::version::TLS13];
 const TIMEOUT: Duration = Duration::from_secs(45);
 // Only authenticated, group-checked peers get time for populated-library apply.
 const PROCESSING_TIMEOUT: Duration = Duration::from_secs(180);
@@ -198,8 +198,10 @@ fn write_private(path: &Path, bytes: &[u8]) -> Result<()> {
     result
 }
 
-/// Create a locally protected, fresh X.509 identity. OpenSSL is invoked as a
-/// maintained certificate generator; TLS and chain validation use rustls.
+/// Create a locally protected, fresh X.509 identity, generated in-process (rcgen
+/// on ring, the same provider rustls uses): ECDSA P-256 / SHA-256, CN "Stack
+/// paired device", SAN DNS:stackdocs.local, basicConstraints CA:FALSE,
+/// keyUsage digitalSignature, extendedKeyUsage serverAuth+clientAuth, ten years.
 pub fn identity_init(root: &Path) -> Result<String> {
     let dir = private_dir(root)?;
     let cert = dir.join("identity.der");
@@ -207,67 +209,35 @@ pub fn identity_init(root: &Path) -> Result<String> {
     if cert.exists() || key.exists() {
         return Err(Error::Policy("Identity already exists"));
     }
-    let temporary = tempfile::Builder::new()
-        .prefix("identity-")
-        .tempdir_in(&dir)?;
-    let pem_key = temporary.path().join("key.pem");
-    let pem_cert = temporary.path().join("cert.pem");
-    let extension = "basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=serverAuth,clientAuth\nsubjectAltName=DNS:stackdocs.local";
-    let status = Command::new("openssl")
-        .args([
-            "req",
-            "-new",
-            "-x509",
-            "-newkey",
-            "ec",
-            "-pkeyopt",
-            "ec_paramgen_curve:P-256",
-            "-nodes",
-            "-days",
-            "3650",
-            "-subj",
-            "/CN=Stack paired device",
-            "-addext",
-            extension,
-            "-keyout",
-        ])
-        .arg(&pem_key)
-        .arg("-out")
-        .arg(&pem_cert)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()?;
-    if !status.success() {
-        return Err(Error::Policy("OpenSSL identity generation failed"));
-    }
-    let status = Command::new("openssl")
-        .args(["x509", "-in"])
-        .arg(&pem_cert)
-        .args(["-outform", "DER", "-out"])
-        .arg(&cert)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()?;
-    if !status.success() {
-        return Err(Error::Policy("OpenSSL certificate conversion failed"));
-    }
-    let status = Command::new("openssl")
-        .args(["pkcs8", "-topk8", "-nocrypt", "-in"])
-        .arg(&pem_key)
-        .args(["-outform", "DER", "-out"])
-        .arg(&key)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()?;
-    if !status.success() {
-        return Err(Error::Policy("OpenSSL key conversion failed"));
-    }
-    fs::set_permissions(&cert, fs::Permissions::from_mode(0o600))?;
-    fs::set_permissions(&key, fs::Permissions::from_mode(0o600))?;
-    File::open(&cert)?.sync_all()?;
-    File::open(&key)?.sync_all()?;
-    File::open(&dir)?.sync_all()?;
+    let (cert_der, key_der) = new_identity()?;
+    write_private(&key, &key_der)?;
+    write_private(&cert, &cert_der)?;
     Ok(fingerprint(&read_private(&cert)?))
+}
+
+/// Certificate and PKCS#8 key (both DER) for a new paired-device identity.
+fn new_identity() -> Result<(Vec<u8>, Vec<u8>)> {
+    use rcgen::{
+        CertificateParams, DistinguishedName, DnType, ExtendedKeyUsagePurpose, IsCa, KeyPair,
+        KeyUsagePurpose,
+    };
+    let failed = |_| Error::Policy("Identity generation failed");
+    let key_pair = KeyPair::generate_for(&rcgen::PKCS_ECDSA_P256_SHA256).map_err(failed)?;
+    let mut params = CertificateParams::new(vec![TLS_NAME.to_owned()]).map_err(failed)?;
+    let mut name = DistinguishedName::new();
+    name.push(DnType::CommonName, "Stack paired device");
+    params.distinguished_name = name;
+    params.is_ca = IsCa::ExplicitNoCa;
+    params.key_usages = vec![KeyUsagePurpose::DigitalSignature];
+    params.extended_key_usages = vec![
+        ExtendedKeyUsagePurpose::ServerAuth,
+        ExtendedKeyUsagePurpose::ClientAuth,
+    ];
+    let now = stack_core::clock::now();
+    params.not_before = now.into();
+    params.not_after = (now + std::time::Duration::from_secs(3650 * 24 * 60 * 60)).into();
+    let certificate = params.self_signed(&key_pair).map_err(failed)?;
+    Ok((certificate.der().to_vec(), key_pair.serialize_der()))
 }
 
 pub fn identity_certificate(root: &Path) -> Result<Vec<u8>> {
@@ -671,7 +641,7 @@ pub fn sync_now_library(
     let local = check_group(library, &policy)?;
     let config =
         ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
-            .with_safe_default_protocol_versions()
+            .with_protocol_versions(TLS_VERSIONS)
             .map_err(Error::Tls)?
             .with_root_certificates(roots)
             .with_client_auth_cert(cert, key)?;
@@ -758,7 +728,7 @@ pub fn serve_accepted_library(
     .map_err(|_| Error::Policy("Invalid enrolled client certificate"))?;
     let config =
         ServerConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
-            .with_safe_default_protocol_versions()
+            .with_protocol_versions(TLS_VERSIONS)
             .map_err(Error::Tls)?
             .with_client_cert_verifier(verifier)
             .with_single_cert(cert, key)?;
@@ -868,6 +838,54 @@ mod tests {
     }
 
     #[test]
+    fn identity_is_private_p256_and_created_once() {
+        use std::os::unix::fs::PermissionsExt;
+        let temp = tempfile::Builder::new()
+            .prefix("stack-identity-")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let root = temp.path().join("lib");
+        drop(Library::open(&root).unwrap());
+        let pin = identity_init(&root).unwrap();
+        let dir = private_dir(&root).unwrap();
+        for name in ["identity.der", "identity-key.der"] {
+            let mode = fs::metadata(dir.join(name)).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o600, "{name}");
+        }
+        let cert = identity_certificate(&root).unwrap();
+        assert_eq!(pin, fingerprint(&cert));
+        // The certificate is a usable trust anchor and the key a PKCS#8 P-256 key rustls accepts.
+        let mut roots = RootCertStore::empty();
+        roots.add(CertificateDer::from(cert.clone())).unwrap();
+        let key = read_private(&dir.join("identity-key.der")).unwrap();
+        rustls::crypto::ring::sign::any_ecdsa_type(&PrivateKeyDer::Pkcs8(
+            PrivatePkcs8KeyDer::from(key),
+        ))
+        .unwrap();
+        // The SAN carries the TLS name the peers check.
+        assert!(
+            cert.windows(TLS_NAME.len())
+                .any(|w| w == TLS_NAME.as_bytes())
+        );
+        assert!(
+            identity_init(&root).is_err(),
+            "a second identity is refused"
+        );
+        assert_eq!(
+            identity_certificate(&root).unwrap(),
+            cert,
+            "the first identity is kept"
+        );
+        assert!(
+            fs::read_dir(&dir).unwrap().all(|e| !e
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .ends_with(".tmp"))
+        );
+    }
+
+    #[test]
     fn authenticated_corrupt_bundle_rejected_then_clean_retry_applies() {
         let temp = tempfile::Builder::new()
             .prefix("stack-lan-corrupt-")
@@ -920,7 +938,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(80));
         let config =
             ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
-                .with_safe_default_protocol_versions()
+                .with_protocol_versions(TLS_VERSIONS)
                 .unwrap()
                 .with_root_certificates(roots)
                 .with_client_auth_cert(cert, key)
@@ -930,6 +948,10 @@ mod tests {
         let name = ServerName::try_from(TLS_NAME).unwrap().to_owned();
         let mut tls = StreamOwned::new(ClientConnection::new(Arc::new(config), name).unwrap(), tcp);
         tls.conn.complete_io(&mut tls.sock).unwrap();
+        assert_eq!(
+            tls.conn.protocol_version(),
+            Some(rustls::ProtocolVersion::TLSv1_3)
+        );
         auth_peer(tls.conn.peer_certificates(), &policy).unwrap();
         hello(&mut tls, &local, &policy, true).unwrap();
         send_frame(&mut tls, b'B', b"corrupt exchange", MAX_BUNDLE).unwrap();
@@ -953,7 +975,7 @@ mod tests {
         local.frontier = None;
         let config =
             ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
-                .with_safe_default_protocol_versions()
+                .with_protocol_versions(TLS_VERSIONS)
                 .unwrap()
                 .with_root_certificates(roots)
                 .with_client_auth_cert(cert, key)

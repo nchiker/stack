@@ -91,7 +91,7 @@ final class LibraryArchive {
         boolean ready=false;
         db.beginTransaction();
         try {
-            JSONObject json=new JSONObject();json.put("format","org.stackdocs.library");json.put("version",3);json.put("schema",8);json.put("created_at",System.currentTimeMillis());
+            JSONObject json=new JSONObject();json.put("format","org.stackdocs.library");json.put("version",3);json.put("schema",8);json.put("created_at",Clock.now());
             json.put("documents",rows("documents",DOC,"id")); json.put("pages",rows("pages",PAGE,"document_id,position"));
             json.put("stacks",rows("stacks",STACK,"sort_order,rowid"));json.put("memberships",rows("document_stacks",MEMBER,"document_id,stack_id"));
             json.put("suggestions",rows("suggestions",SUGGESTION,"document_id"));json.put("choices",rows("suggestion_choices",CHOICE,"document_id,evidence,field"));

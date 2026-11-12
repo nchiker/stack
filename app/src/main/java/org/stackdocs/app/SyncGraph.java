@@ -197,7 +197,7 @@ final class SyncGraph {
             default:throw SyncProtocol.invalid("unsupported graph decision");}
     }
     static JSONObject project(JSONObject cells)throws IOException,JSONException {
-        JSONObject manifest=new JSONObject().put("format","org.stackdocs.library").put("version",3).put("schema",8).put("created_at",System.currentTimeMillis());
+        JSONObject manifest=new JSONObject().put("format","org.stackdocs.library").put("version",3).put("schema",8).put("created_at",Clock.now());
         for(String table:TABLES)manifest.put(table,new JSONArray());
         manifest.put("decision_evidence",new JSONObject());Set<String> docs=new HashSet<>();
         for(String key:SyncProtocol.keys(cells)) {

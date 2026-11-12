@@ -104,6 +104,7 @@ final class SyncExchange {
     }
     private JSONObject importFile(Staged staged,String reviewedLibrary,Collection<String> reviewedMembers,JSONObject review)throws IOException,JSONException {
         control.check();
+        store.snapshotBeforeSync();
         JSONObject header=staged.header;String library=header.getString("library"),sender=header.getString("sender"),local=store.replica();
         if(store.load()!=null)store.capture();
         SyncProtocol.State state=store.load();boolean adopting=state==null;JSONObject baseline=null;

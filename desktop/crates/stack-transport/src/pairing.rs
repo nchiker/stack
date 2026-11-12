@@ -278,12 +278,7 @@ pub fn device_labels(root: &Path) -> Result<Value> {
 }
 pub fn record_sync(root: &Path) -> Result<()> {
     let mut labels = device_labels(root)?;
-    labels["last_sync"] = json!(
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs()
-    );
+    labels["last_sync"] = json!(stack_core::clock::now_secs());
     write_private(
         &pairing_dir(root).join("names.json"),
         &serde_json::to_vec(&labels)?,
@@ -486,7 +481,7 @@ fn run_connected(
     .build()
     .map_err(|_| Error::Peer)?;
     let config = ServerConfig::builder_with_provider(provider)
-        .with_safe_default_protocol_versions()?
+        .with_protocol_versions(TLS_VERSIONS)?
         .with_client_cert_verifier(verifier)
         .with_single_cert(vec![cert], key)?;
     tcp.set_read_timeout(Some(

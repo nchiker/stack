@@ -1,0 +1,5 @@
+# Calendar time comes from stack_core::clock so tests can fix it (see that module).
+# Elapsed-time measurement uses std::time::Instant and is not affected.
+disallowed-methods = [
+    { path = "std::time::SystemTime::now", reason = "use stack_core::clock::now/now_millis/now_secs so tests can fix the time" },
+]

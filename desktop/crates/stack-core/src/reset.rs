@@ -21,6 +21,7 @@ const OWNED: &[&str] = &[
     "originals",
     "operations",
     "sync_blobs",
+    "sync_snapshots",
     "pairing/policy.json",
     "pairing/peer.der",
     "pairing/names.json",

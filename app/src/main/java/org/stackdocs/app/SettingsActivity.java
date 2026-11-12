@@ -34,14 +34,14 @@ public final class SettingsActivity extends LibraryActivity {
     private void updateCheck(){
         if(!UpdateCheck.enabled(this)){
             new AlertDialog.Builder(this).setTitle("Look for new versions?")
-                    .setMessage("Stack can ask github.com once a day whether a newer version is available. The request carries no documents or identifiers; GitHub sees your network address, as any website does.\n\nStack tells you and offers the download. It never installs anything by itself.")
+                    .setMessage("Stack can ask github.com once a day whether a newer version is available. The request carries no documents or identifiers; GitHub sees your network address, as any website does.\n\nStack tells you and offers the update. Android asks you before anything is installed.")
                     .setNegativeButton("Cancel",null).setPositiveButton("Turn on",(d,w) -> {UpdateCheck.setEnabled(this,true);UpdateCheck.checkNow(app(),null);refresh();}).show();
             return;
         }
         boolean available=UpdateCheck.available(this)||(!UpdateCheck.latest(this).isEmpty()&&UpdateCheck.newer(UpdateCheck.latest(this),UpdateCheck.installed(this)));
         AlertDialog.Builder dialog=new AlertDialog.Builder(this).setTitle("Update check").setMessage(UpdateCheck.status(this)+"\n\nYou have version "+UpdateCheck.installed(this)+".")
                 .setNeutralButton("Turn off",(d,w) -> {UpdateCheck.setEnabled(this,false);refresh();}).setNegativeButton("Close",null);
-        if(available&&!UpdateCheck.download(this).isEmpty())dialog.setPositiveButton("Download",(d,w) -> {try{startActivity(new Intent(Intent.ACTION_VIEW,android.net.Uri.parse(UpdateCheck.download(this))));}catch(android.content.ActivityNotFoundException none){Toast.makeText(this,"No browser is available",Toast.LENGTH_SHORT).show();}});
+        if(available&&!UpdateCheck.download(this).isEmpty())dialog.setPositiveButton("Update",(d,w) -> AppUpdater.start(this));
         else dialog.setPositiveButton("Check now",(d,w) -> {UpdateCheck.checkNow(app(),null);Toast.makeText(this,"Checking for updates",Toast.LENGTH_SHORT).show();});
         dialog.show();
     }

@@ -34,10 +34,10 @@ final class UpdateCheck {
     private static final Pattern APK = Pattern.compile("^Stack-(\\d+\\.\\d+\\.\\d+)\\.apk$");
     private static final AtomicBoolean running = new AtomicBoolean();
 
-    /** The newest Android release found: its version, its page and the APK's direct download ("" if unknown). */
+    /** The newest Android release found: version, page, the APK and SHA256SUMS downloads ("" if unknown), APK size. */
     static final class Release {
-        final String version, page, apk;
-        Release(String version, String page, String apk) { this.version = version; this.page = page; this.apk = apk; }
+        final String version, page, apk, sums; final long size;
+        Release(String version, String page, String apk, String sums, long size) { this.version = version; this.page = page; this.apk = apk; this.sums = sums; this.size = size; }
     }
 
     private UpdateCheck() {}
@@ -48,7 +48,7 @@ final class UpdateCheck {
 
     static void setEnabled(Context context, boolean on) {
         SharedPreferences.Editor edit = prefs(context).edit().putBoolean("enabled", on);
-        if (!on) edit.remove("latest").remove("page").remove("apk").remove("dismissed").remove("last_check").remove("last_attempt").remove("failed");
+        if (!on) edit.remove("latest").remove("page").remove("apk").remove("sums").remove("apk_size").remove("dismissed").remove("last_check").remove("last_attempt").remove("failed");
         edit.commit();
     }
 
@@ -61,7 +61,16 @@ final class UpdateCheck {
 
     static String page(Context context) { return prefs(context).getString("page", ""); }
 
-    /** Where Download goes: the APK itself when known, otherwise the release page. */
+    static String apk(Context context) { return prefs(context).getString("apk", ""); }
+    static String sums(Context context) { return prefs(context).getString("sums", ""); }
+    static long apkSize(Context context) { return prefs(context).getLong("apk_size", 0); }
+
+    /** Only files of this repository's releases are ever downloaded. */
+    static boolean isReleaseFile(String url) {
+        return url != null && url.startsWith(DOWNLOAD_PREFIX) && !url.contains("..") && !url.contains("?") && !url.contains("#");
+    }
+
+    /** Where the browser fallback goes: the APK itself when known, otherwise the release page. */
     static String download(Context context) {
         String apk = prefs(context).getString("apk", "");
         return apk.isEmpty() ? page(context) : apk;
@@ -93,7 +102,7 @@ final class UpdateCheck {
     static void checkIfDue(StackApplication app) {
         SharedPreferences p = prefs(app);
         if (!enabled(app)) return;
-        long now = System.currentTimeMillis(), checked = p.getLong("last_check", 0), attempt = p.getLong("last_attempt", 0);
+        long now = Clock.now(), checked = p.getLong("last_check", 0), attempt = p.getLong("last_attempt", 0);
         if (checked > now) checked = 0;
         if (attempt > now) attempt = 0;
         if (now - checked < INTERVAL || now - attempt < RETRY) return;
@@ -105,12 +114,13 @@ final class UpdateCheck {
         if (!enabled(app) || !running.compareAndSet(false, true)) { if (done != null) done.run(); return; }
         new Thread(() -> {
             SharedPreferences p = prefs(app);
-            p.edit().putLong("last_attempt", System.currentTimeMillis()).commit();
+            p.edit().putLong("last_attempt", Clock.now()).commit();
             try {
                 Release release = parse(fetch());
-                SharedPreferences.Editor edit = p.edit().putLong("last_check", System.currentTimeMillis()).remove("failed");
-                if (release == null) edit.remove("latest").remove("page").remove("apk");
-                else edit.putString("latest", release.version).putString("page", release.page).putString("apk", release.apk);
+                SharedPreferences.Editor edit = p.edit().putLong("last_check", Clock.now()).remove("failed");
+                if (release == null) edit.remove("latest").remove("page").remove("apk").remove("sums").remove("apk_size");
+                else edit.putString("latest", release.version).putString("page", release.page).putString("apk", release.apk)
+                        .putString("sums", release.sums).putLong("apk_size", release.size);
                 edit.commit();
             } catch (Exception offline) {
                 p.edit().putBoolean("failed", true).commit();
@@ -153,6 +163,12 @@ final class UpdateCheck {
         JSONObject release = new JSONObject(json);
         JSONArray assets = release.optJSONArray("assets");
         if (assets == null) return null;
+        String sums = "";
+        for (int i = 0; i < assets.length(); i++) {
+            JSONObject asset = assets.getJSONObject(i);
+            String url = asset.optString("browser_download_url", "");
+            if (asset.optString("name").equals("SHA256SUMS") && isReleaseFile(url) && url.endsWith("/SHA256SUMS")) sums = url;
+        }
         for (int i = 0; i < assets.length(); i++) {
             JSONObject asset = assets.getJSONObject(i);
             Matcher match = APK.matcher(asset.optString("name"));
@@ -160,8 +176,8 @@ final class UpdateCheck {
             String page = release.optString("html_url", "");
             if (!page.startsWith(PAGE_PREFIX)) page = PAGE_PREFIX + "latest";
             String apk = asset.optString("browser_download_url", "");
-            if (!apk.startsWith(DOWNLOAD_PREFIX) || !apk.endsWith("/" + match.group(0)) || apk.contains("..")) apk = "";
-            return new Release(match.group(1), page, apk);
+            if (!isReleaseFile(apk) || !apk.endsWith("/" + match.group(0))) apk = "";
+            return new Release(match.group(1), page, apk, apk.isEmpty() ? "" : sums, Math.max(0, asset.optLong("size", 0)));
         }
         return null;
     }

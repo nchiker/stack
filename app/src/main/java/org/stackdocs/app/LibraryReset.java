@@ -14,7 +14,7 @@ import java.util.*;
  * Old data is quarantined until the replacement database passes integrity checks. */
 final class LibraryReset {
     static final String ERASE="erase",CONNECTION="connection";
-    private static final String[] FILES={"consolidation_recovery","documents","incoming","archive_operations","batch_sources","photo_staging","sync_stage","sync_blobs","scan_draft","pairing/policy.json","pairing/policy.json.bak","pairing/policy.json.new","pairing/names.json","pairing/names.json.bak","pairing/names.json.new"};
+    private static final String[] FILES={"consolidation_recovery","documents","incoming","archive_operations","batch_sources","photo_staging","sync_stage","sync_blobs","sync_snapshots","scan_draft","pairing/policy.json","pairing/policy.json.bak","pairing/policy.json.new","pairing/names.json","pairing/names.json.bak","pairing/names.json.new"};
     interface Probe {void reached(String boundary)throws Exception;}
     Probe probe=boundary->{};
     private final Context context;private final AtomicFile request;private final File quarantine;

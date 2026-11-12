@@ -129,7 +129,7 @@ final class AutoBackup {
     static boolean due(Context context) {
         if (!enabled(context)) return false;
         SharedPreferences p = prefs(context);
-        long now = System.currentTimeMillis();
+        long now = Clock.now();
         long ok = p.getLong("last_ok", 0), attempt = p.getLong("last_attempt", 0);
         if (attempt > now) attempt = 0; // clock moved back
         if (ok > now) ok = 0;
@@ -152,12 +152,12 @@ final class AutoBackup {
             return;
         }
         SharedPreferences p = prefs(app);
-        p.edit().putLong("last_attempt", System.currentTimeMillis()).apply();
+        p.edit().putLong("last_attempt", Clock.now()).apply();
         boolean started;
         try {
             started = app.archives.exportToFolder(tree, keepDays(app), (ok, message, name, size) -> {
                 SharedPreferences.Editor edit = p.edit();
-                if (ok) edit.putLong("last_ok", System.currentTimeMillis()).remove("last_error").putString("upload_name", name).putLong("upload_size", size).putString("upload_state", "checking");
+                if (ok) edit.putLong("last_ok", Clock.now()).remove("last_error").putString("upload_name", name).putLong("upload_size", size).putString("upload_state", "checking");
                 else edit.putString("last_error", message == null || message.isEmpty() ? "The backup failed." : message);
                 edit.commit();
                 running.set(false);
@@ -224,10 +224,10 @@ final class AutoBackup {
         String state;
         if (settled) { state = "confirmed"; edit.remove("upload_name").remove("upload_size"); }
         else if (summary.toLowerCase(Locale.ROOT).startsWith("upload failed")) { state = "failed"; edit.putString("last_error", summary); }
-        else if (System.currentTimeMillis() - ok > 24L * 60 * 60 * 1000) { state = "failed"; edit.putString("last_error", listed ? "The upload did not finish within a day." : "The backup file never appeared in the folder."); }
+        else if (Clock.now() - ok > 24L * 60 * 60 * 1000) { state = "failed"; edit.putString("last_error", listed ? "The upload did not finish within a day." : "The backup file never appeared in the folder."); }
         else state = "uploading";
         edit.putString("upload_state", state);
-        if (state.equals("failed")) { edit.putLong("last_ok", 0).putLong("last_attempt", System.currentTimeMillis()).remove("upload_name").remove("upload_size"); }
+        if (state.equals("failed")) { edit.putLong("last_ok", 0).putLong("last_attempt", Clock.now()).remove("upload_name").remove("upload_size"); }
         edit.commit();
         app.notifySyncChanged();
         return state;
@@ -259,7 +259,7 @@ final class AutoBackup {
             }
         } catch (RuntimeException error) { return 0; }
         int removed = 0;
-        for (String id : expired(mine, keepDays, System.currentTimeMillis())) {
+        for (String id : expired(mine, keepDays, Clock.now())) {
             try {
                 if (DocumentsContract.deleteDocument(resolver, DocumentsContract.buildDocumentUriUsingTree(tree, id))) removed++;
             } catch (Exception ignored) { /* best effort; the provider may forbid deletes */ }

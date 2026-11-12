@@ -15,7 +15,8 @@ stack-core = { path = "crates/stack-core" }
 stack-archive = { path = "crates/stack-archive" }
 stack-render = { path = "crates/stack-render" }
 stack-transport = { path = "crates/stack-transport" }
-rustls = { version = "=0.23.46", default-features = false, features = ["std", "ring", "tls12"] }
+rustls = { version = "=0.23.46", default-features = false, features = ["std", "ring"] }
+rcgen = { version = "=0.14.10", default-features = false, features = ["crypto", "ring"] }
 image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
 flate2 = "=1.1.10"
 pdfium-render = { version = "=0.9.4", default-features = false, features = ["pdfium_7881", "image_025", "thread_safe"] }

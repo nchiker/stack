@@ -17,7 +17,7 @@ final class BatchStore {
     String create(String kind,List<String> sources,List<String> documents) {
         if(sources.isEmpty()||sources.size()>LIMIT)throw new IllegalArgumentException("Select between 1 and 50 documents.");
         SQLiteDatabase db=library.database();String id=UUID.randomUUID().toString();db.beginTransaction();
-        try{ContentValues op=new ContentValues();op.put("id",id);op.put("kind",kind);op.put("created_at",System.currentTimeMillis());db.insertOrThrow("operations",null,op);
+        try{ContentValues op=new ContentValues();op.put("id",id);op.put("kind",kind);op.put("created_at",Clock.now());db.insertOrThrow("operations",null,op);
             for(int i=0;i<sources.size();i++){ContentValues item=new ContentValues();item.put("operation_id",id);item.put("position",i);item.put("source",sources.get(i));item.put("document_id",documents==null?UUID.randomUUID().toString():documents.get(i));db.insertOrThrow("operation_items",null,item);}db.setTransactionSuccessful();return id;
         }finally{db.endTransaction();}
     }

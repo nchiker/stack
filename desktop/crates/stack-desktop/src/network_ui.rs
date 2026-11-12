@@ -304,11 +304,7 @@ impl Stack {
         let last = status["labels"]["last_sync"]
             .as_u64()
             .map(|time| {
-                let ago = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs()
-                    .saturating_sub(time);
+                let ago = stack_core::clock::now_secs().saturating_sub(time);
                 if ago < 60 {
                     "Last sync: just now".to_owned()
                 } else if ago < 3600 {

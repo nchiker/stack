@@ -93,3 +93,14 @@ tasks.register('verifyQrDependency') {
     }
 }
 tasks.named('preBuild').configure { dependsOn 'verifyQrDependency' }
+
+// Calendar time must come from Clock.now() so checks can fix it (see Clock.java).
+tasks.register('checkClockUse') {
+    def sources = fileTree('src/main/java') { include '**/*.java'; exclude '**/Clock.java' }
+    inputs.files(sources)
+    doLast {
+        def offenders = sources.files.findAll { it.text.contains('System.currentTimeMillis()') || it.text.contains('new Date()') }
+        if (!offenders.isEmpty()) throw new GradleException('Use Clock.now() for calendar time (checks can fix it): ' + offenders*.name.join(', '))
+    }
+}
+preBuild.dependsOn 'checkClockUse'

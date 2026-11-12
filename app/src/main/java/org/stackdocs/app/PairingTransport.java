@@ -96,7 +96,7 @@ final class PairingTransport {
     String identityInit()throws Exception {
         KeyStore keys=keys();if(!keys.containsAlias(alias)) {
             KeyPairGenerator generator=KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC,"AndroidKeyStore");
-            long now=System.currentTimeMillis();byte[] serial=new byte[16];new SecureRandom().nextBytes(serial);
+            long now=Clock.now();byte[] serial=new byte[16];new SecureRandom().nextBytes(serial);
             generator.initialize(new KeyGenParameterSpec.Builder(alias,KeyProperties.PURPOSE_SIGN|KeyProperties.PURPOSE_VERIFY)
                 .setAlgorithmParameterSpec(new ECGenParameterSpec("secp256r1"))
                 // Conscrypt hashes TLS's CertificateVerify message itself and
@@ -259,7 +259,7 @@ final class PairingTransport {
             ||!state.members.contains(local)||!state.members.contains(policy.getString("peer_replica")))
             throw new IOException("Network transport requires the frozen two-member group");
         JSONObject hello=new JSONObject().put("version",1).put("group",policy.getString("group")).put("replica",local);
-        if(System.currentTimeMillis()>=plainHelloUntil)hello.put("frontier",SyncProtocol.json(state.frontier));
+        if(Clock.now()>=plainHelloUntil)hello.put("frontier",SyncProtocol.json(state.frontier));
         return hello;
     }
 
@@ -279,6 +279,13 @@ final class PairingTransport {
         return tls;
     }
 
+    /** Sync and pairing use TLS 1.3 only, as the computer does; Android 7-9 cannot speak it. */
+    static void tls13Only(SSLSocket socket)throws IOException {
+        if(android.os.Build.VERSION.SDK_INT<29||!Arrays.asList(socket.getSupportedProtocols()).contains("TLSv1.3"))
+            throw new IOException("Computer sync needs Android 10 or newer");
+        socket.setEnabledProtocols(new String[]{"TLSv1.3"});
+    }
+
     /** Must be called from the app's foreground IO executor after an explicit
      * user action. A manual address is used; no background discovery is active. */
     JSONObject syncNow(String host,int port)throws Exception {
@@ -286,7 +293,7 @@ final class PairingTransport {
     }
     JSONObject syncNow(String host,int port,SessionControl control)throws Exception {
         try{return session(host,port,control);}
-        catch(HelloRefused refused){plainHelloUntil=System.currentTimeMillis()+15*60*1000L;return session(host,port,control);}
+        catch(HelloRefused refused){plainHelloUntil=Clock.now()+15*60*1000L;return session(host,port,control);}
     }
     private JSONObject session(String host,int port,SessionControl control)throws Exception {
         if(Looper.myLooper()==Looper.getMainLooper())throw new IOException("Run Sync now on the foreground IO executor");
@@ -299,7 +306,7 @@ final class PairingTransport {
             raw.connect(new InetSocketAddress(host,port),8000);raw.setSoTimeout(TIMEOUT_MS);
             try(SSLSocket socket=(SSLSocket)tls.getSocketFactory().createSocket(raw,TLS_NAME,port,true)) {
                 socket.setSoTimeout(TIMEOUT_MS);
-                socket.setEnabledProtocols(Arrays.stream(socket.getSupportedProtocols()).filter(value->value.equals("TLSv1.2")||value.equals("TLSv1.3")).toArray(String[]::new));
+                tls13Only(socket);
                 SSLParameters parameters=socket.getSSLParameters();parameters.setEndpointIdentificationAlgorithm("HTTPS");socket.setSSLParameters(parameters);
                 socket.startHandshake();
                 Certificate[] peerChain=socket.getSession().getPeerCertificates();

@@ -531,8 +531,8 @@ public final class MainActivity extends LibraryActivity {
     }
     private void updateNoticeActions(){
         new AlertDialog.Builder(this).setTitle("Stack "+UpdateCheck.latest(this)+" is available")
-                .setMessage("You have "+UpdateCheck.installed(this)+". Tap Download, then open the file to update. Your documents stay.")
-                .setPositiveButton("Download",(d,w) -> openLink(UpdateCheck.download(this)))
+                .setMessage("You have "+UpdateCheck.installed(this)+". Update keeps your documents.")
+                .setPositiveButton("Update",(d,w) -> AppUpdater.start(this))
                 .setNegativeButton("What's new",(d,w) -> openLink(UpdateCheck.page(this)))
                 .setNeutralButton("Not for this version",(d,w) -> {UpdateCheck.dismiss(this);refresh();}).show();
     }

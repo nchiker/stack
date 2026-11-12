@@ -30,7 +30,7 @@ final class ArchiveController {
             try {
                 writeArchive(destination);
                 boolean recorded;
-                try{recorded=BackupHistory.completed(app,System.currentTimeMillis());}catch(RuntimeException ignored){recorded=false;}
+                try{recorded=BackupHistory.completed(app,Clock.now());}catch(RuntimeException ignored){recorded=false;}
                 message="Library backup saved. Keep it private; the archive is not encrypted."+(recorded?"":" The backup date could not be saved.");state="success";
             } catch(Exception error) {
                 // A selected provider may not permit deletion or atomic replacement.
@@ -55,12 +55,12 @@ final class ArchiveController {
             try {
                 android.content.ContentResolver resolver=app.getContentResolver();
                 Uri folder=DocumentsContract.buildDocumentUriUsingTree(tree,DocumentsContract.getTreeDocumentId(tree));
-                String name=AutoBackup.newName(System.currentTimeMillis());
+                String name=AutoBackup.newName(Clock.now());
                 file=DocumentsContract.createDocument(resolver,folder,"application/octet-stream",name);
                 if(file==null)throw new IOException("The folder does not accept new files. Choose another folder.");
                 size=writeArchive(file);
                 int removed=AutoBackup.prune(resolver,tree,name,keepDays);
-                try{BackupHistory.completed(app,System.currentTimeMillis());}catch(RuntimeException ignored){}
+                try{BackupHistory.completed(app,Clock.now());}catch(RuntimeException ignored){}
                 message="Library backup saved as "+name+"."+(removed>0?" Removed "+removed+" older automatic "+(removed==1?"backup.":"backups."):"")
                         +" Keep it private; the archive is not encrypted. If the folder belongs to a cloud app, that app finishes the upload.";
                 state="success";done.finished(true,message,name,size);

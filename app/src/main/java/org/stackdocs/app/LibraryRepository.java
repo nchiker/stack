@@ -76,7 +76,7 @@ final class LibraryRepository {
             File[] plans=new File(context.getCacheDir(),"pdf_plans").listFiles();if(plans!=null)for(File file:plans)deleteTree(file);
             File[] exports = new File(context.getCacheDir(), "exports").listFiles();
             if (exports != null) for (File file : exports) {
-                if (System.currentTimeMillis() - file.lastModified() > 86_400_000L) deleteTree(file);
+                if (Clock.now() - file.lastModified() > 86_400_000L) deleteTree(file);
             }
         } catch (IOException | RuntimeException error) {
             initializationError = new IllegalStateException("The local library could not be opened. "
@@ -247,7 +247,7 @@ final class LibraryRepository {
                 values.put("title", title);
                 values.put("title_origin", "filename");
                 values.put("mime", mime);
-                values.put("added_at", System.currentTimeMillis());
+                values.put("added_at", Clock.now());
                 values.put("page_count", pages);
                 values.put("initial_page_count", pages);
                 database.insertOrThrow("documents", null, values);
@@ -287,7 +287,7 @@ final class LibraryRepository {
             // The source has already been saved; an optional provider name must not prevent import.
         }
         name = name.replaceAll("[\\p{Cntrl}]", " ").trim().replaceFirst("(?i)\\.(pdf|jpe?g|png|webp)$", "");
-        if (name.isEmpty()) name = "Document · " + DateFormat.getDateInstance().format(new Date());
+        if (name.isEmpty()) name = "Document · " + DateFormat.getDateInstance().format(new Date(Clock.now()));
         return name.substring(0, Math.min(name.length(), 200));
     }
 
@@ -445,7 +445,7 @@ final class LibraryRepository {
                 values.put("title_origin", titleChosen ? "manual" : draft.choiceTracking ? "default" : "legacy");
                 values.put("filing_origin", filingChosen ? "manual" : draft.choiceTracking ? "default" : "legacy");
                 values.put("title_decision",titleChosen ? 1 : 0); values.put("filing_decision",filingChosen ? 1 : 0);
-                values.put("mime", "application/x-stack-scan"); values.put("added_at", System.currentTimeMillis());
+                values.put("mime", "application/x-stack-scan"); values.put("added_at", Clock.now());
                 values.put("page_count", draft.pages.size()); values.put("initial_page_count", draft.pages.size());
                 values.put("source_scan_id", draft.id);
                 database.insertOrThrow("documents", null, values);
@@ -567,7 +567,7 @@ final class LibraryRepository {
         if (!UUID.fromString(id).toString().equals(id)) throw new IllegalArgumentException("Invalid document identifier.");
         SQLiteDatabase database = db();
         if (!exists(database, id)) return;
-        database.execSQL("INSERT OR IGNORE INTO trash(document_id,deleted_at) VALUES(?,?)", new Object[]{id, System.currentTimeMillis()});
+        database.execSQL("INSERT OR IGNORE INTO trash(document_id,deleted_at) VALUES(?,?)", new Object[]{id, Clock.now()});
     }
 
     /** Puts a trashed document back exactly as it was. */
@@ -596,7 +596,7 @@ final class LibraryRepository {
         return doomed.size();
     }
 
-    int purgeExpiredTrash() { return purgeTrash(System.currentTimeMillis() - TRASH_KEEP_MILLIS); }
+    int purgeExpiredTrash() { return purgeTrash(Clock.now() - TRASH_KEEP_MILLIS); }
 
     void createStack(String name) {
         ContentValues values = new ContentValues();

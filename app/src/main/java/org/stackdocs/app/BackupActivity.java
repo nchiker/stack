@@ -104,7 +104,7 @@ public final class BackupActivity extends LibraryActivity {
     }
     private void pick(boolean saving) {
         Intent intent=new Intent(saving?Intent.ACTION_CREATE_DOCUMENT:Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/octet-stream");
-        if(saving) intent.putExtra(Intent.EXTRA_TITLE,"Stack-"+new SimpleDateFormat("yyyy-MM-dd-HHmmss",Locale.ROOT).format(new Date())+".stackbackup");
+        if(saving) intent.putExtra(Intent.EXTRA_TITLE,"Stack-"+new SimpleDateFormat("yyyy-MM-dd-HHmmss",Locale.ROOT).format(new Date(Clock.now()))+".stackbackup");
         else intent.setType("*/*");
         try{startActivityForResult(intent,saving?BACKUP:RESTORE);}catch(ActivityNotFoundException error){new AlertDialog.Builder(this).setMessage("No document provider is available. Install or enable a local document picker, then retry.").setPositiveButton("OK",null).show();}
     }

@@ -27,6 +27,8 @@ final class FeatureChecks {
         scanChecks(target, mark);
         nudgeChecks(target, mark);
         retentionChecks(target, mark);
+        syncSafetyCopyChecks(target, mark);
+        clockChecks(target, mark);
     }
 
     private static void updateChecks(Consumer<String> mark) throws Exception {
@@ -57,7 +59,21 @@ final class FeatureChecks {
         require(evil != null && evil.apk.isEmpty(), "APK link outside this repository is dropped (Download falls back to the page)");
         UpdateCheck.Release other = UpdateCheck.parse("{\"html_url\":\"" + page + "\",\"assets\":[{\"name\":\"Stack-0.14.0.apk\",\"browser_download_url\":\"https://github.com/nchiker/stack/releases/download/v0.14.0/Other.apk\"}]}");
         require(other != null && other.apk.isEmpty(), "APK link must name the same file");
-        mark.accept("Update check: version order, GitHub release parsing, desktop-only and foreign links, direct APK link");
+        String sumsUrl = "https://github.com/nchiker/stack/releases/download/v0.14.0/SHA256SUMS";
+        UpdateCheck.Release full = UpdateCheck.parse("{\"html_url\":\"" + page + "\",\"assets\":[{\"name\":\"SHA256SUMS\",\"browser_download_url\":\"" + sumsUrl + "\"},{\"name\":\"Stack-0.14.0.apk\",\"size\":31572873,\"browser_download_url\":\"" + apk + "\"}]}");
+        require(full != null && full.sums.equals(sumsUrl) && full.size == 31572873L, "checksum file and APK size are read");
+        UpdateCheck.Release foreignSums = UpdateCheck.parse("{\"html_url\":\"" + page + "\",\"assets\":[{\"name\":\"SHA256SUMS\",\"browser_download_url\":\"https://example.com/SHA256SUMS\"},{\"name\":\"Stack-0.14.0.apk\",\"browser_download_url\":\"" + apk + "\"}]}");
+        require(foreignSums != null && foreignSums.sums.isEmpty(), "a checksum file outside this repository is ignored");
+        require(UpdateCheck.isReleaseFile(apk) && !UpdateCheck.isReleaseFile("https://github.com/nchiker/stack/releases/download/../x.apk")
+                && !UpdateCheck.isReleaseFile("https://github.com/other/stack/releases/download/v1/Stack-1.0.0.apk")
+                && !UpdateCheck.isReleaseFile("http://github.com/nchiker/stack/releases/download/v1/Stack-1.0.0.apk"), "only this repository's https release files");
+        String hash = "439b1939cb667a77bf42ff31ea8fd2f8e2fd838dd45a28d534777dc1257f4e87";
+        require(hash.equals(AppUpdater.parseSums(hash + "  Stack-0.14.0.apk\n", "Stack-0.14.0.apk")), "checksum line is read");
+        require(hash.equals(AppUpdater.parseSums("other  x\n" + hash.toUpperCase(java.util.Locale.ROOT) + " *Stack-0.14.0.apk", "Stack-0.14.0.apk")), "binary-mode line and upper case");
+        require(AppUpdater.parseSums(hash + "  Stack-0.13.0.apk\n", "Stack-0.14.0.apk") == null, "a different file's checksum is not used");
+        require(AppUpdater.parseSums("abc  Stack-0.14.0.apk\n", "Stack-0.14.0.apk") == null, "a malformed checksum is not used");
+        require(AppUpdater.fileName(apk).equals("Stack-0.14.0.apk"), "file name from the link");
+        mark.accept("Update check: version order, GitHub release parsing, desktop-only and foreign links, direct APK link, checksum file");
     }
 
     private static void duplicateChecks(Instrumentation instrumentation, Context target, Consumer<String> mark) throws Exception {
@@ -251,6 +267,62 @@ final class FeatureChecks {
             require(AutoBackup.keepDays(target) == 180, "turning automatic backup off keeps the choice");
             mark.accept("Backup retention: 1 month/3 months/forever/long pause/pending/odd names/stored choice");
         } finally { AutoBackup.prefs(target).edit().clear().commit(); }
+    }
+
+    /** Date decisions read Clock.now(), so a fixed clock gives the same answer on every run. */
+    private static void clockChecks(Context target, Consumer<String> mark) {
+        long day = 24L * 60 * 60 * 1000, fixedNow = 1_800_000_000_000L;
+        target.getSharedPreferences("backup_history", Context.MODE_PRIVATE).edit().clear().commit();
+        target.getSharedPreferences("backup_nudge", Context.MODE_PRIVATE).edit().clear().commit();
+        AutoBackup.prefs(target).edit().clear().commit();
+        try (Clock.Fixed clock = Clock.fix(fixedNow)) {
+            require(Clock.now() == fixedNow, "the clock is fixed");
+            require(BackupHistory.completed(target, fixedNow - 45 * day), "record a backup 45 days ago");
+            require(BackupNudge.message(target, 3).equals("Last backup was 45 days ago"), "reminder reads the fixed clock");
+            clock.advance(10 * day);
+            require(BackupNudge.message(target, 3).equals("Last backup was 55 days ago"), "advancing the clock ages the backup");
+            BackupNudge.snooze(target);
+            require(BackupNudge.message(target, 3).isEmpty(), "snoozed at the fixed time");
+            clock.advance(8 * day);
+            require(!BackupNudge.message(target, 3).isEmpty(), "the snooze ends a week later on the fixed clock");
+        } finally {
+            target.getSharedPreferences("backup_history", Context.MODE_PRIVATE).edit().clear().commit();
+            target.getSharedPreferences("backup_nudge", Context.MODE_PRIVATE).edit().clear().commit();
+        }
+        require(Math.abs(Clock.now() - System.currentTimeMillis()) < 60_000, "closing returns to real time");
+        mark.accept("Clock: reminder and snooze follow a fixed clock; closing returns to real time");
+    }
+
+    /** Before an incoming sync applies, the database is copied; three copies are kept; a failed copy stops the sync. */
+    private static void syncSafetyCopyChecks(Context target, Consumer<String> mark) throws Exception {
+        Context isolated = new ScannerChecks.IsolatedContext(target);
+        LibraryRepository repository = new LibraryRepository(isolated);
+        repository.initialize();
+        android.database.sqlite.SQLiteDatabase db = repository.database();
+        db.execSQL("INSERT INTO documents(id,title,mime,added_at,page_count,initial_page_count) VALUES(?,?,?,?,?,?)", new Object[]{"before", "Before sync", "application/pdf", 1L, 1, 1});
+        SyncStore store = new SyncStore(isolated, repository);
+        java.io.File first = store.snapshotBeforeSync();
+        db.execSQL("INSERT INTO documents(id,title,mime,added_at,page_count,initial_page_count) VALUES(?,?,?,?,?,?)", new Object[]{"after", "After sync", "application/pdf", 2L, 1, 1});
+        java.io.File restored = new java.io.File(isolated.getCacheDir(), "restored.db");
+        java.nio.file.Files.copy(new java.io.File(first, "library.db").toPath(), restored.toPath());
+        java.io.File wal = new java.io.File(first, "library.db-wal");
+        if (wal.isFile()) java.nio.file.Files.copy(wal.toPath(), new java.io.File(restored.getPath() + "-wal").toPath());
+        try (android.database.sqlite.SQLiteDatabase copy = android.database.sqlite.SQLiteDatabase.openDatabase(restored.getPath(), null, android.database.sqlite.SQLiteDatabase.OPEN_READWRITE | android.database.sqlite.SQLiteDatabase.ENABLE_WRITE_AHEAD_LOGGING);
+             android.database.Cursor c = copy.rawQuery("SELECT group_concat(id) FROM documents", null)) {
+            require(c.moveToFirst() && "before".equals(c.getString(0)), "the copy holds the library as it was: " + c.getString(0));
+        }
+        for (int i = 0; i < 4; i++) store.snapshotBeforeSync();
+        java.io.File dir = new java.io.File(isolated.getFilesDir(), SyncStore.SNAPSHOTS);
+        String[] kept = dir.list((parent, name) -> name.startsWith("library-"));
+        require(kept != null && kept.length == 3, "three copies are kept");
+        require(!new java.io.File(dir, ".partial").exists(), "no partial copy is left");
+        LibraryArchive.remove(dir);
+        require(dir.createNewFile(), "block the copy folder");
+        try { store.snapshotBeforeSync(); require(false, "a failed copy must stop the sync"); }
+        catch (java.io.IOException expected) { require(expected.getMessage().contains("safety copy"), "plain message: " + expected.getMessage()); }
+        try (android.database.Cursor c = db.rawQuery("SELECT count(*) FROM documents", null)) { c.moveToFirst(); require(c.getInt(0) == 2, "the library is untouched"); }
+        repository.closeForReset();
+        mark.accept("Sync safety copy: taken before applying, opens with the old state, newest three kept, failure stops the sync");
     }
 
     /** A version 9 library (no trash table) opens, upgrades to 10 and keeps its documents. */

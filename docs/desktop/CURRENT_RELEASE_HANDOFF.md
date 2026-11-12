@@ -1,5 +1,35 @@
 # Current release — 2026-11-11 (Android 0.14.0 published; Flatpak 0.2.0)
 
+## Unreleased (after 0.14.0): sync hardening, fixed clocks, in-app update
+
+Chosen by the owner from the Recipe-Stack comparison (2026-11-11), plus Financial's update idea.
+- **Certificates**: desktop identities come from rcgen (ring) in-process, no `openssl` binary. Same profile as before
+  (P-256, CN "Stack paired device", SAN stackdocs.local, CA:FALSE, EKU server+client, 10 years, files 0600).
+- **TLS 1.3 only**: `TLS_VERSIONS` in stack-transport for every rustls config (the `tls12` feature is dropped);
+  phone `PairingTransport.tls13Only` for sync and Nearby pairing. Android 7-9 get "Computer sync needs Android 10 or
+  newer" (owner accepted). Existing pairings keep working (both sides already negotiated 1.3).
+- **Safety copy before applying a sync**: desktop `Library::snapshot_before_sync` (VACUUM INTO) and phone
+  `SyncStore.snapshotBeforeSync` (library.db + WAL copied under the write lock) write `sync_snapshots/` (desktop:
+  library root, `library-<ms>.sqlite3`; phone: filesDir, `library-<ms>/library.db[-wal]`), keep 3, and apply nothing if
+  the copy fails. Originals are not copied (content-addressed, never overwritten). Reset erases them. No restore UI:
+  to restore by hand, stop the app and put the copy back as library.sqlite3 / library.db (+ -wal), deleting -shm.
+- **Fixed clocks**: calendar time only via `stack_core::clock` (desktop; `clippy.toml` refuses SystemTime::now) and
+  `Clock.now()` (phone; the `checkClockUse` Gradle task, run before every build, refuses System.currentTimeMillis()
+  and new Date()). Tests fix it with `clock::fixed(ms)` / `Clock.fix(ms)`. Monotonic timeouts (Instant,
+  SystemClock.elapsedRealtime) stay real so a frozen clock cannot hang a wait.
+- **In-app update** (`AppUpdater`, `InstallResultReceiver`, REQUEST_INSTALL_PACKAGES): Home/Settings "Update" downloads
+  the release APK and SHA256SUMS (only https URLs under github.com/nchiker/stack/releases/download/, size-capped and
+  matched to the release's asset size), checks SHA-256 while saving and again while writing the PackageInstaller
+  session, then Android asks. First time, Android's "Allow from this source" for Stack is needed (the owner taps it).
+  "Use browser" stays as the fallback. EVERY RELEASE MUST ATTACH `SHA256SUMS` listing `Stack-x.y.z.apk`.
+- Tests: desktop workspace 112 passed / 0 failed / 5 ignored; clippy (incl. the clock rule) and fmt clean; real
+  phone↔desktop `test_android_sync.py --transport --recovery` 16/16 over LAN with the new certs and TLS 1.3; phone
+  `features` 15/15 (new: safety copy, clock, update/checksum parsing), syncAuto, syncUi, archiveOnly, backupLayout
+  (autosync copy) and backupUi, navigationOnly (plain `org.stackdocs.app.checks` copy, which those two require).
+  End to end on the 4a: a 0.13.9-labelled build updated itself to the published 0.14.0 release through Update (owner
+  tapped "Allow from this source" and Android's Update).
+- The desktop Flatpak is still 0.2.0: the desktop-side changes reach the owner only with a new Flatpak build.
+
 ## Android 0.14.0 (versionCode 28, published 2026-11-11): updates like Filen Files
 
 Release APK `Stack-0.14.0.apk` (SHA-256 `439b1939…4e87`, signer `e873f2fd…e311`), staged in

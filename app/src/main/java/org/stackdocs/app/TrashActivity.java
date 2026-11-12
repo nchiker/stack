@@ -49,7 +49,7 @@ public final class TrashActivity extends LibraryActivity {
         intro.setTextColor(Ui.MUTED);
         intro.setPadding(0, 0, 0, Ui.dp(this, 12));
         body.addView(intro);
-        long now = System.currentTimeMillis();
+        long now = Clock.now();
         for (LibraryRepository.Trashed item : items) {
             long ageDays = Math.max(0, (now - item.deletedAt) / (24L * 60 * 60 * 1000));
             long leftDays = Math.max(0, (LibraryRepository.TRASH_KEEP_MILLIS - (now - item.deletedAt) + 24L * 60 * 60 * 1000 - 1) / (24L * 60 * 60 * 1000));

@@ -1,5 +1,6 @@
 //! Desktop-independent domain bounds, persistent repository and archive operations.
 mod browsing;
+pub mod clock;
 mod editing;
 mod interchange;
 pub mod library;

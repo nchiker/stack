@@ -1,6 +1,11 @@
 //! Explicit group adoption and file exchange use the same serialized writer as
 //! edits. Portable backups never carry this causal state or enroll a replica.
 use crate::library::{Error, Library, Result, meta, put_meta, read_graph, write_graph};
+
+/// Folder (in the library root) for the database copies taken before a sync applies.
+pub(crate) const SYNC_SNAPSHOTS: &str = "sync_snapshots";
+/// How many pre-sync copies are kept, newest first.
+pub(crate) const SNAPSHOT_KEEP: usize = 3;
 use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Value, json};
 use stack_sync::{
@@ -1104,6 +1109,51 @@ impl Library {
     /// For baseline adoption, the user reviews the exact library and complete
     /// member list. Existing nonempty libraries cannot be silently identified by
     /// hashes, names, archives or matching legacy IDs.
+    /// A consistent copy of the library database (not the originals: incoming
+    /// originals are content-addressed and never overwrite a file) taken before
+    /// any incoming exchange is applied. If it cannot be written, nothing is
+    /// applied. The newest [`SNAPSHOT_KEEP`] are kept in `sync_snapshots/`.
+    pub(crate) fn snapshot_before_sync(&self) -> Result<std::path::PathBuf> {
+        let dir = self.root.join(SYNC_SNAPSHOTS);
+        let partial = dir.join(".snapshot.partial");
+        let written = (|| -> Result<std::path::PathBuf> {
+            crate::library::private_dir(&dir)?;
+            let stamp = crate::clock::now_millis();
+            let mut target = dir.join(format!("library-{stamp:016}.sqlite3"));
+            let mut extra = 1;
+            while target.exists() {
+                target = dir.join(format!("library-{stamp:016}-{extra}.sqlite3"));
+                extra += 1;
+            }
+            let _ = fs::remove_file(&partial);
+            let text = partial
+                .to_str()
+                .ok_or(Error::Invalid("Library path is not valid text"))?;
+            self.db.execute("VACUUM INTO ?1", [text])?;
+            fs::set_permissions(&partial, fs::Permissions::from_mode(0o600))?;
+            stack_archive::read_regular(&partial)?.sync_all()?;
+            fs::rename(&partial, &target)?;
+            stack_archive::sync_directory(&dir)?;
+            Ok(target)
+        })();
+        let Ok(target) = written else {
+            let _ = fs::remove_file(&partial);
+            return Err(Error::Invalid(
+                "Could not save a safety copy of the library before syncing; nothing was changed",
+            ));
+        };
+        let mut kept: Vec<_> = fs::read_dir(&dir)?
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.starts_with("library-") && name.ends_with(".sqlite3"))
+            .collect();
+        kept.sort_unstable_by(|a, b| b.cmp(a));
+        for old in kept.iter().skip(SNAPSHOT_KEEP) {
+            let _ = fs::remove_file(dir.join(old));
+        }
+        Ok(target)
+    }
+
     pub fn sync_import(
         &mut self,
         path: &Path,
@@ -1134,6 +1184,7 @@ impl Library {
         review: Option<&Value>,
         control: &stack_archive::Control,
     ) -> Result<Value> {
+        self.snapshot_before_sync()?;
         let snapshot = stage
             .parent()
             .ok_or(Error::Invalid("Missing private sync staging"))?
