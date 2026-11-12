@@ -1,6 +1,12 @@
-# Current release — 2026-11-11 (Android 0.14.0 published; Flatpak 0.2.0)
+# Current release — 2026-11-11 (Android 0.15.0 published; Flatpak 0.2.0)
 
-## Unreleased (after 0.14.0): sync hardening, fixed clocks, in-app update
+## Android 0.15.0 (versionCode 29, published 2026-11-11): sync hardening, fixed clocks, in-app update
+
+Release APK `Stack-0.15.0.apk` (SHA-256 `db2b9ca6…8e996`, signer `e873f2fd…e311`, not minified), staged in
+`.artifacts/stack-release-20261111-v0.15.0/`; installed on the 4a over 0.14.0: Home, Settings (Update check "On · Up to
+date"), Backup & restore (Automatic backup, Keep backups) fine, no crash. The first in-app update the owner will see is
+0.15.0 -> 0.16.0 (0.14.0 still uses the browser download).
+
 
 Chosen by the owner from the Recipe-Stack comparison (2026-11-11), plus Financial's update idea.
 - **Certificates**: desktop identities come from rcgen (ring) in-process, no `openssl` binary. Same profile as before
