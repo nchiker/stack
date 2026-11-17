@@ -1,4 +1,29 @@
-# Current release — 2026-11-11 (Android 0.15.0, Desktop 0.3.0 via the Flatpak repository)
+# Current release — 2026-11-17 (Desktop 0.4.0 published to the Flatpak repository; Android 0.16.0 APK built and staged, not yet released or installed; last released Android: 0.15.0)
+
+## Android 0.16.0 (versionCode 30) and Desktop 0.4.0: stack overlap chips (2026-11-17)
+
+- Open a stack and a chip row lists the other stacks that share documents with it, most shared first, with the shared
+  count (House: `Receipts (16) · Bills (5)`). Tapping a chip narrows the list to the overlap (heading `House › Bills`);
+  tapping it again, or Back, clears it. It is a live view of existing stack memberships: no schema, sync or backup
+  change, nothing stored. Documents in Recently deleted (Android) or removed documents (desktop) are not counted.
+- Android: `LibraryRepository.overlappingStacks` and a stack-pair `documents(...)` overload; chip row in `MainActivity`.
+  Built and checked by hand on the test Pixel 4a (debug build installed over 0.15.0, data kept). No release APK built.
+- Desktop: `Library::overlapping_stacks` / `search_in` in stack-core, `Message::Overlap`, chip row in `workspace.rs`.
+  New test `repository::tests::overlapping_stacks_match_the_narrowed_search`. Workspace tests, fmt and Clippy on
+  stack-core/stack-desktop pass. Desktop UI checked with the app's own window capture on a throwaway library (chip row,
+  `İnvoices › Receipts` heading with the chip highlighted, Back button). `stack-transport` localhost tests are timing-sensitive (fixed 80 ms sleep before
+  connecting) and failed twice when run alongside other heavy builds; they pass on a quiet machine.
+- **Desktop 0.4.0 published 2026-11-17** with `publish_flatpak_repo.py --push` (site commit b5d8ff8, Pages build
+  "built"); Flatpak commit dad3876d… (parent f2f0e173…, the 0.3.0 commit); a throwaway ostree remote with the public key
+  pulled its metadata with signature checking on. Bundle `.artifacts/stack-desktop-20261117-v0.4.0/Stack-0.4.0-x86_64.flatpak`.
+  This computer's installed copy has not been updated yet (`flatpak update --user org.stackdocs.desktop`).
+- **Android 0.16.0 APK** built with the development key (signer `e873f2fd…e311` verified, versionCode 30), staged in
+  `.artifacts/stack-release-20261117-v0.16.0/Stack-0.16.0.apk` (SHA-256 `e0a3da2c…cd2e`). Not installed on either
+  phone and no GitHub release created. The production phone's in-app update only sees a newer release once one is
+  published as the latest GitHub release.
+- Chips only show overlaps for documents filed in both stacks; there are no free-form tags (tags in Stack are
+  Organization details).
+
 
 ## Desktop 0.3.0 (2026-11-11): signed Flatpak repository, updates through flatpak/app store
 

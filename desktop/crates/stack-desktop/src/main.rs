@@ -312,6 +312,8 @@ struct Stack {
     opening_document: Option<String>,
     selected: Option<DocumentView>,
     filter: Option<String>,
+    also: Option<String>,
+    overlaps: Vec<stack_core::StackOverlap>,
     query: String,
     sort: Option<Sort>,
     stacks: Vec<stack_core::StackSummary>,
@@ -368,6 +370,8 @@ enum Message {
     LayoutSaved(Result<Response, String>),
     Information(bool),
     Back,
+    /// Narrow the open stack to documents also in this stack; `None` clears it.
+    Overlap(Option<String>),
     BrowserScrolled(f32),
     Previous,
     Next,
@@ -451,6 +455,8 @@ impl cosmic::Application for Stack {
             opening_document: None,
             selected: None,
             filter: None,
+            also: None,
+            overlaps: Vec::new(),
             query: String::new(),
             sort: None,
             stacks: Vec::new(),
@@ -591,6 +597,7 @@ impl cosmic::Application for Stack {
                 navigation::Location::Stack(id) => Some(id),
                 _ => None,
             };
+            self.also = None;
             self.rebuild_navigation();
             return self.browse();
         }
@@ -858,6 +865,7 @@ impl Stack {
         self.repository_request(Request::Browse {
             query: self.query.clone(),
             stack: self.filter.clone(),
+            also: self.filter.as_ref().and(self.also.clone()),
             sort: self.sort,
         })
     }
@@ -1060,6 +1068,12 @@ impl Stack {
                 }
             }
             Message::Back => return self.go_back(),
+            Message::Overlap(also) => {
+                self.also = also;
+                self.browse_offset = 0;
+                self.browse_scroll = 0.;
+                return self.browse();
+            }
             Message::LibraryMenu(open) => self.library_menu_open = open,
             Message::RefreshBrowser => {
                 self.library_menu_open = false;
@@ -1201,6 +1215,7 @@ impl Stack {
                     Ok(Response::Browser {
                         stacks,
                         hits,
+                        overlaps,
                         revision,
                         sort,
                         grid,
@@ -1246,8 +1261,19 @@ impl Stack {
                             .is_some_and(|id| !self.stacks.iter().any(|s| &s.id == id))
                         {
                             self.filter = None;
+                            self.also = None;
                             return self.refresh_browser();
                         }
+                        if self
+                            .also
+                            .as_ref()
+                            .is_some_and(|id| !overlaps.iter().any(|o| &o.stack_id == id))
+                        {
+                            // The shared documents moved or were deleted: show the whole stack.
+                            self.also = None;
+                            return self.refresh_browser();
+                        }
+                        self.overlaps = overlaps;
                         self.rebuild_navigation();
                         self.hits = hits;
                         self.browse_offset = self.browse_offset.min(

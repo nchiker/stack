@@ -16,11 +16,49 @@ pub struct SearchHit {
     pub page_id: Option<String>,
 }
 
+/// Another stack that shares documents with a chosen stack.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StackOverlap {
+    pub stack_id: String,
+    pub count: usize,
+}
+
 impl Library {
+    /// Other stacks whose documents are also in `stack`, most shared first.
+    pub fn overlapping_stacks(&self, stack: &str) -> Result<Vec<StackOverlap>> {
+        let mut statement = self.db.prepare(
+            "WITH m AS (SELECT o.document_id AS doc, json_extract(o.payload,'$.stack_id') AS stack FROM objects o WHERE o.kind='memberships' AND o.active=1) \
+             SELECT b.stack, COUNT(DISTINCT a.doc) AS total FROM m a JOIN m b ON b.doc=a.doc AND b.stack<>a.stack \
+             JOIN documents d ON d.id=a.doc AND d.active=1 \
+             JOIN objects s ON s.kind='stacks' AND s.active=1 AND json_extract(s.payload,'$.id')=b.stack \
+             WHERE a.stack=?1 GROUP BY b.stack ORDER BY total DESC, b.stack",
+        )?;
+        let rows = statement.query_map(params![stack], |r| {
+            Ok(StackOverlap {
+                stack_id: r.get(0)?,
+                count: r.get::<_, i64>(1)? as usize,
+            })
+        })?;
+        rows.collect::<std::result::Result<_, _>>()
+            .map_err(Into::into)
+    }
+
     pub fn search(
         &self,
         query: &str,
         stack: Option<&str>,
+        sort: Sort,
+        limit: u32,
+    ) -> Result<Vec<SearchHit>> {
+        self.search_in(query, stack, None, sort, limit)
+    }
+
+    /// Like [`Library::search`], but documents must also be in `also` when it is given.
+    pub fn search_in(
+        &self,
+        query: &str,
+        stack: Option<&str>,
+        also: Option<&str>,
         sort: Sort,
         limit: u32,
     ) -> Result<Vec<SearchHit>> {
@@ -44,7 +82,7 @@ impl Library {
             Sort::Name => "s.title COLLATE NOCASE,d.id",
         };
         let mut sql = String::from(
-            "SELECT d.id,s.title FROM document_search s JOIN documents d ON d.id=s.document_id WHERE d.active=1 AND (?1 IS NULL OR EXISTS(SELECT 1 FROM objects o WHERE o.kind='memberships' AND o.active=1 AND o.document_id=d.id AND json_extract(o.payload,'$.stack_id')=?1))",
+            "SELECT d.id,s.title FROM document_search s JOIN documents d ON d.id=s.document_id WHERE d.active=1 AND (?1 IS NULL OR EXISTS(SELECT 1 FROM objects o WHERE o.kind='memberships' AND o.active=1 AND o.document_id=d.id AND json_extract(o.payload,'$.stack_id')=?1)) AND (?4 IS NULL OR EXISTS(SELECT 1 FROM objects o WHERE o.kind='memberships' AND o.active=1 AND o.document_id=d.id AND json_extract(o.payload,'$.stack_id')=?4))",
         );
         if !expression.is_empty() {
             sql.push_str(" AND document_search MATCH ?2");
@@ -53,7 +91,7 @@ impl Library {
         }
         sql.push_str(&format!(" ORDER BY {order} LIMIT ?3"));
         let mut statement = self.db.prepare(&sql)?;
-        let rows = statement.query_map(params![stack, expression, limit], |r| {
+        let rows = statement.query_map(params![stack, expression, limit, also], |r| {
             Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
         })?;
         let mut hits = Vec::new();

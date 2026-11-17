@@ -23,6 +23,7 @@ pub enum Request {
     Browse {
         query: String,
         stack: Option<String>,
+        also: Option<String>,
         sort: Option<Sort>,
     },
     Select {
@@ -91,6 +92,7 @@ pub enum Response {
     Browser {
         stacks: Vec<StackSummary>,
         hits: Vec<SearchHit>,
+        overlaps: Vec<stack_core::StackOverlap>,
         revision: i64,
         sort: Sort,
         grid: Option<bool>,
@@ -256,14 +258,29 @@ pub fn start_operations(
                 Request::Operation(request) => Ok(Response::Operation(
                     crate::operations::repository(library, &operations, request)?,
                 )),
-                Request::Browse { query, stack, sort } => {
+                Request::Browse {
+                    query,
+                    stack,
+                    also,
+                    sort,
+                } => {
                     let chosen = sort.unwrap_or_else(|| {
                         preferences
                             .as_ref()
                             .and_then(|path| crate::preferences::load(path).ok())
                             .unwrap_or(Sort::Newest)
                     });
-                    let hits = library.search(&query, stack.as_deref(), chosen, 1000)?;
+                    let hits = library.search_in(
+                        &query,
+                        stack.as_deref(),
+                        also.as_deref(),
+                        chosen,
+                        1000,
+                    )?;
+                    let overlaps = match stack.as_deref() {
+                        Some(id) => library.overlapping_stacks(id)?,
+                        None => Vec::new(),
+                    };
                     if sort.is_some()
                         && let Some(path) = &preferences
                         && crate::preferences::load(path).ok() != Some(chosen)
@@ -275,6 +292,7 @@ pub fn start_operations(
                     Ok(Response::Browser {
                         stacks: library.stacks()?,
                         hits,
+                        overlaps,
                         revision: library.revision()?,
                         sort: chosen,
                         grid: preferences
@@ -474,6 +492,93 @@ mod tests {
     }
 
     #[test]
+    fn overlapping_stacks_match_the_narrowed_search() {
+        struct FixtureBytes;
+        impl stack_archive::SourceVerifier for FixtureBytes {
+            fn verify(
+                &self,
+                _path: &std::path::Path,
+                _mime: &str,
+                _pages: Option<u32>,
+            ) -> stack_archive::Result<()> {
+                Ok(())
+            }
+        }
+        let directory = tempfile::tempdir().unwrap();
+        let fixture = directory.path().join("fixture");
+        stack_archive::synthetic::create(&fixture, [b"pdf", b"jpeg", b"png", b"webp"]).unwrap();
+        let mut library = Library::open(&directory.path().join("library")).unwrap();
+        let staged = library
+            .stage_archive(
+                &mut std::fs::File::open(fixture.join("format-3.stackbackup")).unwrap(),
+                &FixtureBytes,
+                &stack_archive::Control::default(),
+            )
+            .unwrap();
+        let plan = library.review_archive(&staged).unwrap();
+        library
+            .commit_archive(&plan, &stack_archive::Control::default())
+            .unwrap();
+        // File one document in two stacks so there is a real overlap to find.
+        let stacks = library.stacks().unwrap();
+        let (first, second) = (stacks[0].id.clone(), stacks[1].id.clone());
+        let document = library.search("", None, Sort::Newest, 1).unwrap()[0]
+            .document_id
+            .clone();
+        for stack in [&first, &second] {
+            let token = library.token(&document).unwrap();
+            library
+                .edit_document(
+                    &token,
+                    stack_core::DocumentEdit::Membership {
+                        stack: stack.clone(),
+                        selected: true,
+                    },
+                    &stack_archive::Control::default(),
+                )
+                .unwrap();
+        }
+        let shared = library.overlapping_stacks(&first).unwrap();
+        assert!(shared.iter().any(|o| o.stack_id == second && o.count >= 1));
+        let narrowed = library
+            .search_in("", Some(&first), Some(&second), Sort::Newest, 1000)
+            .unwrap();
+        assert!(narrowed.iter().any(|h| h.document_id == document));
+        let mut checked = 0;
+        for stack in library.stacks().unwrap() {
+            let overlaps = library.overlapping_stacks(&stack.id).unwrap();
+            assert!(
+                overlaps
+                    .iter()
+                    .all(|o| o.stack_id != stack.id && o.count > 0)
+            );
+            for overlap in overlaps {
+                let hits = library
+                    .search_in(
+                        "",
+                        Some(&stack.id),
+                        Some(&overlap.stack_id),
+                        Sort::Newest,
+                        1000,
+                    )
+                    .unwrap();
+                assert_eq!(
+                    hits.len(),
+                    overlap.count,
+                    "{} + {}",
+                    stack.id,
+                    overlap.stack_id
+                );
+                checked += 1;
+            }
+        }
+        assert!(
+            checked >= 2,
+            "both directions of the shared pair are checked"
+        );
+    }
+
+    #[test]
     fn composed_search_selects_saved_matching_page_and_sort_survives_worker_restart() {
         struct FixtureBytes;
         impl stack_archive::SourceVerifier for FixtureBytes {
@@ -517,6 +622,7 @@ mod tests {
                 .submit(Request::Browse {
                     query: query.into(),
                     stack: Some("custom-first".into()),
+                    also: None,
                     sort: Some(Sort::Name),
                 })
                 .blocking_recv()
@@ -584,6 +690,7 @@ mod tests {
         Request::Browse {
             query: String::new(),
             stack: None,
+            also: None,
             sort: None,
         }
     }

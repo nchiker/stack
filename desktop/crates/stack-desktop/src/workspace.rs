@@ -214,8 +214,9 @@ impl Stack {
                 .push(widget::space::vertical().height((row_count - end) as f32 * row_height));
         }
         widget::container(
-            widget::column::with_capacity(3)
+            widget::column::with_capacity(4)
                 .push(toolbar)
+                .push_maybe(self.overlap_chips())
                 .push_maybe((self.hits.len() > RESULTS_PER_PAGE).then(|| {
                     widget::column::with_capacity(3)
                         .spacing(8)
@@ -572,6 +573,38 @@ impl Stack {
             .class(cosmic::theme::Container::Transparent)
             .height(iced::Length::Fill)
             .into()
+    }
+
+    /// Other stacks sharing documents with the open stack; the chosen one narrows the list.
+    fn overlap_chips(&self) -> Option<Element<'_, Message>> {
+        if self.filter.is_none() || self.overlaps.is_empty() {
+            return None;
+        }
+        let mut chips = widget::row::with_capacity(self.overlaps.len())
+            .spacing(8)
+            .align_y(iced::Alignment::Center);
+        for overlap in &self.overlaps {
+            let Some(stack) = self.stacks.iter().find(|s| s.id == overlap.stack_id) else {
+                continue;
+            };
+            let on = self.also.as_ref() == Some(&stack.id);
+            let label = format!("{} ({})", stack.name, overlap.count);
+            let chip = if on {
+                widget::button::suggested(label).on_press(Message::Overlap(None))
+            } else {
+                widget::button::standard(label).on_press(Message::Overlap(Some(stack.id.clone())))
+            };
+            chips = chips.push(chip);
+        }
+        Some(
+            widget::scrollable(chips)
+                .direction(iced::widget::scrollable::Direction::Horizontal(
+                    iced::widget::scrollable::Scrollbar::new()
+                        .width(4)
+                        .scroller_width(4),
+                ))
+                .into(),
+        )
     }
 
     pub fn membership_chips(&self, names: &[String]) -> Element<'_, Message> {

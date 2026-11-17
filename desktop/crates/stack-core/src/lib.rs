@@ -15,7 +15,7 @@ pub use interchange::{
     FrozenSnapshot, IdMappings, ImportWork, OutputWork, RestorePlan, RestoreReceipt, SnapshotWork,
     StagedImport,
 };
-pub use search::{SearchHit, Sort};
+pub use search::{SearchHit, Sort, StackOverlap};
 pub use text::{TEXT_CONFIG, TextJob, TextOutput, TextStatus};
 
 pub const APP_ID: &str = "org.stackdocs.desktop";

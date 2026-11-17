@@ -112,6 +112,10 @@ final class LibraryRepository {
         return documents(query,stackId,organization,"newest");
     }
     List<Document> documents(String query, String stackId,String organization,String order) {
+        return documents(query,stackId,null,organization,order);
+    }
+    /** Documents in {@code stackId} that are also in {@code alsoStackId} (either may be null). */
+    List<Document> documents(String query, String stackId,String alsoStackId,String organization,String order) {
         StringBuilder sql = new StringBuilder("SELECT d.*, (SELECT group_concat(m.stack_id) "
                 + "FROM document_stacks m WHERE m.document_id=d.id) AS memberships, ");
         String match = searchTerms(query);
@@ -130,6 +134,10 @@ final class LibraryRepository {
             sql.append("AND EXISTS (SELECT 1 FROM document_stacks m WHERE m.document_id=d.id AND m.stack_id=?) ");
             arguments.add(stackId);
         }
+        if (alsoStackId != null) {
+            sql.append("AND EXISTS (SELECT 1 FROM document_stacks m2 WHERE m2.document_id=d.id AND m2.stack_id=?) ");
+            arguments.add(alsoStackId);
+        }
         if(organization!=null){sql.append("AND EXISTS (SELECT 1 FROM document_tags t WHERE t.document_id=d.id AND t.tag_id=?) ");arguments.add(organization);}
         sql.append("name".equals(order)?"ORDER BY d.title COLLATE NOCASE, d.title, d.id":"ORDER BY d.added_at DESC, d.id");
         List<Document> result = new ArrayList<>();
@@ -138,6 +146,21 @@ final class LibraryRepository {
                 Document found = readDocument(cursor);
                 result.add(searching ? searchContext(found,match) : found);
             }
+        }
+        return result;
+    }
+
+    /** Other stacks that share documents with {@code stackId}, most shared first (trashed documents ignored). */
+    List<StackCategory> overlappingStacks(String stackId) {
+        List<StackCategory> result = new ArrayList<>();
+        try (Cursor cursor = db().rawQuery("SELECT s.id,s.name,s.color,s.visible,COUNT(*) AS total "
+                + "FROM document_stacks a JOIN document_stacks b ON b.document_id=a.document_id AND b.stack_id<>a.stack_id "
+                + "JOIN stacks s ON s.id=b.stack_id "
+                + "WHERE a.stack_id=? AND a.document_id NOT IN (SELECT document_id FROM trash) "
+                + "GROUP BY s.id ORDER BY total DESC, s.name COLLATE NOCASE", new String[]{stackId})) {
+            while (cursor.moveToNext()) result.add(new StackCategory(string(cursor, "id"),
+                    string(cursor, "name"), integer(cursor, "color"), integer(cursor, "visible") == 1,
+                    integer(cursor, "total")));
         }
         return result;
     }

@@ -62,11 +62,19 @@ impl Stack {
     }
 
     pub fn library_location(&self) -> String {
-        self.filter
-            .as_ref()
-            .and_then(|id| self.stacks.iter().find(|s| &s.id == id))
-            .map(|s| s.name.clone())
-            .unwrap_or_else(|| "All documents".into())
+        let name = |id: &String| {
+            self.stacks
+                .iter()
+                .find(|s| &s.id == id)
+                .map(|s| s.name.clone())
+        };
+        match self.filter.as_ref().and_then(name) {
+            Some(stack) => match self.also.as_ref().and_then(name) {
+                Some(also) => format!("{stack} › {also}"),
+                None => stack,
+            },
+            None => "All documents".into(),
+        }
     }
 
     pub fn can_go_back(&self) -> bool {
@@ -75,6 +83,7 @@ impl Stack {
             || self.editor_open
             || self.selected.is_some()
             || self.opening_document.is_some()
+            || self.also.is_some()
     }
 
     pub fn go_back(&mut self) -> app::Task<Message> {
@@ -100,6 +109,12 @@ impl Stack {
         if self.selected.is_some() || self.opening_document.is_some() {
             let browse = self.browse();
             return self.restore_list_position(browse);
+        }
+        if self.also.is_some() {
+            self.also = None;
+            self.browse_offset = 0;
+            let refresh = self.refresh_browser();
+            return self.restore_list_position(refresh);
         }
         app::Task::none()
     }

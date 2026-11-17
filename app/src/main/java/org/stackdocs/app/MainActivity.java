@@ -37,6 +37,7 @@ public final class MainActivity extends LibraryActivity {
     private List<StackCategory> categories = new ArrayList<>();
     private String tab = "home";
     private String stackId;
+    private String alsoStackId;
     private final java.util.LinkedHashSet<String> selected=new java.util.LinkedHashSet<>();
     private android.widget.Button selection;
     private android.widget.Button updateNotice;
@@ -75,12 +76,13 @@ public final class MainActivity extends LibraryActivity {
         if (state != null) {
             tab = state.getString("tab", "home");
             stackId = state.getString("stack");
+            alsoStackId = state.getString("also_stack");
             shareConsumed = state.getBoolean("shareConsumed");
             seenImport=state.getString("seen_import", "");
         }
         if(state==null) {
             android.content.SharedPreferences navigation=getSharedPreferences("navigation",MODE_PRIVATE);
-            tab=navigation.getString("tab","home");stackId=navigation.getString("stack",null);
+            tab=navigation.getString("tab","home");stackId=navigation.getString("stack",null);alsoStackId=navigation.getString("also_stack",null);
         }
         organization=state!=null?state.getString("organization"):getSharedPreferences("navigation",MODE_PRIVATE).getString("organization",null);
         documentSort="name".equals(getSharedPreferences("navigation",MODE_PRIVATE).getString("document_sort","newest"))?"name":"newest";
@@ -104,7 +106,7 @@ public final class MainActivity extends LibraryActivity {
 
     @Override protected void onPause() {
         if(search!=null)getSharedPreferences("navigation",MODE_PRIVATE).edit().putString("tab",tab)
-                .putString("stack",stackId).putString("organization",organization).putString("query",search.getText().toString()).apply();
+                .putString("stack",stackId).putString("also_stack",alsoStackId).putString("organization",organization).putString("query",search.getText().toString()).apply();
         super.onPause();
     }
 
@@ -113,6 +115,7 @@ public final class MainActivity extends LibraryActivity {
         state.putString("tab", tab);
         state.putString("organization",organization);
         state.putString("stack", stackId);
+        state.putString("also_stack", alsoStackId);
         state.putString("query", search.getText().toString());
         state.putBoolean("shareConsumed", shareConsumed);
         state.putString("seen_import",seenImport);
@@ -254,7 +257,7 @@ public final class MainActivity extends LibraryActivity {
 
     private void selectTab(String value) {
         hideAddMenu(); hideKeyboard(); search.clearFocus();
-        tab = value; stackId = null; search.setText(""); refresh();
+        tab = value; stackId = null; alsoStackId = null; search.setText(""); refresh();
     }
 
     private void updateSearchChrome() {
@@ -276,6 +279,7 @@ public final class MainActivity extends LibraryActivity {
         final String query = search.getText().toString().trim();
         final String filter = stackId;
         final String orgFilter=organization;
+        final String alsoFilter=alsoStackId;
         final boolean homeTab=tab.equals("home");
         final String selectedOrder=documentSort;
         progress.setVisibility(View.VISIBLE);
@@ -287,7 +291,10 @@ public final class MainActivity extends LibraryActivity {
             String org=orgs.containsKey(orgFilter)?orgFilter:null;
             boolean recent=homeTab&&(!present||filter==null)&&org==null&&query.isEmpty();
             String order=recent?"newest":selectedOrder;
-            return new Snapshot(catalog,app().library.documents(query,present?filter:null,org,order),orgs,org,app().library.documentCount());
+            List<StackCategory> overlaps=present&&filter!=null?app().library.overlappingStacks(filter):new ArrayList<>();
+            String also=null;for(StackCategory overlap:overlaps)if(overlap.id.equals(alsoFilter))also=alsoFilter;
+            Snapshot built=new Snapshot(catalog,app().library.documents(query,present?filter:null,also,org,order),orgs,org,app().library.documentCount());
+            built.overlaps=overlaps;built.also=also;return built;
         }, snapshot -> {
             if (generation != requestGeneration) return;
             boolean update=UpdateCheck.available(this);
@@ -295,14 +302,14 @@ public final class MainActivity extends LibraryActivity {
             updateNotice.setVisibility(update?View.VISIBLE:View.GONE);
             selection.setText(selected.size()+" selected · Actions");
             selection.setVisibility(selected.isEmpty()?View.GONE:View.VISIBLE);
-            categories = snapshot.categories;organization=snapshot.organization;
+            categories = snapshot.categories;organization=snapshot.organization;alsoStackId=snapshot.also;
             filterIcon.setImageDrawable(new Icons(Icons.Symbol.FILTER,stackId==null&&organization==null?Ui.MUTED:Ui.BLUE));
             filters.setContentDescription("Filter documents"+(stackId==null?"":" · Stack filter active")+(organization==null?"":" · "+snapshot.orgs.get(organization)));
             filterIcon.setBackground(Ui.rounded(this,stackId==null&&organization==null?Ui.DOCUMENT_BG:0xFFE8F0FE,16));
             rows.clear();
             StackCategory current = null;
             for (StackCategory category : categories) if (category.id.equals(stackId)) current = category;
-            if(stackId!=null && current==null)stackId=null;
+            if(stackId!=null && current==null){stackId=null;alsoStackId=null;}
             boolean showingStacks = tab.equals("home") && stackId == null && organization==null && query.isEmpty();
             if (showingStacks) {
                 rows.add(new Header("Your Stacks", "Edit", this::manageStacks));
@@ -316,7 +323,9 @@ public final class MainActivity extends LibraryActivity {
                 if (!snapshot.documents.isEmpty()) rows.add(new Header("Recent documents", null, null));
             } else if (current != null && query.isEmpty()) {
                 StackCategory selected = current;
-                rows.add(new Header(selected.name, "Edit", () -> editStack(selected)));
+                String alsoName=null;for(StackCategory overlap:snapshot.overlaps)if(overlap.id.equals(alsoStackId))alsoName=overlap.name;
+                rows.add(new Header(alsoName==null?selected.name:selected.name+" › "+alsoName, "Edit", () -> editStack(selected)));
+                if(!snapshot.overlaps.isEmpty())rows.add(new OverlapRow(snapshot.overlaps));
             } else rows.add(new Header(query.isEmpty() ? "All documents" : "Search results", documentSort.equals("name")?"Name ▾":"Newest ▾", this::sortDocuments));
             int max = showingStacks ? Math.min(6, snapshot.documents.size()) : snapshot.documents.size();
             int columns = Math.max(2, getResources().getConfiguration().screenWidthDp / 180);
@@ -426,8 +435,8 @@ public final class MainActivity extends LibraryActivity {
             new AlertDialog.Builder(this).setTitle("Filter documents").setItems(new String[]{"Organization", "Stack / category", "Clear all filters"},(d,w) -> {
                 if(w==0)new AlertDialog.Builder(this).setTitle("Organization").setItems(labels.toArray(new String[0]),(dialog,index) -> {organization=index==0?null:ids.get(index-1);refresh();}).setNegativeButton("Cancel",null).show();
                 else if(w==1){List<String> names=new ArrayList<>();names.add("Clear stack filter");for(StackCategory category:categories)names.add("Stack · "+category.name);
-                    new AlertDialog.Builder(this).setTitle("Stack / category").setItems(names.toArray(new String[0]),(dialog,index) -> {stackId=index==0?null:categories.get(index-1).id;refresh();}).setNegativeButton("Cancel",null).show();}
-                else{organization=null;stackId=null;refresh();}
+                    new AlertDialog.Builder(this).setTitle("Stack / category").setItems(names.toArray(new String[0]),(dialog,index) -> {stackId=index==0?null:categories.get(index-1).id;alsoStackId=null;refresh();}).setNegativeButton("Cancel",null).show();}
+                else{organization=null;stackId=null;alsoStackId=null;refresh();}
             }).setNegativeButton("Cancel",null).show();
         });
     }
@@ -467,7 +476,8 @@ public final class MainActivity extends LibraryActivity {
     private void back() {
         if (addMenu.getVisibility() == View.VISIBLE) { hideAddMenu(); return; }
         if (search.hasFocus() || search.length() > 0) { hideKeyboard(); search.clearFocus(); search.setText(""); updateSearchChrome(); return; }
-        if (stackId != null) { stackId = null; refresh(); return; }
+        if (alsoStackId != null) { alsoStackId = null; refresh(); return; }
+        if (stackId != null) { stackId = null; alsoStackId = null; refresh(); return; }
         if (!tab.equals("home")) { selectTab("home"); return; }
         finish();
     }
@@ -600,7 +610,7 @@ public final class MainActivity extends LibraryActivity {
                                     .setPositiveButton("Delete", (confirm, which) -> work(() -> {
                                         app().library.deleteStack(category.id); return true;
                                     }, ignored -> {
-                                        if (category.id.equals(stackId)) stackId = null;
+                                        if (category.id.equals(stackId)) { stackId = null; alsoStackId = null; }
                                         refresh();
                                     })).setNegativeButton("Cancel", null).show();
                         }).setNegativeButton("Cancel", null).show();
@@ -611,6 +621,7 @@ public final class MainActivity extends LibraryActivity {
         final List<Document> documents;
         final java.util.LinkedHashMap<String,String> orgs;final String organization;
         final int total;
+        List<StackCategory> overlaps = new ArrayList<>();String also;
         Snapshot(List<StackCategory> categories, List<Document> documents,java.util.LinkedHashMap<String,String> orgs,String organization,int total) { this.categories = categories; this.documents = documents;this.orgs=orgs;this.organization=organization;this.total=total; }
     }
     private static final class Header {
@@ -622,6 +633,10 @@ public final class MainActivity extends LibraryActivity {
         final List<StackCategory> stacks;
         final int columns;
         StackRow(List<StackCategory> stacks, int columns) { this.stacks = stacks; this.columns = columns; }
+    }
+    private static final class OverlapRow {
+        final List<StackCategory> stacks;
+        OverlapRow(List<StackCategory> stacks) { this.stacks = stacks; }
     }
     private static final class DocumentRow {
         final List<Document> documents;
@@ -654,10 +669,35 @@ public final class MainActivity extends LibraryActivity {
         tile.setContentDescription(category == null ? "Create a new stack" : category.name + ", " + category.count + " documents");
         tile.setOnClickListener(view -> {
             if (category == null) createStack();
-            else { hideAddMenu(); hideKeyboard(); search.clearFocus(); stackId = category.id; refresh(); list.setSelection(0); }
+            else { hideAddMenu(); hideKeyboard(); search.clearFocus(); stackId = category.id; alsoStackId = null; refresh(); list.setSelection(0); }
         });
         if (category != null) tile.setOnLongClickListener(view -> { editStack(category); return true; });
         return tile;
+    }
+
+    /** Chips for the other stacks that share documents with the open stack; tap one to narrow, tap it again to clear. */
+    private View overlapChips(OverlapRow group) {
+        android.widget.HorizontalScrollView scroll = new android.widget.HorizontalScrollView(this);
+        scroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout chips = Ui.row(this);
+        chips.setPadding(Ui.dp(this, 8), Ui.dp(this, 4), Ui.dp(this, 8), Ui.dp(this, 8));
+        for (StackCategory stack : group.stacks) {
+            boolean on = stack.id.equals(alsoStackId);
+            TextView chip = Ui.text(this, stack.name + " (" + stack.count + ")", 14, on);
+            chip.setTextColor(on ? Ui.BLUE : Ui.MUTED);
+            chip.setSingleLine(true);
+            chip.setPadding(Ui.dp(this, 14), Ui.dp(this, 8), Ui.dp(this, 14), Ui.dp(this, 8));
+            chip.setBackground(Ui.outlined(this, on ? 0xFFE8F0FE : Color.WHITE, on ? Ui.BLUE : 0xFFE8EAED, 16, on ? 2 : 1));
+            chip.setFocusable(true);
+            chip.setSelected(on);
+            chip.setContentDescription((on ? "Selected, " : "") + stack.name + ", " + stack.count + (stack.count == 1 ? " shared document" : " shared documents") + (on ? ". Tap to clear." : ""));
+            chip.setOnClickListener(view -> { alsoStackId = on ? null : stack.id; refresh(); });
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, -2);
+            params.setMarginEnd(Ui.dp(this, 8));
+            chips.addView(chip, params);
+        }
+        scroll.addView(chips);
+        return scroll;
     }
 
     private View documentTile(Document document, boolean result) {
@@ -699,7 +739,7 @@ public final class MainActivity extends LibraryActivity {
         @Override public Object getItem(int position) { return rows.get(position); }
         @Override public long getItemId(int position) { return position; }
         @Override public boolean areAllItemsEnabled() { return false; }
-        @Override public boolean isEnabled(int position) { return !(rows.get(position) instanceof String); }
+        @Override public boolean isEnabled(int position) { return !(rows.get(position) instanceof String || rows.get(position) instanceof OverlapRow); }
         @Override public View getView(int position, View recycled, ViewGroup parent) {
             Object item = rows.get(position);
             if (item instanceof Header) {
@@ -711,6 +751,7 @@ public final class MainActivity extends LibraryActivity {
                 if (header.action != null) row.addView(Ui.button(MainActivity.this, header.action, header.click));
                 return row;
             }
+            if (item instanceof OverlapRow) return overlapChips((OverlapRow) item);
             if (item instanceof Document) return documentTile((Document) item, true);
             if (item instanceof String) {
                 LinearLayout empty = Ui.column(MainActivity.this); empty.setGravity(Gravity.CENTER);
