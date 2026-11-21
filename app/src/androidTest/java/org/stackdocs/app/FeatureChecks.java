@@ -335,18 +335,20 @@ final class FeatureChecks {
             db.execSQL("INSERT INTO documents(id,title,mime,added_at,page_count,initial_page_count) VALUES(?,?,?,?,?,?)", new Object[]{id, "Upgrade specimen", "application/pdf", 1L, 1, 1});
             db.execSQL("DROP TRIGGER trash_cleanup");
             db.execSQL("DROP TABLE trash");
+            db.execSQL("DROP TABLE link_search");
+            db.execSQL("DROP TABLE link_records");
             db.setVersion(9);
         } finally { first.close(); }
         LibraryDatabase second = new LibraryDatabase(isolated);
         try {
             android.database.sqlite.SQLiteDatabase db = second.getWritableDatabase();
-            require(db.getVersion() == 10, "library upgrades from version 9 to 10");
+            require(db.getVersion() == 11, "library upgrades from version 9 to 11");
             try (android.database.Cursor c = db.rawQuery("SELECT title FROM documents WHERE id=?", new String[]{id})) { require(c.moveToFirst() && c.getString(0).equals("Upgrade specimen"), "documents survive the upgrade"); }
             db.execSQL("INSERT INTO trash(document_id,deleted_at) VALUES(?,1)", new Object[]{id});
             db.execSQL("DELETE FROM documents WHERE id=?", new Object[]{id});
             try (android.database.Cursor c = db.rawQuery("SELECT count(*) FROM trash", null)) { c.moveToFirst(); require(c.getInt(0) == 0, "cleanup trigger exists after the upgrade"); }
         } finally { second.close(); }
-        mark.accept("Trash: version 9 library upgrades to 10 with its documents and trigger");
+        mark.accept("Trash: version 9 library upgrades to 11 with its documents and trigger");
     }
 
     private static boolean contains(List<Document> documents, String id) {

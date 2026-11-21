@@ -22,11 +22,11 @@ android {
 
     defaultConfig {
         applicationId checksBuild ? 'org.stackdocs.app.checks' + (checksNamespace.isEmpty() ? '' : '.' + checksNamespace) : 'org.stackdocs.app'
-        manifestPlaceholders = [appLabel: checksBuild ? 'Stack Checks' : '@string/app_name']
+        manifestPlaceholders = [appLabel: checksBuild ? ('TEST Stack' + (checksNamespace.isEmpty() ? '' : ' ' + checksNamespace)) : '@string/app_name']
         minSdk 24
         targetSdk 36
-        versionCode 30
-        versionName '0.16.0'
+        versionCode 34
+        versionName '0.17.3'
         testInstrumentationRunner providers.gradleProperty('preservationProbe').isPresent() ? 'org.stackdocs.app.PreservationRunner' : 'org.stackdocs.app.ScannerChecks'
     }
 

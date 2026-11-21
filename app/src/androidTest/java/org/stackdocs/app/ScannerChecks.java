@@ -43,7 +43,7 @@ public final class ScannerChecks extends Instrumentation {
     private boolean features,backupLayout,navigationOnly,backupUi,archivePerformance,archiveOnly,archivePrepare,archiveResume;
     private String archiveBoundary;
     private Bundle syncArguments;
-    private boolean longWorkflow,workflowOnly,providerWorkflow,workflowUi,namingOnly;
+    private boolean longWorkflow,workflowOnly,providerWorkflow,workflowUi,namingOnly,linkContract,linkSeed,linkUnseed;
     private boolean suggestionPrepare,suggestionResume, suggestionUi, suggestionCorpus, suggestionsOnly, baseline, qualityOnly, ocrOnly, preserveOnly, restartPrepare, restartResume, corpusOnly;
 
     @Override public void onCreate(Bundle arguments) {
@@ -66,6 +66,9 @@ public final class ScannerChecks extends Instrumentation {
         providerWorkflow=arguments!=null && "true".equals(arguments.getString("providerWorkflow"));
         workflowUi=arguments!=null && "true".equals(arguments.getString("workflowUi"));
         namingOnly=arguments!=null && "true".equals(arguments.getString("namingOnly"));
+        linkContract=arguments!=null && "true".equals(arguments.getString("linkContract"));
+        linkSeed=arguments!=null && "true".equals(arguments.getString("linkSeed"));
+        linkUnseed=arguments!=null && "true".equals(arguments.getString("linkUnseed"));
         suggestionCorpusAsset=arguments==null ? "suggestions-corpus.json" : arguments.getString("suggestionCorpusAsset","suggestions-corpus.json");
         if(!suggestionCorpusAsset.equals("suggestions-corpus.json") && !suggestionCorpusAsset.equals("naming-followup-corpus.json") && !suggestionCorpusAsset.equals("p0-final-corpus.json")) throw new IllegalArgumentException("Unknown authored corpus");
         suggestionPrepare=arguments != null && "prepare".equals(arguments.getString("suggestionRestart"));
@@ -151,12 +154,15 @@ public final class ScannerChecks extends Instrumentation {
             else if(backupUi) BackupUiChecks.run(this,this::mark);
             else if(features) FeatureChecks.run(this,this::mark);
             else if(archivePerformance) ArchivePerformanceChecks.run(new IsolatedContext(getTargetContext()),this::mark);
-            else if(archiveOnly) {ArchiveChecks.run(new IsolatedContext(getTargetContext()),this::mark);PdfExportChecks.run(new IsolatedContext(getTargetContext()),this::mark);}
+            else if(archiveOnly) {ArchiveChecks.run(new IsolatedContext(getTargetContext()),this::mark);LinkArchiveChecks.run(new IsolatedContext(getTargetContext()),this::mark);EnvelopeChecks.run(this::mark);PdfExportChecks.run(new IsolatedContext(getTargetContext()),this::mark);}
             else if(longWorkflow) LongDocumentChecks.run(new IsolatedContext(getTargetContext()),this::mark);
             else if(workflowOnly) WorkflowRepositoryChecks.run(new IsolatedContext(getTargetContext()),this::mark);
             else if(providerWorkflow) ProviderWorkflowChecks.run(this,new IsolatedContext(getTargetContext()),this::mark);
             else if(workflowUi) WorkflowUiChecks.run(this,new IsolatedContext(getTargetContext()),this::mark);
             else if(namingOnly) NamingChecks.run(this::mark);
+            else if(linkContract) {LinkContractChecks.run(this::mark);LinkStoreChecks.run(new IsolatedContext(getTargetContext()),this::mark);LinkProviderChecks.run(getTargetContext(),this::mark);LinkUiChecks.run(getTargetContext(),new IsolatedContext(getTargetContext()),this::mark);}
+            else if(linkSeed) {LinkUiChecks.seed(getTargetContext());mark("Seeded two linked documents");}
+            else if(linkUnseed) {LinkUiChecks.unseed(getTargetContext(),(StackApplication)getTargetContext().getApplicationContext());mark("Removed seeded linked documents");}
             else if (restartPrepare || restartResume) OcrRestartChecks.run(new IsolatedContext(getTargetContext(),"ocr-restart-"+restartKey),restartPrepare,this::mark);
             else if (corpusOnly) OcrCorpusChecks.run(new IsolatedContext(getTargetContext()),this::mark);
             else if(suggestionPrepare || suggestionResume) SuggestionRestartChecks.run(new IsolatedContext(getTargetContext(),"suggestion-restart-"+restartKey),suggestionPrepare,this::mark);

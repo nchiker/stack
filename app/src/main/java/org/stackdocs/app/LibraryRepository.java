@@ -41,6 +41,7 @@ final class LibraryRepository {
     final SuggestionStore suggestions = new SuggestionStore(this::db);
     final BatchStore batches = new BatchStore(this);
     final MetadataStore metadata = new MetadataStore(this::db,suggestions);
+    final LinkStore links;
     SQLiteDatabase database() { return db(); }
     private Runnable suggestionChanged = () -> {};
     void suggestionsAvailable() { if(!db().inTransaction())suggestionChanged.run(); }
@@ -53,6 +54,7 @@ final class LibraryRepository {
         helper = new LibraryDatabase(context);
         originals = new File(context.getFilesDir(), "documents");
         incoming = new File(context.getFilesDir(), "incoming");
+        links = new LinkStore(this::db, new File(context.getFilesDir(), "links"));
     }
 
     void initialize() {
@@ -839,7 +841,7 @@ final class LibraryRepository {
         }
     }
 
-    private static String searchTerms(String query) {
+    static String searchTerms(String query) {
         Matcher matcher = WORD.matcher(query == null ? "" : query);
         StringBuilder result = new StringBuilder();
         for (int i = 0; i < 12 && matcher.find(); i++) {

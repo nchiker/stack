@@ -294,7 +294,10 @@ public final class MainActivity extends LibraryActivity {
             List<StackCategory> overlaps=present&&filter!=null?app().library.overlappingStacks(filter):new ArrayList<>();
             String also=null;for(StackCategory overlap:overlaps)if(overlap.id.equals(alsoFilter))also=alsoFilter;
             Snapshot built=new Snapshot(catalog,app().library.documents(query,present?filter:null,also,org,order),orgs,org,app().library.documentCount());
-            built.overlaps=overlaps;built.also=also;return built;
+            built.overlaps=overlaps;built.also=also;
+            // Linked documents have no stacks yet (a later slice), so they appear only when no stack or tag filter is active.
+            if(org==null&&(!present||filter==null))built.links=app().library.links.list(query);
+            return built;
         }, snapshot -> {
             if (generation != requestGeneration) return;
             boolean update=UpdateCheck.available(this);
@@ -334,12 +337,17 @@ public final class MainActivity extends LibraryActivity {
             } else for (int start = 0; start < max; start += columns) {
                 rows.add(new DocumentRow(new ArrayList<>(snapshot.documents.subList(start, Math.min(start + columns, max))), columns));
             }
+            if (!snapshot.links.isEmpty()) {
+                rows.add(new Header("Linked documents", null, null));
+                int shownLinks = showingStacks ? Math.min(6, snapshot.links.size()) : snapshot.links.size();
+                for (int i = 0; i < shownLinks; i++) rows.add(snapshot.links.get(i));
+            }
             if (showingStacks) {
                 // After the recent documents, so nothing above them moves; low priority on purpose.
                 String reminder = BackupNudge.message(this, snapshot.total);
                 if (!reminder.isEmpty()) rows.add(new Header(reminder, "Back up", this::backupNoticeActions));
             }
-            if (snapshot.documents.isEmpty() && !showingStacks) rows.add(query.isEmpty()
+            if (snapshot.documents.isEmpty() && snapshot.links.isEmpty() && !showingStacks) rows.add(query.isEmpty()
                     ? "No documents yet" : "No documents found");
             status.setText(R.string.saving_document);
             status.setVisibility(importing ? View.VISIBLE : View.GONE);
@@ -621,7 +629,7 @@ public final class MainActivity extends LibraryActivity {
         final List<Document> documents;
         final java.util.LinkedHashMap<String,String> orgs;final String organization;
         final int total;
-        List<StackCategory> overlaps = new ArrayList<>();String also;
+        List<StackCategory> overlaps = new ArrayList<>();String also;List<LinkStore.Link> links = new ArrayList<>();
         Snapshot(List<StackCategory> categories, List<Document> documents,java.util.LinkedHashMap<String,String> orgs,String organization,int total) { this.categories = categories; this.documents = documents;this.orgs=orgs;this.organization=organization;this.total=total; }
     }
     private static final class Header {
@@ -734,6 +742,40 @@ public final class MainActivity extends LibraryActivity {
         return tile;
     }
 
+    /** A linked document: owned by another app, so no thumbnail or selection; it opens its own screen. */
+    private View linkTile(LinkStore.Link link) {
+        LinearLayout tile = Ui.row(this);
+        tile.setPadding(Ui.dp(this, 6), Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 12));
+        tile.setBackground(Ui.ripple(this, Color.TRANSPARENT, 8));
+        ImageView icon = new ImageView(this);
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        icon.setBackground(Ui.outlined(this, 0xFFFAFAFA, 0xFFE8EAED, 6, 1));
+        icon.setPadding(Ui.dp(this, 8), Ui.dp(this, 8), Ui.dp(this, 8), Ui.dp(this, 8));
+        icon.setImageDrawable(new Icons(Icons.Symbol.DOCUMENT, Ui.BLUE));
+        icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        tile.addView(icon, new LinearLayout.LayoutParams(Ui.dp(this, 88), Ui.dp(this, 100)));
+        LinearLayout words = Ui.column(this);
+        words.setPadding(Ui.dp(this, 16), Ui.dp(this, 8), 0, 0);
+        TextView name = Ui.text(this, link.title, 17, false);
+        name.setMaxLines(2); name.setEllipsize(TextUtils.TruncateAt.END);
+        words.addView(name, new LinearLayout.LayoutParams(-1, -2));
+        String owner = LinkOpener.ownerName(link.owner);
+        TextView badge = Ui.text(this, "Linked · " + owner + (link.isProtected ? " · protected" : ""), 12, false);
+        badge.setTextColor(Ui.BLUE); badge.setPadding(0, Ui.dp(this, 4), 0, 0);
+        words.addView(badge);
+        String excerpt = LinkPreview.displayText(link.excerpt, 300).trim();
+        if (!excerpt.isEmpty()) {
+            TextView snippet = Ui.text(this, excerpt, 14, false);
+            snippet.setTextColor(Ui.MUTED); snippet.setMaxLines(3); snippet.setPadding(0, Ui.dp(this, 6), 0, 0);
+            words.addView(snippet);
+        }
+        tile.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
+        tile.setFocusable(true);
+        tile.setContentDescription(link.title + ", linked document from " + owner);
+        tile.setOnClickListener(view -> { hideKeyboard(); startActivity(new Intent(this, LinkActivity.class).putExtra("link_id", link.id)); });
+        return tile;
+    }
+
     private final class RowsAdapter extends BaseAdapter {
         @Override public int getCount() { return rows.size(); }
         @Override public Object getItem(int position) { return rows.get(position); }
@@ -753,6 +795,7 @@ public final class MainActivity extends LibraryActivity {
             }
             if (item instanceof OverlapRow) return overlapChips((OverlapRow) item);
             if (item instanceof Document) return documentTile((Document) item, true);
+            if (item instanceof LinkStore.Link) return linkTile((LinkStore.Link) item);
             if (item instanceof String) {
                 LinearLayout empty = Ui.column(MainActivity.this); empty.setGravity(Gravity.CENTER);
                 empty.setPadding(Ui.dp(MainActivity.this, 24), Ui.dp(MainActivity.this, 72), Ui.dp(MainActivity.this, 24), Ui.dp(MainActivity.this, 48));

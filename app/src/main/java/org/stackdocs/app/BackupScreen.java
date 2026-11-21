@@ -17,7 +17,7 @@ final class BackupScreen {
     private final Activity activity;
     private final LinearLayout body;
     private final View backup,restore;
-    private View automatic;private TextView automaticCaption;
+    private View automatic,encryption;private TextView automaticCaption,encryptionCaption,protection;
     private LinearLayout keepGroup;private TextView keepCaption;
     private final LinearLayout operation;
     private final TextView heading,status,summary,backupDate;
@@ -63,13 +63,26 @@ final class BackupScreen {
 
         TextView scope=muted(activity,"Saved documents, page edits, stacks and text are included. Unfinished scans stay on this device.",14);
         scope.setPadding(0,Ui.dp(activity,28),0,Ui.dp(activity,8));body.addView(scope);
-        TextView protection=muted(activity,"Backup files are not encrypted.",13);body.addView(protection);
+        protection=muted(activity,"Backup files are not encrypted.",13);body.addView(protection);
         Button details=Ui.button(activity,"What's included",help);
         LinearLayout.LayoutParams helpSize=new LinearLayout.LayoutParams(-2,-2);helpSize.gravity=Gravity.START;helpSize.topMargin=Ui.dp(activity,8);helpSize.leftMargin=-Ui.dp(activity,16);body.addView(details,helpSize);
     }
 
     private static TextView muted(Activity activity,String value,int size) {
         TextView text=Ui.text(activity,value,size,false);text.setTextColor(Ui.MUTED);text.setLineSpacing(Ui.dp(activity,3),1);return text;
+    }
+    /** The "Backup encryption" row under Restore; call once. {@code on} follows the saved setup. */
+    void encryption(Runnable open){
+        encryption=Ui.actionRow(activity,Icons.Symbol.TUNE,"Backup encryption","",0xFFE3E0F0,open);
+        encryptionCaption=(TextView)((LinearLayout)((LinearLayout)encryption).getChildAt(1)).getChildAt(1);
+        int at=body.indexOfChild(restore)+1;
+        body.addView(Ui.divider(activity),at,new LinearLayout.LayoutParams(-1,Ui.dp(activity,1)));body.addView(encryption,at+1);
+    }
+    void encryptionState(boolean on){
+        if(encryption==null)return;
+        String caption=on?"On · Backups are encrypted, including linked documents":"Off · Turn on to include linked documents";
+        if(!encryptionCaption.getText().toString().equals(caption)){encryptionCaption.setText(caption);encryption.setContentDescription("Backup encryption. "+caption);}
+        protection.setText(on?"Backups are encrypted. Without the recovery key (kept in Key Vault), a backup cannot be opened.":"Backup files are not encrypted, and leave out linked documents unless you choose otherwise.");
     }
     void reset(Runnable open){body.addView(Ui.divider(activity));body.addView(Ui.actionRow(activity,Icons.Symbol.TUNE,"Reset or rebuild library…","Careful local erase or a fresh sync connection",0xFFF0E3EF,open));}
     /** Adds the "Automatic backup" row between Backup and Restore; call once. */

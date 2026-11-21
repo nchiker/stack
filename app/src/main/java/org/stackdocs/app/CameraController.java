@@ -44,6 +44,7 @@ final class CameraController {
     private int generation;
     private boolean opening;
     private boolean capturing;
+    private int captureSeq; // each capture has its own timeout; an old one must never cancel a newer capture
     private boolean waitingForFocus;
     private boolean torch;
     private boolean hasFlash;
@@ -178,7 +179,7 @@ final class CameraController {
         if (session == null || capturing) return;
         capturing = true;
         waitingForFocus = true;
-        int ticket = generation;
+        int ticket = generation, seq = ++captureSeq;
         try {
             repeating.set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_START);
             session.capture(repeating.build(), new CameraCaptureSession.CaptureCallback() {
@@ -193,7 +194,7 @@ final class CameraController {
             // Continuous-focus cameras may not emit a locked state on the trigger result.
             handler.postDelayed(() -> { if (ticket == generation && waitingForFocus) takePhoto(ticket); }, 1200);
             handler.postDelayed(() -> {
-                if (ticket == generation && capturing) fail(ticket, "The photo timed out. Your other pages are safe; tap Retry camera.");
+                if (ticket == generation && seq == captureSeq && capturing) fail(ticket, "The photo timed out. Your other pages are safe; tap Retry camera.");
             }, 10_000);
         } catch (Exception error) { fail(ticket, "The photo could not be taken. Tap Retry camera."); }
     }

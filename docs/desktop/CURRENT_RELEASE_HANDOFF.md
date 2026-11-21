@@ -1,4 +1,4 @@
-# Current release — 2026-11-17 (Desktop 0.4.0 published to the Flatpak repository; Android 0.16.0 APK built and staged, not yet released or installed; last released Android: 0.15.0)
+# Current release — 2026-11-17 (Android 0.16.0 released on GitHub, Desktop 0.4.0 via the Flatpak repository)
 
 ## Android 0.16.0 (versionCode 30) and Desktop 0.4.0: stack overlap chips (2026-11-17)
 
@@ -17,10 +17,11 @@
   "built"); Flatpak commit dad3876d… (parent f2f0e173…, the 0.3.0 commit); a throwaway ostree remote with the public key
   pulled its metadata with signature checking on. Bundle `.artifacts/stack-desktop-20261117-v0.4.0/Stack-0.4.0-x86_64.flatpak`.
   This computer's installed copy has not been updated yet (`flatpak update --user org.stackdocs.desktop`).
-- **Android 0.16.0 APK** built with the development key (signer `e873f2fd…e311` verified, versionCode 30), staged in
-  `.artifacts/stack-release-20261117-v0.16.0/Stack-0.16.0.apk` (SHA-256 `e0a3da2c…cd2e`). Not installed on either
-  phone and no GitHub release created. The production phone's in-app update only sees a newer release once one is
-  published as the latest GitHub release.
+- **Android 0.16.0 released 2026-11-17**: https://github.com/nchiker/stack/releases/tag/v0.16.0 (latest, target `main`,
+  assets `Stack-0.16.0.apk` + `SHA256SUMS`; download re-checked identical to the staged file, SHA-256 `e0a3da2c…cd2e`).
+  Built with the development key (signer `e873f2fd…e311`), staged in `.artifacts/stack-release-20261117-v0.16.0/`
+  (with `notes.md`). Source checkpoint pushed first with `tools/backup_github.py` (main 81f5277). Installed on the
+  test Pixel 4a over the earlier debug build (data kept). The production phone's Update check will now offer 0.16.0.
 - Chips only show overlaps for documents filed in both stacks; there are no free-form tags (tags in Stack are
   Organization details).
 

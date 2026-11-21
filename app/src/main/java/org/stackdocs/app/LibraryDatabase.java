@@ -8,7 +8,7 @@ import android.graphics.Color;
 
 final class LibraryDatabase extends SQLiteOpenHelper {
     LibraryDatabase(Context context) {
-        super(context, "library.db", null, 10);
+        super(context, "library.db", null, 11);
         setWriteAheadLoggingEnabled(true);
     }
 
@@ -44,6 +44,7 @@ final class LibraryDatabase extends SQLiteOpenHelper {
         addStackOrder(db);
         addSyncSchema(db);
         addTrash(db);
+        addLinks(db);
         String[] ids = {"bills", "banking", "ids", "house", "medical", "receipts", "starred"};
         String[] names = {"Bills", "Banking", "IDs", "House", "Medical", "Receipts", "Starred"};
         String[] colors = {"#DCEADB", "#E5E8FA", "#F7E6D2", "#F1DDE8", "#DCECF2", "#F7EDCA", "#E2E5E0"};
@@ -58,7 +59,7 @@ final class LibraryDatabase extends SQLiteOpenHelper {
     }
 
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 1 || oldVersion > 9 || newVersion != 10) {
+        if (oldVersion < 1 || oldVersion > 10 || newVersion != 11) {
             throw new IllegalStateException("No migration from library version " + oldVersion);
         }
         if (oldVersion < 2) {
@@ -76,6 +77,22 @@ final class LibraryDatabase extends SQLiteOpenHelper {
         if (oldVersion < 8) addStackOrder(db);
         if (oldVersion < 9) addSyncSchema(db);
         if (oldVersion < 10) addTrash(db);
+        if (oldVersion < 11) addLinks(db);
+    }
+
+    /**
+     * Link records (docs/STACK_LINK_CONTRACT.md): documents owned by other apps. Deliberately NOT part of `documents`
+     * and not captured by the sync triggers or exported by the archive, so existing backup, restore and sync are
+     * untouched. `link_search` keeps the owner's extracted text (its `body`) for search and display.
+     */
+    static void addLinks(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE link_records (id TEXT PRIMARY KEY, owner TEXT NOT NULL, link_id TEXT NOT NULL, "
+                + "kind TEXT NOT NULL, title TEXT NOT NULL, mime TEXT NOT NULL, modified INTEGER NOT NULL, "
+                + "hash TEXT NOT NULL, shared INTEGER NOT NULL DEFAULT 0, protected INTEGER NOT NULL DEFAULT 0, "
+                + "locators TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'live', preview_file TEXT NOT NULL DEFAULT '', "
+                + "added_at INTEGER NOT NULL, received_at INTEGER NOT NULL, title_user_edited INTEGER NOT NULL DEFAULT 0, "
+                + "UNIQUE(owner, link_id))");
+        db.execSQL("CREATE VIRTUAL TABLE link_search USING fts4(record_id, title, body, notindexed=record_id, tokenize=unicode61)");
     }
 
     /**

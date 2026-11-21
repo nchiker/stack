@@ -72,13 +72,17 @@ final class LibraryArchive {
         final Map<String,String> documents=new LinkedHashMap<>(),pages=new LinkedHashMap<>(),stacks=new LinkedHashMap<>(),scans=new LinkedHashMap<>();
         final JSONArray newStacks=new JSONArray();
         final boolean pristine;
-        int collisions,mergedStacks;
+        final Map<String,String> links=new LinkedHashMap<>();
+        int collisions,mergedStacks,skippedLinks;
         String catalog;
         Plan(String operation,boolean pristine){this.operation=operation;this.pristine=pristine;}
-        String summary(){return documents.size()+" documents will be added. "+collisions+" document ID conflicts will get new IDs. "+mergedStacks+" stacks match existing stacks; their current visibility is kept. Existing documents, names and filing stay as they are. Selecting this archive again imports another copy.";}
+        String summary(){return documents.size()+" documents will be added. "+collisions+" document ID conflicts will get new IDs. "+mergedStacks+" stacks match existing stacks; their current visibility is kept. Existing documents, names and filing stay as they are. Selecting this archive again imports another copy."+(links.size()+skippedLinks>0?" "+links.size()+" linked documents will be added"+(skippedLinks>0?"; "+skippedLinks+" already exist here and stay as they are":"")+".":"");}
     }
-    Snapshot snapshot(Progress progress) throws IOException { return snapshot(progress,false); }
-    Snapshot snapshot(Progress progress,boolean syncInternal) throws IOException {
+    /** Link modes for {@link #snapshot(Progress,boolean,int)}: none (format 3), include them if any (format 4), encrypted (always format 4). */
+    static final int LINKS_NONE=0,LINKS_INCLUDED=1,LINKS_ENCRYPTED=2;
+    Snapshot snapshot(Progress progress) throws IOException { return snapshot(progress,false,LINKS_NONE); }
+    Snapshot snapshot(Progress progress,boolean syncInternal) throws IOException { return snapshot(progress,syncInternal,LINKS_NONE); }
+    Snapshot snapshot(Progress progress,boolean syncInternal,int linkMode) throws IOException {
         if(!syncInternal)try {
             SyncProtocol.State sync=new SyncStore(context,repository).load();
             if(sync!=null) {
@@ -117,6 +121,20 @@ final class LibraryArchive {
                     files.put(entry);
                 }
             }
+            if(!syncInternal && linkMode!=LINKS_NONE) {
+                JSONArray links=LinkArchive.capture(db);
+                if(links.length()>0 || linkMode==LINKS_ENCRYPTED) {
+                    json.put("links",links).put("version",4);File previews=new File(context.getFilesDir(),"links");
+                    for(JSONObject link:objects(links)) {
+                        progress.check();String id=link.getString("id");uuid(id);File source=new File(previews,id+".pdf");
+                        if(!source.isFile())continue;
+                        regular(source);String path=LinkArchive.previewPath(id);File target=new File(directory,path);mkdir(target.getParentFile());
+                        try {Os.link(source.getAbsolutePath(),target.getAbsolutePath());}
+                        catch(android.system.ErrnoException unavailable) {copyFile(source,target,progress);}
+                        JSONObject entry=new JSONObject();entry.put("path",path);entry.put("length",target.length());files.put(entry);
+                    }
+                }
+            }
             json.put("decision_evidence",evidence);json.put("files",files);
             db.setTransactionSuccessful();ready=true;return new Snapshot(directory,json);
         } catch(JSONException error){throw invalid();}
@@ -153,7 +171,7 @@ final class LibraryArchive {
     Staged stage(InputStream source,Progress progress) throws IOException {
         mkdir(root);File directory=new File(root,UUID.randomUUID().toString());mkdir(directory);boolean ready=false;
         try {
-            DataInputStream input=new DataInputStream(new BufferedInputStream(source,65536));byte[] magic=new byte[MAGIC.length];input.readFully(magic);if(!Arrays.equals(magic,MAGIC))throw new IOException("Choose a supported Stack .stackbackup file (formats 1, 2 or 3).");
+            DataInputStream input=new DataInputStream(new BufferedInputStream(source,65536));byte[] magic=new byte[MAGIC.length];input.readFully(magic);if(!Arrays.equals(magic,MAGIC))throw new IOException("Choose a supported Stack .stackbackup file (formats 1 to 4).");
             int length=input.readInt();if(length<2 || length>MANIFEST_LIMIT)throw new IOException("Backup metadata exceeds the 32 MiB limit.");
             byte[] expected=new byte[32];input.readFully(expected);byte[] bytes=new byte[length];input.readFully(bytes);progress.check();
             if(!MessageDigest.isEqual(expected,digest().digest(bytes)))throw new IOException("The backup manifest checksum does not match.");
@@ -191,6 +209,15 @@ final class LibraryArchive {
                 String mapped=id;int attempt=0;while(stackIds.contains(mapped))mapped=mapped(plan.operation,"stack",id,++attempt);
                 JSONObject fresh=new JSONObject(stack.toString());fresh.put("id",mapped);fresh.put("sort_order",existing.size());plan.newStacks.put(fresh);existing.add(fresh);stackIds.add(mapped);plan.stacks.put(id,mapped);
             }
+            if(staged.manifest.has("links")) {
+                Set<String> localIds=ids("link_records","id"),existing2=new HashSet<>();
+                try(Cursor row=db.rawQuery("SELECT owner||char(10)||link_id FROM link_records",null)){while(row.moveToNext())existing2.add(row.getString(0));}
+                for(JSONObject link:objects(staged.manifest.getJSONArray("links"))) {
+                    if(existing2.contains(link.getString("owner")+"\n"+link.getString("link_id"))){plan.skippedLinks++;continue;}
+                    String old=link.getString("id"),mapped=old;int attempt=0;while(localIds.contains(mapped)||new File(context.getFilesDir(),"links/"+mapped+".pdf").exists())mapped=mapped(plan.operation,"link",old,++attempt);
+                    localIds.add(mapped);plan.links.put(old,mapped);
+                }
+            }
             staged.plan=plan;return plan;
         } catch(JSONException error){throw invalid();}
     }
@@ -203,13 +230,21 @@ final class LibraryArchive {
             for(String id:plan.documents.values())if(ids("documents","id").contains(id)||new File(originals,id).exists())throw new IOException("The library changed during review. Cancel and select the backup again.");
             for(String id:plan.pages.values())if(ids("pages","id").contains(id))throw new IOException("Pages changed during review. Review again.");
             progress.update("Installing restored originals…");
-            JSONObject journal=new JSONObject();journal.put("operation",plan.operation);journal.put("documents",new JSONArray(plan.documents.values()));atomic(new File(staged.directory,"journal.json"),journal.toString());syncDirectory(staged.directory);probe.reached("journal");
+            JSONObject journal=new JSONObject();journal.put("operation",plan.operation);journal.put("documents",new JSONArray(plan.documents.values()));journal.put("links",new JSONArray(plan.links.values()));atomic(new File(staged.directory,"journal.json"),journal.toString());syncDirectory(staged.directory);probe.reached("journal");
             for(Map.Entry<String,String> doc:plan.documents.entrySet()) {
                 progress.check();File from=new File(staged.directory,"originals/"+doc.getKey()),to=new File(originals,doc.getValue());
                 atomic(new File(from,".restore_owner"),plan.operation);syncDirectory(from);
                 if(to.exists() || !from.renameTo(to))throw new IOException("Not enough storage to install restored originals. Retry with more free space.");
                 syncDirectory(originals);probe.reached("file");
             }
+            File linkDir=new File(context.getFilesDir(),"links");Set<String> withPreview=new HashSet<>();
+            for(Map.Entry<String,String> link:plan.links.entrySet()) {
+                progress.check();File from=new File(staged.directory,LinkArchive.previewPath(link.getKey()));if(!from.isFile())continue;
+                mkdir(linkDir);File to=new File(linkDir,link.getValue()+".pdf");
+                if(to.exists() || !from.renameTo(to))throw new IOException("Not enough storage to install restored previews. Retry with more free space.");
+                withPreview.add(link.getKey());
+            }
+            if(!withPreview.isEmpty())syncDirectory(linkDir);
             progress.update("Committing restored library…");
             db.beginTransaction();
             try {
@@ -259,6 +294,17 @@ final class LibraryArchive {
                 for(JSONObject original:objects(staged.manifest.getJSONArray("document_tags"))) {
                     JSONObject row=new JSONObject(original.toString());row.put("document_id",plan.documents.get(row.getString("document_id")));row.put("tag_id",tagMap.get(row.getString("tag_id")));insert("document_tags",row,DOCUMENT_TAG);
                 }
+                if(!plan.links.isEmpty()) {
+                    long now=Clock.now();
+                    for(JSONObject original:objects(staged.manifest.getJSONArray("links"))) {
+                        String old=original.getString("id"),id=plan.links.get(old);if(id==null)continue;
+                        ContentValues values=new ContentValues();
+                        for(String field:LinkArchive.FIELDS) {if(field.equals("text")||field.equals("id"))continue;Object value=original.get(field);if(value instanceof Number)values.put(field,((Number)value).longValue());else values.put(field,(String)value);}
+                        values.put("id",id);values.put("preview_file",withPreview.contains(old)?id+".pdf":"");values.put("received_at",now);
+                        db.insertOrThrow("link_records",null,values);
+                        db.execSQL("INSERT INTO link_search(record_id,title,body) VALUES(?,?,?)",new Object[]{id,original.getString("title"),original.getString("text")});
+                    }
+                }
                 for(String id:plan.documents.values())LibraryRepository.index(db,id,repository.document(id).title);
                 ContentValues marker=new ContentValues();marker.put("id",plan.operation);db.insertOrThrow("restore_commits",null,marker);
                 progress.check();probe.reached("transaction");db.setTransactionSuccessful();
@@ -283,6 +329,10 @@ final class LibraryArchive {
                 byte[] bytes=readBounded(journal,128*1024);JSONObject json=ArchiveJson.read(utf8(bytes));if(!operation.getName().equals(json.getString("operation")))throw invalid();
                 List<String> ids=new ArrayList<>();JSONArray documents=json.getJSONArray("documents");if(documents.length()>DOCUMENT_LIMIT)throw invalid();for(int i=0;i<documents.length();i++){String id=documents.getString(i);uuid(id);ids.add(id);}
                 if(committed(operation.getName())) {cleanupCommitted(operation,ids);return;}
+                JSONArray linkArray=json.optJSONArray("links");
+                if(linkArray!=null){if(linkArray.length()>LinkArchive.LINK_LIMIT)throw invalid();for(int i=0;i<linkArray.length();i++){String id=linkArray.getString(i);uuid(id);
+                    // Fresh ids only: a preview with no database row belongs to this unfinished restore.
+                    if(!ids("link_records","id").contains(id))new File(context.getFilesDir(),"links/"+id+".pdf").delete();}}
                 for(String id:ids) {
                     File owned=new File(originals,id),tag=new File(owned,".restore_owner");
                     if(!ids("documents","id").contains(id) && tag.isFile() && utf8(readBounded(tag,128)).equals(operation.getName()))remove(owned);
@@ -310,8 +360,8 @@ final class LibraryArchive {
     static void validate(JSONObject json) throws IOException {
         try {
             long version=number(json,"version",1,Long.MAX_VALUE);
-            if(!"org.stackdocs.library".equals(str(json,"format",64)) || !((version==1 && number(json,"schema",0,Long.MAX_VALUE)==6) || (version==2 && number(json,"schema",0,Long.MAX_VALUE)==7) || (version==3 && number(json,"schema",0,Long.MAX_VALUE)==8)))throw new IOException("This backup version is unsupported. Keep it for a compatible Stack version.");
-            keys(json,cols("format,version,schema,created_at,documents,pages,stacks,memberships,suggestions,choices,decision_evidence,files"+(version>=2?",details,tags,document_tags":"")));
+            if(!"org.stackdocs.library".equals(str(json,"format",64)) || !((version==1 && number(json,"schema",0,Long.MAX_VALUE)==6) || (version==2 && number(json,"schema",0,Long.MAX_VALUE)==7) || (version>=3 && version<=4 && number(json,"schema",0,Long.MAX_VALUE)==8)))throw new IOException("This backup version is unsupported. Keep it for a compatible Stack version.");
+            keys(json,cols("format,version,schema,created_at,documents,pages,stacks,memberships,suggestions,choices,decision_evidence,files"+(version>=2?",details,tags,document_tags":"")+(version>=4?",links":"")));
             number(json,"created_at",0,Long.MAX_VALUE);
             JSONArray docs=array(json,"documents",DOCUMENT_LIMIT),pages=array(json,"pages",PAGE_LIMIT),stacks=array(json,"stacks",1000),members=array(json,"memberships",100000),suggestions=array(json,"suggestions",DOCUMENT_LIMIT),choices=array(json,"choices",20000),files=array(json,"files",FILE_LIMIT);
             Map<String,JSONObject> documents=new HashMap<>();Map<String,Set<Integer>> positions=new HashMap<>();Set<String> pageIds=new HashSet<>(),stackIds=new HashSet<>(),stackNames=new TreeSet<>(String.CASE_INSENSITIVE_ORDER),scans=new HashSet<>();
@@ -326,7 +376,7 @@ final class LibraryArchive {
             }
             JSONObject evidence=json.getJSONObject("decision_evidence");if(evidence.length()!=documents.size())throw invalid();for(String id:documents.keySet())sha(str(evidence,id,64));
             int stackPosition=0;
-            for(JSONObject row:objects(stacks)) {keys(row,version==3?STACK:STACK_OLD);if(version==3 && number(row,"sort_order",0,stacks.length()-1)!=stackPosition++)throw invalid();String id=str(row,"id",80);stackId(id);if(!stackIds.add(id))throw invalid();name(row,"name");if(!stackNames.add(row.getString("name")))throw invalid();number(row,"color",Integer.MIN_VALUE,Integer.MAX_VALUE);number(row,"visible",0,1);}
+            for(JSONObject row:objects(stacks)) {keys(row,version>=3?STACK:STACK_OLD);if(version>=3 && number(row,"sort_order",0,stacks.length()-1)!=stackPosition++)throw invalid();String id=str(row,"id",80);stackId(id);if(!stackIds.add(id))throw invalid();name(row,"name");if(!stackNames.add(row.getString("name")))throw invalid();number(row,"color",Integer.MIN_VALUE,Integer.MAX_VALUE);number(row,"visible",0,1);}
             for(JSONObject row:objects(pages)) {
                 keys(row,PAGE);String id=str(row,"id",36);uuid(id);if(!pageIds.add(id))throw invalid();String doc=str(row,"document_id",36);JSONObject document=documents.get(doc);if(document==null)throw invalid();
                 int position=(int)number(row,"position",0,document.getLong("page_count")-1);if(!positions.get(doc).add(position))throw invalid();
@@ -369,8 +419,11 @@ final class LibraryArchive {
                 }
                 if(!links.equals(activeOrganizations))throw invalid();
             }
+            Set<String> linkIds=version>=4?LinkArchive.validate(array(json,"links",LinkArchive.LINK_LIMIT)):new HashSet<>();
             Set<String> paths=new HashSet<>();Map<String,Integer> counts=new HashMap<>();long total=0;
-            for(JSONObject row:objects(files)){keys(row,cols("path,length,sha256"));String name=str(row,"path",160);path(name);String doc=name.split("/")[1];if(!documents.containsKey(doc)||!paths.add(name))throw invalid();counts.put(doc,counts.getOrDefault(doc,0)+1);total+=number(row,"length",1,FILE_BYTES);if(total>TOTAL_BYTES)throw new IOException("Backup exceeds the 8 GiB original-byte limit.");sha(str(row,"sha256",64));}
+            for(JSONObject row:objects(files)){keys(row,cols("path,length,sha256"));String name=str(row,"path",160);path(name);
+                if(name.startsWith("previews/")){if(!linkIds.contains(name.substring(9,45))||!paths.add(name))throw invalid();total+=number(row,"length",1,LinkRecord.MAX_PREVIEW);if(total>TOTAL_BYTES)throw new IOException("Backup exceeds the 8 GiB original-byte limit.");sha(str(row,"sha256",64));continue;}
+                String doc=name.split("/")[1];if(!documents.containsKey(doc)||!paths.add(name))throw invalid();counts.put(doc,counts.getOrDefault(doc,0)+1);total+=number(row,"length",1,FILE_BYTES);if(total>TOTAL_BYTES)throw new IOException("Backup exceeds the 8 GiB original-byte limit.");sha(str(row,"sha256",64));}
             for(String id:documents.keySet())if(!counts.containsKey(id))throw invalid();
             for(JSONObject row:objects(pages))if(!paths.contains("originals/"+row.getString("document_id")+"/"+row.getString("source_file")))throw invalid();
         } catch(JSONException|IllegalArgumentException error){throw invalid();}
@@ -391,7 +444,14 @@ final class LibraryArchive {
         Map<String,String> mime=new HashMap<>();Map<String,Integer> initial=new HashMap<>();
         for(JSONObject doc:objects(json.getJSONArray("documents"))){mime.put(doc.getString("id"),doc.getString("mime"));initial.put(doc.getString("id"),doc.getInt("initial_page_count"));}
         for(JSONObject entry:objects(json.getJSONArray("files"))) {
-            progress.check();String path=entry.getString("path");File source=new File(directory,path);String id=path.split("/")[1],type=mime.get(id);regular(source);
+            progress.check();String path=entry.getString("path");File source=new File(directory,path);regular(source);
+            if(path.startsWith("previews/")) {
+                try(ParcelFileDescriptor descriptor=ParcelFileDescriptor.open(source,ParcelFileDescriptor.MODE_READ_ONLY);PdfRenderer renderer=new PdfRenderer(descriptor)) {
+                    if(renderer.getPageCount()<1)throw invalid();
+                } catch(RuntimeException error){throw new IOException("A backed-up preview is damaged or protected.");}
+                continue;
+            }
+            String id=path.split("/")[1],type=mime.get(id);
             if(path.endsWith("/source") && type.equals("application/pdf")) {
                 try(ParcelFileDescriptor descriptor=ParcelFileDescriptor.open(source,ParcelFileDescriptor.MODE_READ_ONLY);PdfRenderer renderer=new PdfRenderer(descriptor)) {
                     if(renderer.getPageCount()!=initial.get(id))throw invalid();
@@ -422,6 +482,7 @@ final class LibraryArchive {
     private static void uuid(String text) throws IOException {try{if(!UUID.fromString(text).toString().equals(text))throw invalid();}catch(IllegalArgumentException error){throw invalid();}}
     private static void stackId(String text) throws IOException {if(!text.matches("[A-Za-z0-9_-]{1,80}"))throw invalid();}
     private static void path(String value) throws IOException {
+        if(value.startsWith("previews/")){if(value.length()!=9+36+4||!value.endsWith(".pdf"))throw invalid();uuid(value.substring(9,45));return;}
         String[] parts=value.split("/",-1);if(parts.length!=3||!parts[0].equals("originals"))throw invalid();uuid(parts[1]);
         if(!parts[2].equals("source")){if(!parts[2].endsWith(".jpg"))throw invalid();uuid(parts[2].substring(0,parts[2].length()-4));}
     }
