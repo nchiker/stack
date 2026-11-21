@@ -36,14 +36,17 @@ public final class TrashActivity extends LibraryActivity {
 
     private void refresh() {
         // Expired entries are deleted for good before the list is read, so the screen never shows one.
-        work(() -> { app().library.purgeExpiredTrash(); return app().library.trashed(); }, this::render);
+        work(() -> { app().library.purgeExpiredTrash(); app().library.links.sweep(Clock.now()); return new Object[]{app().library.trashed(), app().library.links.trashed()}; },
+            both -> render((List<LibraryRepository.Trashed>) both[0], (List<LinkStore.Trashed>) both[1]));
     }
 
-    private void render(List<LibraryRepository.Trashed> items) {
+    @SuppressWarnings("unchecked")
+    private void render(List<LibraryRepository.Trashed> items, List<LinkStore.Trashed> links) {
         body.removeAllViews();
-        empty.setVisibility(items.isEmpty() ? android.view.View.GONE : android.view.View.VISIBLE);
-        empty.setOnClickListener(view -> confirmEmpty(items.size()));
-        TextView intro = Ui.text(this, items.isEmpty()
+        boolean nothing = items.isEmpty() && links.isEmpty();
+        empty.setVisibility(nothing ? android.view.View.GONE : android.view.View.VISIBLE);
+        empty.setOnClickListener(view -> confirmEmpty(items.size() + links.size()));
+        TextView intro = Ui.text(this, nothing
                 ? "Nothing here. Documents you delete stay here for 30 days before they are deleted for good."
                 : "Deleted documents stay here for 30 days. If you sync with a computer, they stay there until they are deleted for good.", 14, false);
         intro.setTextColor(Ui.MUTED);
@@ -58,6 +61,23 @@ public final class TrashActivity extends LibraryActivity {
             body.addView(Ui.actionRow(this, Icons.Symbol.DOCUMENT, item.title, when + " · " + left, 0xFFF0E3EF, () -> options(item)));
             body.addView(Ui.divider(this), new LinearLayout.LayoutParams(-1, Ui.dp(this, 1)));
         }
+        for (LinkStore.Trashed item : links) {
+            long ageDays = Math.max(0, (now - item.deletedAt) / (24L * 60 * 60 * 1000));
+            long leftDays = Math.max(0, (LinkStore.KEEP_MILLIS - (now - item.deletedAt) + 24L * 60 * 60 * 1000 - 1) / (24L * 60 * 60 * 1000));
+            String why = "user".equals(item.reason) ? "Removed from Stack" : "trashed".equals(item.reason) ? "In " + LinkOpener.ownerName(item.owner) + "'s trash" : "deleted".equals(item.reason) ? "Deleted in " + LinkOpener.ownerName(item.owner) : "Missing for 30 days";
+            String when = why + (ageDays == 0 ? " today" : ageDays == 1 ? " yesterday" : " " + ageDays + " days ago");
+            String left = leftDays <= 1 ? "Deleted for good within a day" : leftDays + " days left";
+            body.addView(Ui.actionRow(this, Icons.Symbol.DOCUMENT, item.title, "Linked · " + when + " · " + left, 0xFFF0E3EF, () -> linkOptions(item)));
+            body.addView(Ui.divider(this), new LinearLayout.LayoutParams(-1, Ui.dp(this, 1)));
+        }
+    }
+
+    private void linkOptions(LinkStore.Trashed item) {
+        new AlertDialog.Builder(this).setTitle(item.title)
+                .setMessage("Restore it to your library, or delete Stack's saved copy for good. The document itself is never touched.")
+                .setPositiveButton("Restore", (d, w) -> work(() -> { app().library.links.restore(item.id); return true; }, ok -> { app().notifySyncChanged(); app().notifyLibraryChanged(); }))
+                .setNeutralButton("Delete for good", (d, w) -> work(() -> { app().library.links.deleteTrashed(item.id); return true; }, ok -> app().notifyLibraryChanged()))
+                .setNegativeButton("Cancel", null).show();
     }
 
     private void options(LibraryRepository.Trashed item) {
@@ -76,9 +96,9 @@ public final class TrashActivity extends LibraryActivity {
     }
 
     private void confirmEmpty(int count) {
-        new AlertDialog.Builder(this).setTitle("Delete " + count + (count == 1 ? " document" : " documents") + " for good?")
+        new AlertDialog.Builder(this).setTitle("Delete " + count + (count == 1 ? " item" : " items") + " for good?")
                 .setMessage("Everything in Recently deleted will be removed from this device. This cannot be undone.")
-                .setPositiveButton("Delete all", (d, w) -> work(() -> app().library.purgeTrash(Long.MAX_VALUE), n -> app().notifyLibraryChanged()))
+                .setPositiveButton("Delete all", (d, w) -> work(() -> { app().library.links.emptyTrash(); return app().library.purgeTrash(Long.MAX_VALUE); }, n -> app().notifyLibraryChanged()))
                 .setNegativeButton("Cancel", null).show();
     }
 }

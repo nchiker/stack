@@ -64,6 +64,18 @@ final class LinkCallers {
         return decide(callerPackage, certificateOf(context, callerPackage), own, PINNED) ? callerPackage : null;
     }
 
+    /**
+     * True only if the app that actually serves `<owner>.stacklink` is `owner` itself and passes the same pinned-certificate test
+     * as a caller. Without this, any app could claim that authority after the owner is uninstalled and answer "no such file".
+     */
+    static boolean trustedOwnerProvider(Context context, String owner) {
+        try {
+            android.content.pm.ProviderInfo info = context.getPackageManager().resolveContentProvider(owner + ".stacklink", 0);
+            if (info == null || !owner.equals(info.packageName)) return false;
+            return decide(owner, certificateOf(context, owner), certificateOf(context, context.getPackageName()), PINNED);
+        } catch (RuntimeException error) { return false; }
+    }
+
     private static String hex(byte[] bytes) {
         StringBuilder out = new StringBuilder();
         for (byte b : bytes) out.append(String.format("%02x", b & 0xff));

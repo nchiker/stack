@@ -26,6 +26,8 @@ public final class LinkActivity extends LibraryActivity {
     private LinearLayout previewBox, textBox;
     private android.widget.Button open;
     private int generation;
+    private boolean checkedThisVisit;
+    private android.widget.Button update;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -46,6 +48,9 @@ public final class LinkActivity extends LibraryActivity {
         open = Ui.primary(this, "Open", this::openOwner);
         LinearLayout.LayoutParams openParams = new LinearLayout.LayoutParams(-1, Ui.dp(this, 48)); openParams.topMargin = Ui.dp(this, 12);
         body.addView(open, openParams);
+        update = Ui.button(this, "Update saved copy", this::updateSaved);
+        update.setVisibility(View.GONE);
+        body.addView(update);
         notice = Ui.text(this, "", 14, false); notice.setTextColor(0xFFB3261E); notice.setVisibility(View.GONE); notice.setPadding(0, Ui.dp(this, 8), 0, 0);
         body.addView(notice);
         TextView previewHeader = Ui.text(this, "Saved preview", 14, true); previewHeader.setPadding(0, Ui.dp(this, 20), 0, Ui.dp(this, 8));
@@ -81,16 +86,19 @@ public final class LinkActivity extends LibraryActivity {
     }
 
     private void show(Loaded loaded) {
-        if (loaded.link == null) { finish(); return; }
+        if (loaded.link == null || LinkStore.TRASHED.equals(loaded.link.state)) { finish(); return; }
         link = loaded.link;
         title.setText(link.title);
         String owner = LinkOpener.ownerName(link.owner);
         StringBuilder text = new StringBuilder("Linked document · ").append(owner);
         text.append("\nSaved from ").append(owner).append(" · changed ").append(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(new Date(link.modified)));
+        if (LinkStore.MISSING.equals(link.state)) text.append("\n").append(owner).append(" can't find this document. It may have been moved or deleted. The saved text and preview stay here; if it stays missing, Stack moves it to Recently deleted after 30 days.");
+        else if (LinkStore.UNREACHABLE.equals(link.state)) text.append("\nCan't reach ").append(owner).append(" right now. Nothing was removed; the saved text and preview are still here.");
         if (link.shared) text.append("\nShared");
         if (link.isProtected) text.append("\nPassword-protected in ").append(owner).append(" — the saved text and preview here are not protected by that password.");
         info.setText(text);
         open.setText("Open in " + owner);
+        if (!checkedThisVisit) { checkedThisVisit = true; checkNow(false); }
         previewBox.removeAllViews();
         textBox.removeAllViews();
         if (loaded.preview == null) addNote(previewBox, "No preview was saved.");
@@ -152,9 +160,32 @@ public final class LinkActivity extends LibraryActivity {
         }, () -> open.setEnabled(true));
     }
 
+    /** Asks the owner whether the file still exists. A failed ask changes nothing but the grey badge. */
+    private void checkNow(boolean manual) {
+        if (link == null) return;
+        final LinkStore.Link target = link;
+        check(() -> LinkChecker.check(app(), target), result -> {
+            if (!result.busy) load();
+            if (result.busy) { if (manual) { notice.setText(LinkOpener.ownerName(target.owner) + " is still busy. Try again in a moment."); notice.setVisibility(View.VISIBLE); } return; }
+            update.setVisibility(result.changed ? View.VISIBLE : View.GONE);
+            if (result.changed) { notice.setText("This document changed in " + LinkOpener.ownerName(target.owner) + " since Stack saved it."); notice.setVisibility(View.VISIBLE); }
+            else if (manual) { notice.setText(LinkStore.LIVE.equals(result.state) ? "Checked: the document is there and up to date." : "Checked."); notice.setVisibility(View.VISIBLE); }
+        });
+    }
+
+    private void updateSaved() {
+        if (link == null) return;
+        final LinkStore.Link target = link;
+        update.setEnabled(false);
+        check(() -> LinkChecker.refresh(app(), target), problem -> {
+            update.setEnabled(true);
+            if (problem == null) { update.setVisibility(View.GONE); notice.setVisibility(View.GONE); } else { notice.setText(problem); notice.setVisibility(View.VISIBLE); }
+        });
+    }
+
     private void more() {
         if (link == null) return;
-        new AlertDialog.Builder(this).setTitle(link.title).setItems(new String[]{"Rename", "Remove from Stack"}, (d, which) -> { if (which == 0) rename(); else confirmRemove(); }).show();
+        new AlertDialog.Builder(this).setTitle(link.title).setItems(new String[]{"Check now", "Rename", "Remove from Stack"}, (d, which) -> { if (which == 0) { notice.setVisibility(View.GONE); checkNow(true); } else if (which == 1) rename(); else confirmRemove(); }).show();
     }
 
     private void rename() {
@@ -169,8 +200,8 @@ public final class LinkActivity extends LibraryActivity {
 
     private void confirmRemove() {
         new AlertDialog.Builder(this).setTitle("Remove from Stack?")
-            .setMessage("“" + link.title + "” is removed from Stack's list and search. The document itself is not touched; it stays in " + LinkOpener.ownerName(link.owner) + " and wherever it is stored.")
-            .setPositiveButton("Remove", (d, w) -> work(() -> { app().library.links.delete(linkId); return true; }, ok -> { app().notifySyncChanged(); finish(); }))
+            .setMessage("“" + link.title + "” moves to Recently deleted for 30 days, then it is deleted for good. The document itself is not touched; it stays in " + LinkOpener.ownerName(link.owner) + " and wherever it is stored.")
+            .setPositiveButton("Remove", (d, w) -> work(() -> { app().library.links.trash(linkId, "user"); return true; }, ok -> { app().notifySyncChanged(); finish(); }))
             .setNegativeButton("Cancel", null).show();
     }
 }

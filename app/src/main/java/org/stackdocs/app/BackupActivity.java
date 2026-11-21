@@ -23,7 +23,7 @@ public final class BackupActivity extends LibraryActivity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         screen=new BackupScreen(this,this::finish,this::backupClicked,this::restoreClicked,
-                () -> {app().archives.restore();render();},() -> {app().archives.cancel();render();},this::aboutBackups);
+                this::restoreConfirmed,() -> {app().archives.cancel();render();},this::aboutBackups);
         screen.automatic(AutoBackup.label(this),() -> whenAllowed(this::autoBackup));
         screen.keep(() -> whenAllowed(this::keepFor));
         screen.encryption(() -> whenAllowed(this::encryptionClicked));
@@ -122,6 +122,13 @@ public final class BackupActivity extends LibraryActivity {
         },"Stack link count").start();
     }
     private void restoreClicked() {pick(false);}
+    /** A backup without encryption cannot be checked for tampering, so adding it asks first. */
+    private void restoreConfirmed() {
+        if(!app().archives.reviewUnencrypted()){app().archives.restore();render();return;}
+        new AlertDialog.Builder(this).setTitle("Not encrypted")
+                .setMessage("This backup is not encrypted, so Stack cannot tell whether someone changed it. Add it only if you made it and kept it private.")
+                .setPositiveButton("Add it",(d,w) -> {app().archives.restore();render();}).setNegativeButton("Cancel",null).show();
+    }
     /** Plain backups go straight to review; an encrypted one first asks for the passphrase or the recovery key. */
     private void restoreChosen(android.net.Uri uri) {
         new Thread(() -> {

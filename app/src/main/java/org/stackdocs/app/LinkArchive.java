@@ -18,11 +18,11 @@ final class LinkArchive {
 
     static String previewPath(String id) { return "previews/" + id + ".pdf"; }
 
-    /** All link rows with their text, in id order. Runs inside the snapshot transaction. */
+    /** All link rows except those in Recently deleted, with their text, in id order. Runs inside the snapshot transaction. */
     static JSONArray capture(SQLiteDatabase db) throws JSONException {
         JSONArray out = new JSONArray();
         try (Cursor c = db.rawQuery("SELECT r.id,r.owner,r.link_id,r.kind,r.title,r.mime,r.modified,r.hash,r.shared,r.protected,r.locators,r.state,"
-                + "r.title_user_edited,r.added_at,COALESCE((SELECT body FROM link_search WHERE record_id=r.id),'') FROM link_records r ORDER BY r.id", null)) {
+                + "r.title_user_edited,r.added_at,COALESCE((SELECT body FROM link_search WHERE record_id=r.id),'') FROM link_records r WHERE r.state<>'trashed' ORDER BY r.id", null)) {
             while (c.moveToNext()) {
                 JSONObject row = new JSONObject();
                 for (int i = 0; i < FIELDS.length; i++) {
@@ -58,7 +58,7 @@ final class LinkArchive {
                 LinkRecord parsed = LinkRecord.parse(record.toString());
                 if (!keys.add(parsed.owner + "\n" + parsed.linkId)) throw invalid();
                 String state = string(row, "state", 32);
-                if (!state.matches("[a-z_]{1,32}")) throw invalid();
+                if (!state.equals("live") && !state.equals("unreachable") && !state.equals("missing") && !state.equals("trashed")) throw invalid();
                 bool(row, "title_user_edited");
                 Object added = row.get("added_at");
                 if (!(added instanceof Integer || added instanceof Long) || ((Number) added).longValue() < 0) throw invalid();

@@ -86,6 +86,37 @@ final class LinkRecord {
         return new LinkRecord(owner, linkId, kind, title, mime, hash, ((Number) modified).longValue(), shared, isProtected, locators);
     }
 
+    /** The owner's `removed` message: exactly contract, owner, link_id, reason. Returns {owner, link_id, reason}. */
+    static String[] parseRemoval(String json) throws IOException {
+        if (json == null || json.length() > 4096) throw bad("the message is missing or too large");
+        JSONObject o = ArchiveJson.read(json);
+        Object number = o.opt("contract");
+        if (!(number instanceof Integer) && !(number instanceof Long)) throw bad("contract must be a whole number");
+        long version = ((Number) number).longValue();
+        if (version != CONTRACT) throw new UnsupportedContract((int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, version)));
+        exactKeys(o, set("contract", "owner", "link_id", "reason"), set(), "removal");
+        String reason = text(o, "reason", Pattern.compile("deleted|trashed"), 16);
+        return new String[]{text(o, "owner", PACKAGE, 200), text(o, "link_id", UUID, 36), reason};
+    }
+
+    /** The locators of a `stat` reply (a JSON array of at most 16 KiB), validated like a record's; null if they are not valid. */
+    static List<Locator> parseLocators(String json) {
+        try {
+            if (json == null || json.length() > 16 * 1024) return null;
+            Object parsed = new org.json.JSONTokener(json).nextValue();
+            if (!(parsed instanceof JSONArray)) return null;
+            JSONArray array = (JSONArray) parsed;
+            if (array.length() == 0 || array.length() > MAX_LOCATORS) return null;
+            List<Locator> out = new ArrayList<>();
+            for (int i = 0; i < array.length(); i++) {
+                Object entry = array.opt(i);
+                if (!(entry instanceof JSONObject)) return null;
+                out.add(locator((JSONObject) entry));
+            }
+            return out;
+        } catch (IOException | org.json.JSONException | RuntimeException error) { return null; }
+    }
+
     /** The streamed search text: at most 1 MiB of UTF-16 text and no NUL. */
     static void checkText(String text) throws IOException {
         if (text == null || text.length() > MAX_TEXT || text.indexOf('\0') >= 0) throw bad("text is missing, over 1 MiB or contains NUL");

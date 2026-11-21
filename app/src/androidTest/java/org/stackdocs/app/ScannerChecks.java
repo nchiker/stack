@@ -43,7 +43,7 @@ public final class ScannerChecks extends Instrumentation {
     private boolean features,backupLayout,navigationOnly,backupUi,archivePerformance,archiveOnly,archivePrepare,archiveResume;
     private String archiveBoundary;
     private Bundle syncArguments;
-    private boolean longWorkflow,workflowOnly,providerWorkflow,workflowUi,namingOnly,linkContract,linkSeed,linkUnseed;
+    private boolean longWorkflow,workflowOnly,providerWorkflow,workflowUi,namingOnly,linkContract,linkE2e,linkSeed,linkUnseed;
     private boolean suggestionPrepare,suggestionResume, suggestionUi, suggestionCorpus, suggestionsOnly, baseline, qualityOnly, ocrOnly, preserveOnly, restartPrepare, restartResume, corpusOnly;
 
     @Override public void onCreate(Bundle arguments) {
@@ -67,6 +67,7 @@ public final class ScannerChecks extends Instrumentation {
         workflowUi=arguments!=null && "true".equals(arguments.getString("workflowUi"));
         namingOnly=arguments!=null && "true".equals(arguments.getString("namingOnly"));
         linkContract=arguments!=null && "true".equals(arguments.getString("linkContract"));
+        linkE2e=arguments!=null && "true".equals(arguments.getString("linkE2e"));
         linkSeed=arguments!=null && "true".equals(arguments.getString("linkSeed"));
         linkUnseed=arguments!=null && "true".equals(arguments.getString("linkUnseed"));
         suggestionCorpusAsset=arguments==null ? "suggestions-corpus.json" : arguments.getString("suggestionCorpusAsset","suggestions-corpus.json");
@@ -160,7 +161,8 @@ public final class ScannerChecks extends Instrumentation {
             else if(providerWorkflow) ProviderWorkflowChecks.run(this,new IsolatedContext(getTargetContext()),this::mark);
             else if(workflowUi) WorkflowUiChecks.run(this,new IsolatedContext(getTargetContext()),this::mark);
             else if(namingOnly) NamingChecks.run(this::mark);
-            else if(linkContract) {LinkContractChecks.run(this::mark);LinkStoreChecks.run(new IsolatedContext(getTargetContext()),this::mark);LinkProviderChecks.run(getTargetContext(),this::mark);LinkUiChecks.run(getTargetContext(),new IsolatedContext(getTargetContext()),this::mark);}
+            else if(linkE2e) LinkLifecycleChecks.endToEnd(getTargetContext(),this::mark);
+            else if(linkContract) {LinkContractChecks.run(this::mark);LinkStoreChecks.run(new IsolatedContext(getTargetContext()),this::mark);LinkProviderChecks.run(getTargetContext(),this::mark);LinkLifecycleChecks.run(getTargetContext(),getContext().getPackageName(),this::mark);LinkUiChecks.run(getTargetContext(),new IsolatedContext(getTargetContext()),this::mark);}
             else if(linkSeed) {LinkUiChecks.seed(getTargetContext());mark("Seeded two linked documents");}
             else if(linkUnseed) {LinkUiChecks.unseed(getTargetContext(),(StackApplication)getTargetContext().getApplicationContext());mark("Removed seeded linked documents");}
             else if (restartPrepare || restartResume) OcrRestartChecks.run(new IsolatedContext(getTargetContext(),"ocr-restart-"+restartKey),restartPrepare,this::mark);

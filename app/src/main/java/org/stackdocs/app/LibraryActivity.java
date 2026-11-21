@@ -41,6 +41,10 @@ abstract class LibraryActivity extends Activity {
     }
     final <T> void read(Callable<T> operation,Consumer<T> success){read(operation,success,()->{});}
 
+    private static final java.util.concurrent.Executor CHECKS = java.util.concurrent.Executors.newSingleThreadExecutor();
+    /** Runs a call to another app (LinkChecker) on its own thread, never on the library's IO executor. */
+    final <T> void check(Callable<T> operation, Consumer<T> success) { dispatch(CHECKS, operation, success, () -> {}); }
+
     private <T> void dispatch(java.util.concurrent.Executor executor,Callable<T> operation,Consumer<T> success,Runnable failure) {
         if(app().resetRequested){new AlertDialog.Builder(this).setTitle("Reset pending").setMessage("Close and reopen Stack to finish the reset.").setPositiveButton("OK",null).show();return;}
         if(!app().access.allowed()){deferred.add(() -> dispatch(executor,operation,success,failure));return;}

@@ -24,6 +24,8 @@ final class ArchiveController {
     ArchiveController(StackApplication app){this.app=app;}
     boolean busy(){return state.equals("exporting")||state.equals("validating")||state.equals("restoring");}
     String review(){return review;}
+    /** True while a reviewed archive has no encryption (so no tamper check); restoring it needs an explicit confirmation. */
+    boolean reviewUnencrypted(){return unencrypted;}
     void export(Uri destination) {export(destination,false);}
     /** {@code plainLinks}: the user agreed to put linked documents into an unencrypted backup (ignored when encryption is set up). */
     void export(Uri destination,boolean plainLinks) {
@@ -136,7 +138,8 @@ final class ArchiveController {
                 unencrypted=!encrypted;
                 progress.check();LibraryArchive.Staged selected=candidate;
                 LibraryArchive.Plan plan=app.io.submit(() -> archive.plan(selected)).get();
-                progress.check();staged=candidate;review=plan.summary()+(unencrypted?" This backup is not encrypted, so it cannot be checked for tampering. Make sure it is yours.":"");state="review";
+                progress.check();staged=candidate;String made="";try{made="This backup was made "+java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM,java.text.DateFormat.SHORT).format(new java.util.Date(selected.manifest.getLong("created_at")))+". Check it is the one you expect. ";}catch(org.json.JSONException ignored){}
+                review=made+plan.summary()+(unencrypted?" This backup is not encrypted, so it cannot be checked for tampering. Make sure it is yours.":"");state="review";
             } catch(Exception error) {if(candidate!=null)candidate.close();failure(error,"");}
         });
     }

@@ -457,6 +457,7 @@ public final class MainActivity extends LibraryActivity {
         menu.getMenu().add("Imports & batch actions").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,BatchActivity.class));return true;});
         menu.getMenu().add("Edit stacks").setOnMenuItemClickListener(item -> { manageStacks(); return true; });
         menu.getMenu().add("Find duplicates").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,DuplicatesActivity.class));return true;});
+        menu.getMenu().add("Check linked documents").setOnMenuItemClickListener(item -> {checkLinked();return true;});
         menu.getMenu().add("Recently deleted").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,TrashActivity.class));return true;});
         menu.getMenu().add("Backup & restore").setOnMenuItemClickListener(item -> {
             startActivity(new Intent(this,BackupActivity.class));return true;
@@ -743,6 +744,18 @@ public final class MainActivity extends LibraryActivity {
     }
 
     /** A linked document: owned by another app, so no thumbnail or selection; it opens its own screen. */
+    private void checkLinked() {
+        android.widget.Toast.makeText(this,"Checking linked documents…",android.widget.Toast.LENGTH_SHORT).show();
+        check(() -> LinkChecker.checkAll(app()), summary -> {
+            String text = summary.checked + (summary.checked == 1 ? " linked document checked" : " linked documents checked");
+            if (summary.unreachable > 0) text += " · " + summary.unreachable + " can't be reached";
+            if (summary.missing > 0) text += " · " + summary.missing + " missing";
+            if (summary.changed > 0) text += " · " + summary.changed + " changed since saved";
+            if (summary.skipped > 0) text += " · " + summary.skipped + " skipped (busy)";
+            android.widget.Toast.makeText(this,text,android.widget.Toast.LENGTH_LONG).show();
+        });
+    }
+
     private View linkTile(LinkStore.Link link) {
         LinearLayout tile = Ui.row(this);
         tile.setPadding(Ui.dp(this, 6), Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 12));
@@ -760,8 +773,8 @@ public final class MainActivity extends LibraryActivity {
         name.setMaxLines(2); name.setEllipsize(TextUtils.TruncateAt.END);
         words.addView(name, new LinearLayout.LayoutParams(-1, -2));
         String owner = LinkOpener.ownerName(link.owner);
-        TextView badge = Ui.text(this, "Linked · " + owner + (link.isProtected ? " · protected" : ""), 12, false);
-        badge.setTextColor(Ui.BLUE); badge.setPadding(0, Ui.dp(this, 4), 0, 0);
+        TextView badge = Ui.text(this, "Linked · " + owner + (link.isProtected ? " · protected" : "") + (LinkStore.MISSING.equals(link.state) ? " · missing" : LinkStore.UNREACHABLE.equals(link.state) ? " · can't reach" : ""), 12, false);
+        badge.setTextColor(LinkStore.LIVE.equals(link.state) ? Ui.BLUE : LinkStore.MISSING.equals(link.state) ? 0xFFB3261E : Ui.MUTED); badge.setPadding(0, Ui.dp(this, 4), 0, 0);
         words.addView(badge);
         String excerpt = LinkPreview.displayText(link.excerpt, 300).trim();
         if (!excerpt.isEmpty()) {
@@ -771,7 +784,7 @@ public final class MainActivity extends LibraryActivity {
         }
         tile.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
         tile.setFocusable(true);
-        tile.setContentDescription(link.title + ", linked document from " + owner);
+        tile.setContentDescription(link.title + ", linked document from " + owner + (LinkStore.MISSING.equals(link.state) ? ", missing" : LinkStore.UNREACHABLE.equals(link.state) ? ", can't reach" : ""));
         tile.setOnClickListener(view -> { hideKeyboard(); startActivity(new Intent(this, LinkActivity.class).putExtra("link_id", link.id)); });
         return tile;
     }

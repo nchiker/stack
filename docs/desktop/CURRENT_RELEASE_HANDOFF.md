@@ -17,6 +17,9 @@
   "built"); Flatpak commit dad3876d… (parent f2f0e173…, the 0.3.0 commit); a throwaway ostree remote with the public key
   pulled its metadata with signature checking on. Bundle `.artifacts/stack-desktop-20261117-v0.4.0/Stack-0.4.0-x86_64.flatpak`.
   This computer's installed copy has not been updated yet (`flatpak update --user org.stackdocs.desktop`).
+- **Android 0.17.3 released 2026-11-21**: https://github.com/nchiker/stack/releases/tag/v0.17.3 (latest; link records, encrypted backups with a
+  Key Vault key; staged in `.artifacts/stack-release-20261121-v0.17.3/`). Source checkpoint pushed first (main f836879). Installed on the
+  test Pixel 4a; the production phone's Update check offers it (a fresh backup was made first). Desktop unchanged (0.4.0).
 - **Android 0.16.0 released 2026-11-17**: https://github.com/nchiker/stack/releases/tag/v0.16.0 (latest, target `main`,
   assets `Stack-0.16.0.apk` + `SHA256SUMS`; download re-checked identical to the staged file, SHA-256 `e0a3da2c…cd2e`).
   Built with the development key (signer `e873f2fd…e311`), staged in `.artifacts/stack-release-20261117-v0.16.0/`

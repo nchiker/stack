@@ -8,7 +8,7 @@ import android.graphics.Color;
 
 final class LibraryDatabase extends SQLiteOpenHelper {
     LibraryDatabase(Context context) {
-        super(context, "library.db", null, 11);
+        super(context, "library.db", null, 12);
         setWriteAheadLoggingEnabled(true);
     }
 
@@ -45,6 +45,7 @@ final class LibraryDatabase extends SQLiteOpenHelper {
         addSyncSchema(db);
         addTrash(db);
         addLinks(db);
+        addLinkLifecycle(db);
         String[] ids = {"bills", "banking", "ids", "house", "medical", "receipts", "starred"};
         String[] names = {"Bills", "Banking", "IDs", "House", "Medical", "Receipts", "Starred"};
         String[] colors = {"#DCEADB", "#E5E8FA", "#F7E6D2", "#F1DDE8", "#DCECF2", "#F7EDCA", "#E2E5E0"};
@@ -59,7 +60,7 @@ final class LibraryDatabase extends SQLiteOpenHelper {
     }
 
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 1 || oldVersion > 10 || newVersion != 11) {
+        if (oldVersion < 1 || oldVersion > 11 || newVersion != 12) {
             throw new IllegalStateException("No migration from library version " + oldVersion);
         }
         if (oldVersion < 2) {
@@ -78,6 +79,7 @@ final class LibraryDatabase extends SQLiteOpenHelper {
         if (oldVersion < 9) addSyncSchema(db);
         if (oldVersion < 10) addTrash(db);
         if (oldVersion < 11) addLinks(db);
+        if (oldVersion < 12) addLinkLifecycle(db);
     }
 
     /**
@@ -93,6 +95,19 @@ final class LibraryDatabase extends SQLiteOpenHelper {
                 + "added_at INTEGER NOT NULL, received_at INTEGER NOT NULL, title_user_edited INTEGER NOT NULL DEFAULT 0, "
                 + "UNIQUE(owner, link_id))");
         db.execSQL("CREATE VIRTUAL TABLE link_search USING fts4(record_id, title, body, notindexed=record_id, tokenize=unicode61)");
+    }
+
+    /**
+     * Link lifecycle (slice 4). `state_since` is when the current state began (it drives both 30-day periods: missing, then
+     * trashed); `revision` is bumped by every publish, removal and user action so a slow check cannot overwrite them;
+     * `removed_reason` is why the record is trashed (`deleted`, `trashed`, `user`, `forgotten`). Local only.
+     */
+    static void addLinkLifecycle(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE link_records ADD COLUMN state_since INTEGER NOT NULL DEFAULT 0");
+        db.execSQL("ALTER TABLE link_records ADD COLUMN checked_at INTEGER NOT NULL DEFAULT 0");
+        db.execSQL("ALTER TABLE link_records ADD COLUMN revision INTEGER NOT NULL DEFAULT 0");
+        db.execSQL("ALTER TABLE link_records ADD COLUMN removed_reason TEXT NOT NULL DEFAULT ''");
+        db.execSQL("CREATE INDEX link_records_state ON link_records(state)");
     }
 
     /**

@@ -218,6 +218,7 @@ Format 3 layout unchanged (`STACKBK\x01`, manifest length, SHA-256, manifest, en
 (`schema` stays 8 unless the link tables need a bump) and two additions: a `links` array and `previews/<canonical UUID>.pdf`
 entries in `files`. Link row fields (all required, strict, unknown fields rejected): `id, owner, link_id, kind, title, mime,
 modified, hash, shared, protected, locators, state, title_user_edited, added_at, text`. `text` up to 1 MiB (as OCR text).
+`state` is one of `live`, `unreachable`, `missing`, `trashed`; any other value is refused. A writer leaves out links in Recently deleted (`trashed`), so they are never exported. A reader accepts all four but, whatever the value, stores every restored link as `unreachable` (its `saf`/`owner` locators belong to another device or time; the next check settles it). Lifecycle columns (`state_since`, `checked_at`, `revision`, `removed_reason`) are local and not exported; no format bump.
 Limits: 1,000 links; preview at most 32 MiB; previews count toward the 8 GiB total. A library with no link records may
 still be written as format 3. Restore: a link whose `(owner, link_id)` exists locally is kept as is (never overwritten,
 same or different hash) and counted as skipped in the report; others are inserted with new row ids inside the existing

@@ -38,10 +38,17 @@ final class LinkOpener {
         Bundle reply;
         try {
             Bundle extras = new Bundle(); extras.putString("mode", mode);
-            reply = context.getContentResolver().call(Uri.parse("content://" + link.owner + ".stacklink"), "open", link.linkId, extras);
-        } catch (IllegalArgumentException | SecurityException | UnsupportedOperationException error) {
+            reply = LinkChecker.call(context, link.owner, "open", link.linkId, extras);
+        } catch (LinkChecker.Busy busy) {
+            throw new Failure(name + " is still busy. Try again in a moment.");
+        } catch (java.util.concurrent.TimeoutException late) {
+            throw new Failure(name + " took too long to answer. Try again.");
+        } catch (IllegalArgumentException | SecurityException | UnsupportedOperationException | IllegalStateException error) {
             throw new Failure(name + " isn't installed, or this version doesn't work with Stack yet. You can still read the saved text and preview here.");
-        } catch (RuntimeException error) {
+        } catch (Exception error) {
+            Throwable cause = error.getCause();
+            if (cause instanceof IllegalArgumentException || cause instanceof SecurityException || cause instanceof UnsupportedOperationException)
+                throw new Failure(name + " isn't installed, or this version doesn't work with Stack yet. You can still read the saved text and preview here.");
             throw new Failure(name + " could not be reached. Try again.");
         }
         if (reply == null) throw new Failure(name + " isn't installed, or this version doesn't work with Stack yet. You can still read the saved text and preview here.");

@@ -125,8 +125,7 @@ restored, locators dead ──▶ unreachable ("Set up again")
 4. Nothing the user added in Stack (stacks, tags, notes) is touched by a move.
 
 **Delete in the owner app or Filen.**
-1. Sender calls `removed`. Stack moves the record to **Recently deleted** with its text and preview, so the user
-   can still read it for 30 days and restore the *file* from Filen's own trash if they want it back.
+1. Sender calls `removed`. Stack moves the record to **Recently deleted** and keeps its text and preview for 30 days (restoring it makes it readable again; a read-only view inside Recently deleted is not built yet) and restore the *file* from Filen's own trash if they want it back.
 2. Filen trash is not a delete: while the file is in Filen's trash, reason is `trashed`. If it is restored,
    `moved` or `publish` returns the record to `live` automatically.
 3. After 30 days, or "Delete for good" in Stack, the record is removed and a tombstone is kept (see Sync).
@@ -188,6 +187,10 @@ see the commit messages for the fixes. Not yet done on the Stack side: stacks, t
 deleted, backup and sync of links (slices 3, 4, 6). The owner side (AmiPro) is the rest of slice 2.
 
 Slice 3 handoff (archive format 4 and encrypted exports): `docs/STACK_LINK_SLICE3_HANDOFF.md`.
+
+## Slice 4, Stack side: built (2026-11-21)
+
+`stat`/`refresh` calls (`LinkChecker`: owner identity checked first, 5 s limit, own thread pool, one call per owner, compare-and-set write; only a well-formed `exists:false` makes `missing`), provider `removed` (`{ok:true, changed:bool}`; unknown id is a no-op; `moved`/`unshared`/`delete` answer `unknown_method`), states `live|unreachable|missing|trashed` with `state_since` (missing for 30 days becomes trashed; trashed for 30 days is deleted), Recently deleted for links, "Check linked documents", detail-screen messages and an "Update saved copy" button when the hash changed. Checks: `LinkLifecycleChecks`.
 
 ## Work by project
 

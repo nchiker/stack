@@ -2,6 +2,8 @@
     <application>
         <provider android:name="org.stackdocs.app.WorkflowFixtureProvider"
             android:authorities="${applicationId}.fixtures" android:exported="true" />
+        <provider android:name="org.stackdocs.app.StubOwnerProvider"
+            android:authorities="${applicationId}.stacklink" android:exported="true" />
         <activity android:name="org.stackdocs.app.PdfRequestProbeActivity" android:exported="true" />
         <activity android:name="org.stackdocs.app.ExportGrantProbeActivity" android:exported="true" />
     </application>

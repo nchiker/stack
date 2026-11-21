@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
  * package, so one app cannot publish as another. The provider never reads or returns library content.
  */
 public final class LinkProvider extends ContentProvider {
-    static final String METHOD_CONTRACT = "contract", METHOD_BEGIN = "begin", METHOD_COMMIT = "commit", METHOD_ABORT = "abort";
+    static final String METHOD_CONTRACT = "contract", METHOD_BEGIN = "begin", METHOD_COMMIT = "commit", METHOD_ABORT = "abort", METHOD_REMOVED = "removed";
     static final int MAX_RECORD_JSON = 256 * 1024, MAX_TEXT_BYTES = 4 * 1024 * 1024, MAX_STAGED = 8;
     static final long STAGING_LIFETIME_MS = 10 * 60 * 1000L;
     private static final java.util.regex.Pattern TOKEN = java.util.regex.Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
@@ -56,6 +56,8 @@ public final class LinkProvider extends ContentProvider {
                 case METHOD_CONTRACT: out.putInt("min", LinkRecord.CONTRACT); out.putInt("max", LinkRecord.CONTRACT); return out;
                 case METHOD_BEGIN: return begin(caller, argument);
                 case METHOD_COMMIT: return commit(caller, argument);
+                // Accepted while the app lock is on: it changes a stored state and shows nothing.
+                case METHOD_REMOVED: return removed(caller, argument);
                 case METHOD_ABORT: { File dir = stage(caller, argument); if (dir != null) deleteTree(dir); return out; }
                 default: out.putString("error", "unknown_method"); return out;
             }
@@ -83,6 +85,30 @@ public final class LinkProvider extends ContentProvider {
         Bundle out = new Bundle();
         out.putString("token", token);
         return out;
+    }
+
+    /** The owner saw its file gone. Only the owner's own record can change; an unknown link_id is a harmless no-op. */
+    private Bundle removed(String caller, String json) throws IOException {
+        String[] message = LinkRecord.parseRemoval(json);
+        if (!message[0].equals(caller)) throw new IOException("A record can only be removed by the app named in its owner field.");
+        if (!COMMITS.tryAcquire()) throw new IOException("Stack is busy. Try again in a moment.");
+        Future<Boolean> work = null;
+        try {
+            StackApplication app = (StackApplication) getContext().getApplicationContext();
+            try {
+                if (!app.libraryReady.await(20, TimeUnit.SECONDS)) throw new IOException("Stack is still starting. Try again.");
+                work = app.io.submit(() -> app.library.links.markRemoved(message[0], message[1], message[2]));
+                boolean changed = work.get(30, TimeUnit.SECONDS);
+                if (changed) app.notifySyncChanged();
+                Bundle out = new Bundle();
+                out.putBoolean("ok", true); out.putBoolean("changed", changed);
+                return out;
+            } catch (InterruptedException | java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException error) {
+                if (work != null && !work.isDone()) work.cancel(true);
+                if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+                throw new IOException("Stack could not store the change. Try again.");
+            }
+        } finally { COMMITS.release(); }
     }
 
     private Bundle commit(String caller, String token) throws IOException {

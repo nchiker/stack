@@ -211,7 +211,7 @@ final class LibraryArchive {
             }
             if(staged.manifest.has("links")) {
                 Set<String> localIds=ids("link_records","id"),existing2=new HashSet<>();
-                try(Cursor row=db.rawQuery("SELECT owner||char(10)||link_id FROM link_records",null)){while(row.moveToNext())existing2.add(row.getString(0));}
+                try(Cursor row=db.rawQuery("SELECT owner||char(10)||link_id FROM link_records WHERE state<>'trashed'",null)){while(row.moveToNext())existing2.add(row.getString(0));}
                 for(JSONObject link:objects(staged.manifest.getJSONArray("links"))) {
                     if(existing2.contains(link.getString("owner")+"\n"+link.getString("link_id"))){plan.skippedLinks++;continue;}
                     String old=link.getString("id"),mapped=old;int attempt=0;while(localIds.contains(mapped)||new File(context.getFilesDir(),"links/"+mapped+".pdf").exists())mapped=mapped(plan.operation,"link",old,++attempt);
@@ -300,7 +300,13 @@ final class LibraryArchive {
                         String old=original.getString("id"),id=plan.links.get(old);if(id==null)continue;
                         ContentValues values=new ContentValues();
                         for(String field:LinkArchive.FIELDS) {if(field.equals("text")||field.equals("id"))continue;Object value=original.get(field);if(value instanceof Number)values.put(field,((Number)value).longValue());else values.put(field,(String)value);}
+                        // A copy of this link sitting in Recently deleted gives way to the backup's copy.
+                        try(Cursor gone=db.rawQuery("SELECT id FROM link_records WHERE owner=? AND link_id=? AND state='trashed'",new String[]{original.getString("owner"),original.getString("link_id")})){
+                            while(gone.moveToNext()){String trashedId=gone.getString(0);db.execSQL("DELETE FROM link_search WHERE record_id=?",new Object[]{trashedId});db.execSQL("DELETE FROM link_records WHERE id=?",new Object[]{trashedId});new File(context.getFilesDir(),"links/"+trashedId+".pdf").delete();}
+                        }
                         values.put("id",id);values.put("preview_file",withPreview.contains(old)?id+".pdf":"");values.put("received_at",now);
+                        // Whatever state the backup recorded, locators from another device or time may be dead: the next check settles it.
+                        values.put("state","unreachable");values.put("state_since",now);
                         db.insertOrThrow("link_records",null,values);
                         db.execSQL("INSERT INTO link_search(record_id,title,body) VALUES(?,?,?)",new Object[]{id,original.getString("title"),original.getString("text")});
                     }
