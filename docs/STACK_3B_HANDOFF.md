@@ -1,5 +1,7 @@
 # Stack 3b: desktop reads archive format 4 and encrypted backups (handoff, 2026-11-21)
 
+**Run all checks (one click):** double-click `Run Stack checks.desktop` in the repo root (if the file manager asks, choose "Allow Launching" once), or run `python3 desktop/tools/run_all_checks.py` with no arguments. A terminal opens, runs the desktop tests, the Java-vs-Rust check, the desktop interop run and, if the test phone is connected and unlocked, the phone interop run and the three phone suites, then prints `PASS`/`FAIL`/`SKIP` lines and a summary (about 2 minutes; add `--large` for the slow size test). Logs go to a fresh `/tmp/stack-checks-...` folder. It never installs on the phone. Still by hand: the real Flatpak key store (`SKIP flatpak-key-store`), the Key Vault menus/QR and the real windows.
+
 Start with: "Read docs/STACK_3B_HANDOFF.md and start 3b." The user wants this done mostly with cheaper agents (see Process).
 
 ## Why

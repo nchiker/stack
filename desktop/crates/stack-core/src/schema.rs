@@ -1,7 +1,7 @@
 use crate::library::{Error, Result};
 use rusqlite::Connection;
 
-pub const VERSION: i64 = 5;
+pub const VERSION: i64 = 6;
 const APPLICATION_ID: i64 = 0x53544b44;
 
 pub const V1: &str = "
@@ -34,6 +34,18 @@ CREATE INDEX text_jobs_queue ON text_jobs(state,document_id,page_id);
 const V5: &str = "
 CREATE TABLE link_records(row_id TEXT PRIMARY KEY,owner TEXT NOT NULL,link_id TEXT NOT NULL,kind TEXT NOT NULL,title TEXT NOT NULL,mime TEXT NOT NULL,modified INTEGER NOT NULL,hash TEXT NOT NULL,shared INTEGER NOT NULL,protected INTEGER NOT NULL,locators TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN('live','unreachable','missing','trashed')),title_user_edited INTEGER NOT NULL,added_at INTEGER NOT NULL,text TEXT NOT NULL,preview INTEGER NOT NULL CHECK(preview IN(0,1)),UNIQUE(owner,link_id));
 CREATE VIRTUAL TABLE link_search USING fts5(row_id UNINDEXED,title,body,tokenize='unicode61');
+";
+
+/// Link sync (slice 6, D5). Additive: existing rows keep working. `preview_sha` is empty for rows restored from an
+/// archive or migrated (no digest known); only rows with `preview_pending=1` are ever re-installed. `link_projection`
+/// holds the link cells as last applied; it is separate from `sync_state.projection` so document capture and install
+/// never see link cells.
+const V6: &str = "
+ALTER TABLE link_records ADD COLUMN state_since INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE link_records ADD COLUMN removed_reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE link_records ADD COLUMN preview_sha TEXT NOT NULL DEFAULT '';
+ALTER TABLE link_records ADD COLUMN preview_pending INTEGER NOT NULL DEFAULT 0;
+CREATE TABLE link_projection(key TEXT PRIMARY KEY,value TEXT NOT NULL);
 ";
 
 pub fn migrate(db: &mut Connection) -> Result<()> {
@@ -90,6 +102,10 @@ pub fn migrate(db: &mut Connection) -> Result<()> {
         db.prepare("SELECT row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,title_user_edited,added_at,text,preview FROM link_records LIMIT 0")?;
         db.prepare("SELECT row_id,title,body FROM link_search LIMIT 0")?;
     }
+    if version >= 6 {
+        db.prepare("SELECT state_since,removed_reason,preview_sha,preview_pending FROM link_records LIMIT 0")?;
+        db.prepare("SELECT key,value FROM link_projection LIMIT 0")?;
+    }
     if version < VERSION {
         let tx = db.transaction()?;
         if version < 1 {
@@ -106,6 +122,9 @@ pub fn migrate(db: &mut Connection) -> Result<()> {
         }
         if version < 5 {
             tx.execute_batch(V5)?;
+        }
+        if version < 6 {
+            tx.execute_batch(V6)?;
         }
         tx.pragma_update(None, "application_id", APPLICATION_ID)?;
         tx.pragma_update(None, "user_version", VERSION)?;
@@ -158,6 +177,73 @@ mod tests {
         let library = Library::open(&root).unwrap();
         assert_eq!(crate::library::bindings(&library.db).unwrap(), bindings);
         assert_eq!(library.journal().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn schema_5_library_with_links_migrates_to_6_additively() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().join("library");
+        drop(Library::open(&root).unwrap());
+        std::fs::remove_file(root.join("library.sqlite3")).unwrap();
+        // A real version 5 database: V1..V5 exactly as the previous release created them, with a link row.
+        let db = Connection::open(root.join("library.sqlite3")).unwrap();
+        db.execute_batch(V1).unwrap();
+        db.execute_batch(V2).unwrap();
+        db.execute_batch(V3).unwrap();
+        db.execute_batch("CREATE TABLE sync_state(singleton INTEGER PRIMARY KEY CHECK(singleton=1),state TEXT NOT NULL,projection TEXT NOT NULL,baseline TEXT NOT NULL);CREATE TABLE sync_receipts(peer TEXT PRIMARY KEY,frontier TEXT NOT NULL);").unwrap();
+        db.execute_batch(V5).unwrap();
+        db.pragma_update(None, "application_id", APPLICATION_ID)
+            .unwrap();
+        db.pragma_update(None, "user_version", 5).unwrap();
+        for (key, value) in [
+            ("library_id", "existing-library"),
+            ("replica_id", "existing-replica"),
+        ] {
+            db.execute("INSERT INTO meta VALUES(?1,?2)", params![key, value])
+                .unwrap();
+        }
+        db.execute(
+            "INSERT INTO link_records VALUES('11111111-1111-4111-8111-111111111111','org.example.amipro','22222222-2222-4222-8222-222222222222','doc','Old link','application/pdf',1,?1,0,1,'[]','unreachable',0,5,'old text',1)",
+            ["a".repeat(64)],
+        )
+        .unwrap();
+        db.execute(
+            "INSERT INTO link_search VALUES('11111111-1111-4111-8111-111111111111','Old link','old text')",
+            [],
+        )
+        .unwrap();
+        drop(db);
+        let library = Library::open(&root).unwrap();
+        assert_eq!(library.status().unwrap().schema, 6);
+        assert_eq!(library.link_count().unwrap(), 1);
+        let row: (String, i64, String, i64, i64, i64, String) = library
+            .db
+            .query_row(
+                "SELECT title,preview,preview_sha,preview_pending,state_since,protected,removed_reason FROM link_records",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?)),
+            )
+            .unwrap();
+        // Migrated rows start with no digest and nothing pending: repair never touches them.
+        assert_eq!(
+            row,
+            ("Old link".into(), 1, String::new(), 0, 0, 1, String::new())
+        );
+        let projection: i64 = library
+            .db
+            .query_row("SELECT count(*) FROM link_projection", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(projection, 0);
+        let version: i64 = library
+            .db
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(version, 6);
+        drop(library);
+        // Reopening is a no-op, and the previous release (VERSION 5) would refuse this library because
+        // `version > VERSION` is an error (see `rejects_future_foreign_and_partial_schema...`).
+        let library = Library::open(&root).unwrap();
+        assert_eq!(library.link_count().unwrap(), 1);
     }
 
     #[test]

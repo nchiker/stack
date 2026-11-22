@@ -7,8 +7,13 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.graphics.Color;
 
 final class LibraryDatabase extends SQLiteOpenHelper {
-    LibraryDatabase(Context context) {
-        super(context, "library.db", null, 12);
+    static final int VERSION = 13;
+
+    LibraryDatabase(Context context) { this(context, "library.db"); }
+
+    /** A different file name exists only so a test can build and migrate a throwaway library next to the real one. */
+    LibraryDatabase(Context context, String name) {
+        super(context, name, null, VERSION);
         setWriteAheadLoggingEnabled(true);
     }
 
@@ -46,6 +51,7 @@ final class LibraryDatabase extends SQLiteOpenHelper {
         addTrash(db);
         addLinks(db);
         addLinkLifecycle(db);
+        addLinkSync(db);
         String[] ids = {"bills", "banking", "ids", "house", "medical", "receipts", "starred"};
         String[] names = {"Bills", "Banking", "IDs", "House", "Medical", "Receipts", "Starred"};
         String[] colors = {"#DCEADB", "#E5E8FA", "#F7E6D2", "#F1DDE8", "#DCECF2", "#F7EDCA", "#E2E5E0"};
@@ -60,7 +66,7 @@ final class LibraryDatabase extends SQLiteOpenHelper {
     }
 
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 1 || oldVersion > 11 || newVersion != 12) {
+        if (oldVersion < 1 || oldVersion > 12 || newVersion != VERSION) {
             throw new IllegalStateException("No migration from library version " + oldVersion);
         }
         if (oldVersion < 2) {
@@ -80,6 +86,40 @@ final class LibraryDatabase extends SQLiteOpenHelper {
         if (oldVersion < 10) addTrash(db);
         if (oldVersion < 11) addLinks(db);
         if (oldVersion < 12) addLinkLifecycle(db);
+        if (oldVersion < 13) addLinkSync(db);
+    }
+
+    /**
+     * Link sync, phone side (docs/STACK_LINK_SLICE6_DESIGN.md sections 7 and 15, item P1). Additive only, so every existing
+     * library opens and migrates. `text_sha`/`text_len`/`preview_sha`/`preview_len` are the digests of the saved text (UTF-8
+     * bytes of `link_search.body`) and preview file; they are reset whenever a publish changes the content and are verified by
+     * length and hash before capture reuses them. `preview_pending` marks a synced preview whose file is not placed yet. `preview_mtime` is the preview file's modified time when
+     * `preview_sha` was verified against it, so the check survives a restart (a different time means the file is hashed again).
+     * `sync_link_projection` holds the link cells as last synced (one row per cell key, canonical JSON value); only link capture
+     * and install read or write it, so the document projection in `sync_state` is never touched by links.
+     * The triggers record a change only when something that is SYNCED changed (an IS NOT comparison, and trashed-ness for
+     * `state`), so writes of only `checked_at`, `state_since`, `revision` or `received_at`, or a live/unreachable/missing
+     * flip by LinkChecker, never fire. Each trigger also raises the `link_dirty` flag that makes capture run.
+     */
+    static void addLinkSync(SQLiteDatabase db) {
+        for (String column : new String[]{"text_sha TEXT NOT NULL DEFAULT ''", "text_len INTEGER NOT NULL DEFAULT 0",
+                "preview_sha TEXT NOT NULL DEFAULT ''", "preview_len INTEGER NOT NULL DEFAULT 0", "preview_pending INTEGER NOT NULL DEFAULT 0",
+                "preview_mtime INTEGER NOT NULL DEFAULT 0"})
+            db.execSQL("ALTER TABLE link_records ADD COLUMN " + column);
+        db.execSQL("CREATE TABLE IF NOT EXISTS sync_link_projection (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+        String guard = " WHEN (SELECT enabled=1 AND applying=0 FROM sync_control WHERE singleton=1)";
+        String body = " BEGIN INSERT INTO sync_change(table_name,action) VALUES('link_records','%s'); "
+                + "INSERT OR REPLACE INTO sync_meta(key,value) VALUES('link_dirty','1'); END";
+        db.execSQL("CREATE TRIGGER IF NOT EXISTS sync_link_records_insert AFTER INSERT ON link_records" + guard + String.format(java.util.Locale.ROOT, body, "INSERT"));
+        db.execSQL("CREATE TRIGGER IF NOT EXISTS sync_link_records_delete AFTER DELETE ON link_records" + guard + String.format(java.util.Locale.ROOT, body, "DELETE"));
+        String[] synced = {"owner", "link_id", "kind", "title", "mime", "modified", "hash", "shared", "protected", "locators",
+                "preview_file", "title_user_edited", "removed_reason"};
+        StringBuilder changed = new StringBuilder("(OLD.state='trashed') IS NOT (NEW.state='trashed')");
+        for (String column : synced) changed.append(" OR OLD.").append(column).append(" IS NOT NEW.").append(column);
+        db.execSQL("CREATE TRIGGER IF NOT EXISTS sync_link_records_update AFTER UPDATE OF owner,link_id,kind,title,mime,modified,hash,shared,protected,"
+                + "locators,state,preview_file,title_user_edited,removed_reason ON link_records"
+                + " WHEN (SELECT enabled=1 AND applying=0 FROM sync_control WHERE singleton=1) AND (" + changed + ")"
+                + String.format(java.util.Locale.ROOT, body, "UPDATE"));
     }
 
     /**

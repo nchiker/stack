@@ -25,7 +25,12 @@ fn failure_line(error: &dyn std::error::Error) -> String {
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
     if args.first().is_some_and(|c| {
-        c == "sync" || c == "library" || c == "archive" || c == "m1-fixtures" || c == "m1-interrupt"
+        c == "sync"
+            || c == "key"
+            || c == "library"
+            || c == "archive"
+            || c == "m1-fixtures"
+            || c == "m1-interrupt"
     }) {
         return storage::run(&args);
     }

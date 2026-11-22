@@ -58,11 +58,11 @@ pub(crate) fn preview_file(row_id: &str) -> String {
 
 impl Library {
     pub fn link_count(&self) -> Result<usize> {
-        Ok(self
-            .db
-            .query_row("SELECT count(*) FROM link_records", [], |r| {
-                r.get::<_, i64>(0)
-            })? as usize)
+        Ok(self.db.query_row(
+            "SELECT count(*) FROM link_records WHERE state<>'trashed'",
+            [],
+            |r| r.get::<_, i64>(0),
+        )? as usize)
     }
 
     pub fn linked_document(&self, id: &str) -> Result<LinkedDocument> {
@@ -70,7 +70,7 @@ impl Library {
         let row = self
             .db
             .query_row(
-                "SELECT owner,link_id,kind,title,mime,modified,added_at,state,hash,text,preview FROM link_records WHERE row_id=?1",
+                "SELECT owner,link_id,kind,title,mime,modified,added_at,state,hash,text,preview AND NOT preview_pending FROM link_records WHERE row_id=?1",
                 [id],
                 |r| {
                     Ok((
@@ -117,7 +117,7 @@ impl Library {
         let mut out = Vec::new();
         if expression.is_empty() {
             let mut statement = self.db.prepare(&format!(
-                "SELECT l.row_id,l.title,l.added_at FROM link_records l ORDER BY {order} LIMIT ?1"
+                "SELECT l.row_id,l.title,l.added_at FROM link_records l WHERE l.state<>'trashed' ORDER BY {order} LIMIT ?1"
             ))?;
             for row in statement.query_map(params![limit], |r| {
                 Ok((r.get(0)?, r.get(1)?, r.get(2)?, String::new()))
@@ -126,7 +126,7 @@ impl Library {
             }
         } else {
             let mut statement = self.db.prepare(&format!(
-                "SELECT l.row_id,l.title,l.added_at,snippet(link_search,2,'','','…',24) FROM link_search s JOIN link_records l ON l.row_id=s.row_id WHERE link_search MATCH ?1 ORDER BY {order} LIMIT ?2"
+                "SELECT l.row_id,l.title,l.added_at,snippet(link_search,2,'','','…',24) FROM link_search s JOIN link_records l ON l.row_id=s.row_id WHERE link_search MATCH ?1 AND l.state<>'trashed' ORDER BY {order} LIMIT ?2"
             ))?;
             for row in statement.query_map(params![expression, limit], |r| {
                 Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))

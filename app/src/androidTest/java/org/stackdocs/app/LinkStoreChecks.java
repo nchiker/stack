@@ -27,6 +27,11 @@ final class LinkStoreChecks {
         return file;
     }
 
+    /** The journal rows of documents and the rest of the library; link rows have their own capture (slice 6) and raise `link_records` entries. */
+    private static int documentJournal(SQLiteDatabase db) {
+        try (Cursor c = db.rawQuery("SELECT count(*) FROM sync_change WHERE table_name<>'link_records'", null)) { c.moveToFirst(); return c.getInt(0); }
+    }
+
     private static int count(SQLiteDatabase db, String table) {
         try (Cursor c = db.rawQuery("SELECT count(*) FROM " + table, null)) { c.moveToFirst(); return c.getInt(0); }
     }
@@ -40,12 +45,12 @@ final class LinkStoreChecks {
             LinkStore store = new LinkStore(() -> db, links);
             // Sync on: a link record must add nothing to the journal and nothing to documents.
             db.execSQL("INSERT OR REPLACE INTO sync_control(singleton,enabled,applying) VALUES(1,1,0)");
-            int journal = count(db, "sync_change"), documents = count(db, "documents");
+            int journal = documentJournal(db), documents = count(db, "documents");
 
             String a = UUID.randomUUID().toString(), uuid = UUID.randomUUID().toString();
             LinkStore.Result first = store.publish(record(a, "Medicines and doctors", "1".repeat(64), uuid), "Dr Patel cardiology metformin 500 mg twice daily", pdf(staging, "one.pdf"));
             WorkflowRepositoryChecks.require(first.created && first.contentChanged && first.duplicateOf == null, "first publish creates a record");
-            WorkflowRepositoryChecks.require(count(db, "sync_change") == journal && count(db, "documents") == documents, "a link record adds nothing to the sync journal or to documents");
+            WorkflowRepositoryChecks.require(documentJournal(db) == journal && count(db, "documents") == documents, "a link record adds nothing to the document sync journal or to documents");
             WorkflowRepositoryChecks.require(store.preview(first.id) != null && store.get(first.id).hasPreview, "the preview is cached");
             List<LinkStore.Link> found = store.list("metformin");
             WorkflowRepositoryChecks.require(found.size() == 1 && found.get(0).id.equals(first.id) && found.get(0).excerpt.contains("metformin"), "search finds the owner's text with an excerpt");
@@ -88,15 +93,15 @@ final class LinkStoreChecks {
             WorkflowRepositoryChecks.require(cached != null, "a preview exists before delete");
             store.delete(gone.id);
             WorkflowRepositoryChecks.require(store.get(gone.id) == null && store.list("temporary").isEmpty() && !cached.exists(), "delete removes the record, its search entry and its preview");
-            WorkflowRepositoryChecks.require(count(db, "sync_change") == journal && count(db, "documents") == documents, "the journal and documents are still untouched after every operation");
+            WorkflowRepositoryChecks.require(documentJournal(db) == journal && count(db, "documents") == documents, "the document journal and documents are still untouched after every operation");
 
             // A version 10 library gains the link tables without losing anything.
-            db.execSQL("DROP TABLE link_search"); db.execSQL("DROP TABLE link_records"); db.setVersion(10);
+            db.execSQL("DROP TABLE link_search"); db.execSQL("DROP TABLE link_records"); db.execSQL("DROP TABLE sync_link_projection"); db.setVersion(10);
         } finally { helper.close(); }
         LibraryDatabase upgraded = new LibraryDatabase(isolated);
         try {
             SQLiteDatabase db = upgraded.getWritableDatabase();
-            WorkflowRepositoryChecks.require(db.getVersion() == 12 && count(db, "link_records") == 0 && count(db, "link_search") == 0, "a version 10 library upgrades to 12 with empty link tables");
+            WorkflowRepositoryChecks.require(db.getVersion() == 13 && count(db, "link_records") == 0 && count(db, "link_search") == 0, "a version 10 library upgrades to 13 with empty link tables");
         } finally { upgraded.close(); }
         mark.accept("Link store: publish/repeat/replace/rename/delete, text+title search with excerpt, duplicate-hash report, refused text stores nothing, sync journal and documents untouched, v10 to v11 upgrade");
     }

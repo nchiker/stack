@@ -19,6 +19,15 @@ fn report(value: &impl serde::Serialize) -> Result<()> {
 }
 
 pub fn run(args: &[OsString]) -> Result<()> {
+    if let [command, rest @ ..] = args
+        && command == "key"
+    {
+        let line = key_command(&stack_core::keystore::SystemStore, rest, || {
+            read_secret_stdin("Recovery key: ")
+        })?;
+        println!("{line}");
+        return Ok(());
+    }
     let control = Control::default();
     let renderer = Renderer::from_environment();
     if let [command, source, output] = args
@@ -292,6 +301,68 @@ pub fn run(args: &[OsString]) -> Result<()> {
         _ => Err(usage().into()),
     }
 }
+const NO_STORE: &str =
+    "No key store is available on this computer, so the saved key cannot be used";
+const BAD_KEY: &str = "That is not a Stack backup key";
+const KEY_EXISTS: &str =
+    "A backup key is already saved on this computer; add --replace to replace it";
+fn store_error(error: stack_core::keystore::StoreError) -> Box<dyn std::error::Error> {
+    use stack_core::keystore::StoreError;
+    match error {
+        StoreError::Unavailable => NO_STORE.into(),
+        other => other.into(),
+    }
+}
+
+/// `key save --key-stdin [--replace]`, `key status`, `key remove`: manage the backup key saved on this computer
+/// (the same store the desktop app uses). The key comes only from standard input and is never printed; `status`
+/// shows only whether a key is saved and its short fingerprint. The desktop app replaces a saved key only after the
+/// new key has opened a backup; a command with no backup to prove it needs `--replace` to overwrite.
+fn key_command(
+    store: &dyn stack_core::keystore::SecretStore,
+    args: &[OsString],
+    read_stdin: impl FnOnce() -> Result<String>,
+) -> Result<String> {
+    use stack_core::keystore::{KeyStatus, fingerprint, key_status, parse_key_text};
+    let word = |a: &OsString| a.to_str().map(str::to_owned);
+    match args.iter().map(word).collect::<Option<Vec<_>>>().as_deref() {
+        Some([action, flag]) | Some([action, flag, _])
+            if action == "save" && flag == "--key-stdin" =>
+        {
+            let replace = match args {
+                [_, _] => false,
+                [_, _, r] if r == "--replace" => true,
+                _ => return Err(usage().into()),
+            };
+            let text = zeroize::Zeroizing::new(read_stdin()?);
+            let hex = parse_key_text(&text).ok_or(BAD_KEY)?;
+            if !replace && store.get().map_err(store_error)?.is_some() {
+                return Err(KEY_EXISTS.into());
+            }
+            store.set(&hex).map_err(store_error)?;
+            Ok(format!(
+                "Backup key saved on this computer. Fingerprint {}",
+                fingerprint(&hex)
+            ))
+        }
+        Some([action]) if action == "status" => match key_status(store) {
+            Ok(KeyStatus::Saved { fingerprint }) => {
+                Ok(format!("saved: yes\nfingerprint: {fingerprint}"))
+            }
+            Ok(KeyStatus::NotSet) => Ok("saved: no".into()),
+            Ok(KeyStatus::Locked) => Ok("saved: unknown (the key store is locked)".into()),
+            Err(message) if message == stack_core::keystore::StoreError::UNAVAILABLE_TEXT => {
+                Err(NO_STORE.into())
+            }
+            Err(message) => Err(message.into()),
+        },
+        Some([action]) if action == "remove" => {
+            store.remove().map_err(store_error)?;
+            Ok("Saved backup key removed from this computer.".into())
+        }
+        _ => Err(usage().into()),
+    }
+}
 /// The key the desktop app saved on this computer. The user asked for it, so a missing key store is an error here
 /// (the CLI never falls back to a plain file).
 fn saved_key() -> Result<stack_core::BackupKey> {
@@ -419,7 +490,7 @@ fn visibility(value: &str) -> Result<bool> {
     }
 }
 fn usage() -> &'static str {
-    "Usage: stack-cli library ROOT status|reindex|manifest|journal|search QUERY [STACK]|import FILE TITLE|rename ID TITLE|notes ID TEXT|file ID [STACK...]|detail ID JSON_FILE|remove-detail ID FIELD|delete ID|page-order ID PAGE...|stack-create NAME COLOR show/hide|stack-rename ID NAME|stack-visibility ID show/hide|stack-delete ID|stack-order ID...; stack-cli archive ROOT validate|review|restore FILE [--saved-key|--key-file PATH|--key-stdin|--passphrase-file PATH|--passphrase-stdin] (validate|review print a short summary; add --full for the whole id mapping)|export NEW_FILE [--saved-key]; stack-cli m1-fixtures M0_FIXTURES NEW_DIRECTORY"
+    "Usage: stack-cli library ROOT status|reindex|manifest|journal|search QUERY [STACK]|import FILE TITLE|rename ID TITLE|notes ID TEXT|file ID [STACK...]|detail ID JSON_FILE|remove-detail ID FIELD|delete ID|page-order ID PAGE...|stack-create NAME COLOR show/hide|stack-rename ID NAME|stack-visibility ID show/hide|stack-delete ID|stack-order ID...; stack-cli archive ROOT validate|review|restore FILE [--saved-key|--key-file PATH|--key-stdin|--passphrase-file PATH|--passphrase-stdin] (validate|review print a short summary; add --full for the whole id mapping)|export NEW_FILE [--saved-key]; stack-cli key save --key-stdin [--replace]|status|remove (the key is read from standard input only); stack-cli m1-fixtures M0_FIXTURES NEW_DIRECTORY"
 }
 
 /// External SIGKILL harness hook, restricted to explicit synthetic /tmp roots.
@@ -531,6 +602,90 @@ mod tests {
         );
         fs::write(&file, "\n").unwrap();
         assert!(backup_key(&args(&["--key-file", file.to_str().unwrap()])).is_err());
+    }
+
+    #[test]
+    fn key_commands_use_the_store_and_never_show_the_key() {
+        use stack_core::keystore::{MemoryStore, SecretStore, fingerprint};
+        use std::sync::atomic::Ordering::SeqCst;
+        let args = |v: &[&str]| v.iter().map(OsString::from).collect::<Vec<_>>();
+        let hex: String = (1u8..=32).map(|b| format!("{b:02x}")).collect();
+        let stdin = |text: String| move || Ok(text);
+        let store = MemoryStore::default();
+        let status = |s: &MemoryStore| key_command(s, &args(&["status"]), || unreachable!());
+        assert_eq!(status(&store).unwrap(), "saved: no");
+        let saved = key_command(&store, &args(&["save", "--key-stdin"]), stdin(hex.clone()));
+        assert_eq!(
+            saved.unwrap(),
+            format!(
+                "Backup key saved on this computer. Fingerprint {}",
+                fingerprint(&hex)
+            )
+        );
+        let shown = status(&store).unwrap();
+        assert_eq!(
+            shown,
+            format!("saved: yes\nfingerprint: {}", fingerprint(&hex))
+        );
+        assert!(!shown.contains(&hex));
+        // An existing key is replaced only with --replace.
+        let other = "ab".repeat(32);
+        let refused = key_command(
+            &store,
+            &args(&["save", "--key-stdin"]),
+            stdin(other.clone()),
+        );
+        assert_eq!(refused.unwrap_err().to_string(), KEY_EXISTS);
+        assert_eq!(&**store.get().unwrap().unwrap(), hex.as_str());
+        key_command(
+            &store,
+            &args(&["save", "--key-stdin", "--replace"]),
+            stdin(other.clone()),
+        )
+        .unwrap();
+        assert_eq!(&**store.get().unwrap().unwrap(), other.as_str());
+        // An invalid key gets a generic message that does not echo it.
+        let bad = key_command(
+            &store,
+            &args(&["save", "--key-stdin", "--replace"]),
+            stdin("nope-secret".into()),
+        );
+        let message = bad.unwrap_err().to_string();
+        assert_eq!(message, BAD_KEY);
+        assert!(!message.contains("secret"));
+        // A key (or anything else) on the command line is a usage error and is never read.
+        for bad in [
+            args(&["save", &hex]),
+            args(&["save", "--key", &hex]),
+            args(&["save", "--key-stdin", &hex]),
+            args(&["save"]),
+            args(&["status", "x"]),
+            args(&["remove", "x"]),
+            args(&["wat"]),
+            args(&[]),
+        ] {
+            let error = key_command(&store, &bad, || unreachable!())
+                .unwrap_err()
+                .to_string();
+            assert!(error.starts_with("Usage:") && !error.contains(&hex));
+        }
+        assert_eq!(
+            key_command(&store, &args(&["remove"]), || unreachable!()).unwrap(),
+            "Saved backup key removed from this computer."
+        );
+        assert_eq!(status(&store).unwrap(), "saved: no");
+        // Locked and unreachable stores.
+        store.locked.store(true, SeqCst);
+        assert!(status(&store).unwrap().starts_with("saved: unknown"));
+        assert_eq!(store.unlocks.load(SeqCst), 0);
+        store.locked.store(false, SeqCst);
+        store.unavailable.store(true, SeqCst);
+        for a in [vec!["status"], vec!["remove"]] {
+            let e = key_command(&store, &args(&a), || unreachable!()).unwrap_err();
+            assert_eq!(e.to_string(), NO_STORE);
+        }
+        let e = key_command(&store, &args(&["save", "--key-stdin"]), stdin(hex));
+        assert_eq!(e.unwrap_err().to_string(), NO_STORE);
     }
 
     #[test]

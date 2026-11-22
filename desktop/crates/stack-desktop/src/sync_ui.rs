@@ -56,6 +56,8 @@ fn conflict_entries(status: &Value) -> Vec<(&String, &Value)> {
     };
     conflicts
         .iter()
+        // Link records are read-only here: the phone resolves them. They never appear in the review.
+        .filter(|(key, _)| !key.starts_with("link_records/"))
         .filter(|(key, _)| {
             if let Some(ids) = key
                 .strip_prefix("choices/")
@@ -74,6 +76,16 @@ fn conflict_entries(status: &Value) -> Vec<(&String, &Value)> {
 }
 fn conflict_count(status: &Value) -> usize {
     conflict_entries(status).len()
+}
+/// True when a linked-document record has a conflict (shown as a plain note; resolved on the phone).
+pub(crate) fn has_link_conflict(status: &Value) -> bool {
+    status["conflicts"]
+        .as_object()
+        .is_some_and(|c| c.keys().any(|key| key.starts_with("link_records/")))
+}
+/// True when the conflict section has anything to show (document conflicts or a link note).
+pub(crate) fn shows_conflicts(status: &Value) -> bool {
+    conflict_count(status) > 0 || has_link_conflict(status)
 }
 
 fn choice(status: &Value, key: &str, position: usize) -> Result<(Value, Value), String> {
@@ -357,17 +369,28 @@ impl Stack {
         let Some(status) = &self.sync.status else {
             return content.into();
         };
-        let Some(conflicts) = status["conflicts"].as_object() else {
+        if !shows_conflicts(status) {
             return content.into();
-        };
-        if conflicts.is_empty() {
-            return content.into();
+        }
+        if conflict_count(status) == 0 {
+            return content
+                .push(widget::text::title3("Linked documents"))
+                .push(self.body(
+                    "Some linked documents changed on both devices. Resolve them on the phone.",
+                ))
+                .into();
         }
         content = content
             .push(widget::text::title3("Changed on both devices"))
             .push(self.body(
                 "Choose the version to keep. Your other documents continue to sync automatically.",
             ));
+        if has_link_conflict(status) {
+            content =
+                content.push(self.body(
+                    "Some linked documents changed on both devices. Resolve them on the phone.",
+                ));
+        }
         let displayed = conflict_entries(status);
         for (key, values) in displayed
             .iter()
@@ -477,6 +500,17 @@ mod tests {
     use super::*;
     use serde_json::json;
     use stack_core::{DocumentView, library::DocumentToken};
+
+    #[test]
+    fn link_conflicts_are_hidden_from_the_review_and_noted_for_the_phone() {
+        let only_link = json!({"conflicts": {"link_records/[\"a.b\",\"x\"]/title": []}});
+        assert_eq!(conflict_count(&only_link), 0);
+        assert!(has_link_conflict(&only_link));
+        assert!(shows_conflicts(&only_link));
+        let mixed = json!({"conflicts": {"link_records/[\"a.b\",\"x\"]": [],"documents/[\"d\"]/title": []}});
+        assert_eq!(conflict_count(&mixed), 1);
+        assert!(!shows_conflicts(&json!({"conflicts": {}})));
+    }
 
     #[test]
     fn resolution_carries_every_reviewed_id_and_never_resurrects_deletion() {

@@ -768,5 +768,3951 @@
         "evidence": null
       }
     }
-  ]
+  ],
+  "graph_cases": {
+    "format": "org.stackdocs.link-graph-golden",
+    "version": 1,
+    "pending": {
+      "rust": "D2",
+      "java": "D3"
+    },
+    "notes": [
+      "Strings may be written as {\"repeat\":s,\"count\":n}; loaders expand to s repeated n times before use.",
+      "receiver_rejects: receive-side validator (graph validate_changes / SyncGraph.validateChanges) must return an error.",
+      "receiver_accepts_skips: validator accepts; projection (project_links / applySynced) reports `projection` = applied | applied_metadata_only | skipped | gone | not_applicable; skip_count is the number counted.",
+      "writer_refuses: writer self-check input is `input.row` plus optional `input.context`; expect.outcome = emitted | row_refused | cell_skipped; expect.cells maps a suffix to its exact value (null = null cell); expect.absent lists suffixes that must not be emitted.",
+      "enable_ops: expect.kernel is checked against the existing kernel today; expect.receiver against the link receiver (pending)."
+    ],
+    "receiver_rejects": [
+      {
+        "name": "key-non-canonical-json-space",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\", \"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          }
+        },
+        "why": "key shape"
+      },
+      {
+        "name": "key-wrong-arity-three",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\",\"x\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          }
+        },
+        "why": "key arity"
+      },
+      {
+        "name": "key-wrong-arity-one",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          }
+        },
+        "why": "key arity"
+      },
+      {
+        "name": "key-uppercase-link-id",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-00000000000A\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-00000000000A",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          }
+        },
+        "why": "key shape"
+      },
+      {
+        "name": "key-differs-from-identity-owner",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.other",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          }
+        },
+        "why": "key must equal identity row"
+      },
+      {
+        "name": "key-differs-from-identity-link-id",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000002",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          }
+        },
+        "why": "key must equal identity row"
+      },
+      {
+        "name": "unknown-suffix",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/bogus": {
+            "x": 1
+          }
+        },
+        "why": "unknown suffix"
+      },
+      {
+        "name": "identity-extra-field",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "extra": 1
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "extra field"
+      },
+      {
+        "name": "identity-missing-field",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "missing field"
+      },
+      {
+        "name": "identity-null",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "identity not nullable"
+      },
+      {
+        "name": "identity-added-at-string",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": "1"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "wrong JSON type"
+      },
+      {
+        "name": "identity-added-at-2^53",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 9007199254740992
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "range"
+      },
+      {
+        "name": "identity-added-at-negative",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": -1
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "range"
+      },
+      {
+        "name": "content-extra-field",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "extra": 1
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "extra field"
+      },
+      {
+        "name": "content-missing-field",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "missing field"
+      },
+      {
+        "name": "content-modified-string",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": "1",
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "wrong JSON type"
+      },
+      {
+        "name": "content-shared-string",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": "1",
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "wrong JSON type"
+      },
+      {
+        "name": "content-protected-string",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": "1"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "wrong JSON type"
+      },
+      {
+        "name": "content-modified-2^53",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 9007199254740992,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "range"
+      },
+      {
+        "name": "content-modified-negative",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": -1,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "range"
+      },
+      {
+        "name": "content-shared-2",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 2,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "shared must be 0 or 1"
+      },
+      {
+        "name": "content-protected-2",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 2
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "protected must be 0 or 1"
+      },
+      {
+        "name": "content-hash-over-64-chars",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "memory bound: hash at most 64"
+      },
+      {
+        "name": "content-mime-over-100-chars",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": {
+              "repeat": "a",
+              "count": 101
+            },
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "memory bound: mime at most 100"
+      },
+      {
+        "name": "text-extra-field",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10,
+            "extra": 1
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "extra field"
+      },
+      {
+        "name": "text-length-0",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "length 1..1048576"
+      },
+      {
+        "name": "text-length-1MiB-plus-1",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 1048577
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "length 1..1048576"
+      },
+      {
+        "name": "text-length-string",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": "10"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "wrong JSON type"
+      },
+      {
+        "name": "text-sha-over-64-chars",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "memory bound"
+      },
+      {
+        "name": "preview-length-0",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "length 1..33554432"
+      },
+      {
+        "name": "preview-length-32MiB-plus-1",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 33554433
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "length 1..33554432"
+      },
+      {
+        "name": "title-over-200-utf16-units",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": {
+              "repeat": "a",
+              "count": 201
+            },
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "title at most 200 UTF-16 units"
+      },
+      {
+        "name": "title-over-200-utf16-units-astral",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": {
+              "repeat": "🦀",
+              "count": 101
+            },
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "101 astral chars = 202 units (bytes would also exceed; units are the rule)"
+      },
+      {
+        "name": "title-flag-2",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 2
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "flag 0 or 1"
+      },
+      {
+        "name": "title-flag-string",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": "0"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "wrong JSON type"
+      },
+      {
+        "name": "title-extra-field",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0,
+            "extra": 1
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "extra field"
+      },
+      {
+        "name": "filen-path-over-1024-utf16-units",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": {
+              "repeat": "a",
+              "count": 1025
+            }
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "path at most 1024 UTF-16 units"
+      },
+      {
+        "name": "filen-path-513-astral-1026-units",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": {
+              "repeat": "🦀",
+              "count": 513
+            }
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "513 astral chars = 1026 UTF-16 units (over 1024), only 513 code points: units are the rule"
+      },
+      {
+        "name": "filen-extra-field",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf",
+            "extra": 1
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "extra field"
+      },
+      {
+        "name": "filen-missing-field",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "missing field"
+      },
+      {
+        "name": "presence-null",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": null
+        },
+        "why": "presence not nullable"
+      },
+      {
+        "name": "presence-extra-field",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0,
+            "extra": 1
+          }
+        },
+        "why": "extra field"
+      },
+      {
+        "name": "presence-missing-since",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": ""
+          }
+        },
+        "why": "missing field"
+      },
+      {
+        "name": "presence-since-2^53",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 9007199254740992
+          }
+        },
+        "why": "range"
+      },
+      {
+        "name": "presence-since-negative",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": -1
+          }
+        },
+        "why": "range"
+      },
+      {
+        "name": "presence-since-string",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": "0"
+          }
+        },
+        "why": "wrong JSON type"
+      },
+      {
+        "name": "marker-missing-since",
+        "changes": {
+          "link_records/enabled/20000000-0000-0000-0000-000000000001": {}
+        },
+        "why": "marker needs since"
+      },
+      {
+        "name": "marker-null",
+        "changes": {
+          "link_records/enabled/20000000-0000-0000-0000-000000000001": null
+        },
+        "why": "marker not nullable"
+      },
+      {
+        "name": "marker-since-2^53",
+        "changes": {
+          "link_records/enabled/20000000-0000-0000-0000-000000000001": {
+            "since": 9007199254740992
+          }
+        },
+        "why": "range"
+      },
+      {
+        "name": "marker-since-negative",
+        "changes": {
+          "link_records/enabled/20000000-0000-0000-0000-000000000001": {
+            "since": -1
+          }
+        },
+        "why": "range"
+      },
+      {
+        "name": "marker-extra-field",
+        "changes": {
+          "link_records/enabled/20000000-0000-0000-0000-000000000001": {
+            "since": 1,
+            "extra": 1
+          }
+        },
+        "why": "extra field"
+      },
+      {
+        "name": "marker-since-string",
+        "changes": {
+          "link_records/enabled/20000000-0000-0000-0000-000000000001": {
+            "since": "1"
+          }
+        },
+        "why": "wrong JSON type"
+      },
+      {
+        "name": "content-non-object",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": "x",
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "wrong JSON type"
+      }
+    ],
+    "receiver_accepts_skips": [
+      {
+        "name": "full-valid-link",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "all seven cells valid"
+      },
+      {
+        "name": "identity-added-at-2^53-1",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 9007199254740991
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "2^53-1 accepted"
+      },
+      {
+        "name": "identity-added-at-0",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "zero accepted"
+      },
+      {
+        "name": "content-modified-2^53-1",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 9007199254740991,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "2^53-1 accepted"
+      },
+      {
+        "name": "presence-since-2^53-1",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 9007199254740991
+          }
+        },
+        "projection": "applied",
+        "why": "2^53-1 accepted"
+      },
+      {
+        "name": "marker-since-2^53-1",
+        "changes": {
+          "link_records/enabled/20000000-0000-0000-0000-000000000001": {
+            "since": 9007199254740991
+          }
+        },
+        "projection": "not_applicable",
+        "why": "marker accepted at 2^53-1"
+      },
+      {
+        "name": "marker-since-0",
+        "changes": {
+          "link_records/enabled/20000000-0000-0000-0000-000000000001": {
+            "since": 0
+          }
+        },
+        "projection": "not_applicable",
+        "why": "marker accepted"
+      },
+      {
+        "name": "text-length-1",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 1
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "lower bound"
+      },
+      {
+        "name": "text-length-1MiB",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 1048576
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "upper bound (bytes)"
+      },
+      {
+        "name": "preview-length-32MiB",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 33554432
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "upper bound"
+      },
+      {
+        "name": "title-exactly-200-units",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": {
+              "repeat": "a",
+              "count": 200
+            },
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "200 accepted"
+      },
+      {
+        "name": "title-200-units-astral",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": {
+              "repeat": "🦀",
+              "count": 100
+            },
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "100 astral chars = 200 units, 400 bytes"
+      },
+      {
+        "name": "filen-path-1024-units-astral",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": {
+              "repeat": "🦀",
+              "count": 512
+            }
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "512 astral chars = 1024 UTF-16 units (2048 bytes): units, not bytes"
+      },
+      {
+        "name": "filen-path-1024-ascii",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": {
+              "repeat": "a",
+              "count": 1024
+            }
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "1024 accepted"
+      },
+      {
+        "name": "title-leading-trailing-space",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "  spaced  ",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "LinkRecord.free accepts surrounding spaces; applied unchanged",
+        "skip_count": 0
+      },
+      {
+        "name": "title-control-char",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "bad\u0001title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "skipped",
+        "why": "valid on the wire; projection skips and counts",
+        "skip_count": 1
+      },
+      {
+        "name": "title-direction-char",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "bad‮title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "skipped",
+        "why": "direction char; projection skips and counts",
+        "skip_count": 1
+      },
+      {
+        "name": "presence-bad-reason",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "nonsense",
+            "since": 0
+          }
+        },
+        "projection": "skipped",
+        "why": "section 8 lists bad presence reason as accepted-then-skipped",
+        "skip_count": 1
+      },
+      {
+        "name": "content-uppercase-hash",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "skipped",
+        "why": "hash must be lowercase hex; skipped",
+        "skip_count": 1
+      },
+      {
+        "name": "filen-empty-path",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": ""
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "skipped",
+        "why": "path 1..1024 semantic; skipped",
+        "skip_count": 1
+      },
+      {
+        "name": "protected-link-with-text-cell",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 1
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied_metadata_only",
+        "why": "phone never writes it; desktop ignores the text cell (no text applied)"
+      },
+      {
+        "name": "protected-link-with-preview-cell",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 1
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied_metadata_only",
+        "why": "desktop ignores the preview cell"
+      },
+      {
+        "name": "protected-link-metadata-only",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 1
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied_metadata_only",
+        "why": "Q1: identity, content, title, filen, presence only"
+      },
+      {
+        "name": "null-content-cell",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "null accepted for every suffix except identity and presence"
+      },
+      {
+        "name": "null-text-cell",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "null accepted for every suffix except identity and presence"
+      },
+      {
+        "name": "null-preview-cell",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "null accepted for every suffix except identity and presence"
+      },
+      {
+        "name": "null-title-cell",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "null accepted for every suffix except identity and presence"
+      },
+      {
+        "name": "null-filen-cell",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "null accepted for every suffix except identity and presence"
+      },
+      {
+        "name": "gone-op-null-content-and-others",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "gone",
+            "reason": "deleted",
+            "since": 1700000002000
+          }
+        },
+        "projection": "gone",
+        "why": "the op the phone emits on delete for good (identity stays, five cells null, presence gone)"
+      },
+      {
+        "name": "identity-only-then-presence",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "absent cells are fine; presence absent = live is separate"
+      },
+      {
+        "name": "no-presence-cell-means-live",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          }
+        },
+        "projection": "applied",
+        "why": "desktop enable ops omit presence; absent = live"
+      },
+      {
+        "name": "trashed-presence",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "trashed",
+            "reason": "user",
+            "since": 1700000003000
+          }
+        },
+        "projection": "applied",
+        "why": "trashed with reason user"
+      }
+    ],
+    "writer_refuses": [
+      {
+        "name": "title-200-emitted",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": {
+              "repeat": "a",
+              "count": 200
+            },
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "": {
+              "owner": "org.stackdocs.test",
+              "link_id": "30000000-0000-0000-0000-000000000001",
+              "kind": "pdf",
+              "added_at": 1700000000000
+            },
+            "/title": {
+              "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "title_user_edited": 0
+            }
+          }
+        },
+        "why": "200 allowed"
+      },
+      {
+        "name": "title-201-refuses-row",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": {
+              "repeat": "a",
+              "count": 201
+            },
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "row_refused"
+        },
+        "why": "title 201 UTF-16 units; row not written, marked not synced"
+      },
+      {
+        "name": "title-surrounding-spaces-emitted",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": " x ",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "/title": {
+              "title": " x ",
+              "title_user_edited": 0
+            }
+          }
+        },
+        "why": "LinkRecord.free semantics, not clean_name"
+      },
+      {
+        "name": "text-1MiB-utf8-bytes-emitted",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": {
+              "repeat": "a",
+              "count": 1048576
+            },
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "/text": {
+              "sha256": "9bc1b2a288b26af7257a36277ae3816a7d4f16e89c1e7e77d0a5c48bad62b360",
+              "length": 1048576
+            }
+          }
+        },
+        "why": "1,048,576 UTF-8 bytes emitted"
+      },
+      {
+        "name": "text-1MiB-plus-1-utf8-bytes-cell-skipped",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": {
+              "repeat": "a",
+              "count": 1048577
+            },
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "cell_skipped",
+          "absent": [
+            "/text"
+          ]
+        },
+        "why": "1,048,577 bytes: text cell skipped, link still syncs"
+      },
+      {
+        "name": "text-524289-two-byte-chars-cell-skipped",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": {
+              "repeat": "é",
+              "count": 524289
+            },
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "cell_skipped",
+          "absent": [
+            "/text"
+          ]
+        },
+        "why": "524,289 UTF-16 units but 1,048,578 UTF-8 bytes: counted in bytes on the writer side"
+      },
+      {
+        "name": "text-524288-two-byte-chars-emitted",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": {
+              "repeat": "é",
+              "count": 524288
+            },
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "/text": {
+              "sha256": "f09174b501fc23341df3455a669e479aad297a973a25e6a38b57364785611ff4",
+              "length": 1048576
+            }
+          }
+        },
+        "why": "1,048,576 UTF-8 bytes exactly"
+      },
+      {
+        "name": "text-empty-maps-to-null-cell",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": "",
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "/text": null
+          }
+        },
+        "why": "empty text emits a null cell, never a length-0 blob cell"
+      },
+      {
+        "name": "text-null-emits-null",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "/text": null
+          }
+        },
+        "why": "no text emits null"
+      },
+      {
+        "name": "modified-2^53-refuses-row",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 9007199254740992,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "row_refused"
+        },
+        "why": "number above 2^53-1: row skipped, not synced"
+      },
+      {
+        "name": "modified-2^53-1-emitted",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 9007199254740991,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "/content": {
+              "hash": "abababababababababababababababababababababababababababababababab",
+              "mime": "application/pdf",
+              "modified": 9007199254740991,
+              "shared": 0,
+              "protected": 0
+            }
+          }
+        },
+        "why": "2^53-1 allowed"
+      },
+      {
+        "name": "added-at-2^53-refuses-row",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 9007199254740992,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "row_refused"
+        },
+        "why": "number above 2^53-1"
+      },
+      {
+        "name": "presence-since-2^53-refuses-row",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "trashed",
+              "reason": "user",
+              "since": 9007199254740992
+            }
+          }
+        },
+        "expect": {
+          "outcome": "row_refused"
+        },
+        "why": "number above 2^53-1"
+      },
+      {
+        "name": "owner-200-emitted",
+        "input": {
+          "row": {
+            "owner": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "": {
+              "owner": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "link_id": "30000000-0000-0000-0000-000000000001",
+              "kind": "pdf",
+              "added_at": 1700000000000
+            }
+          }
+        },
+        "why": "owner 200 allowed"
+      },
+      {
+        "name": "owner-201-refuses-row",
+        "input": {
+          "row": {
+            "owner": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "row_refused"
+        },
+        "why": "owner at most 200 (LinkRecord.java:67,99), not 255"
+      },
+      {
+        "name": "owner-no-dot-refuses-row",
+        "input": {
+          "row": {
+            "owner": "orgstackdocstest",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "row_refused"
+        },
+        "why": "owner needs at least one dot (LinkRecord.PACKAGE)"
+      },
+      {
+        "name": "link-id-uppercase-refuses-row",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-00000000000A",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "row_refused"
+        },
+        "why": "link_id canonical lowercase UUID"
+      },
+      {
+        "name": "kind-bad-refuses-row",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "PDF",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "row_refused"
+        },
+        "why": "kind [a-z]{1,16}"
+      },
+      {
+        "name": "hash-uppercase-refuses-row",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "row_refused"
+        },
+        "why": "hash 64 lowercase hex"
+      },
+      {
+        "name": "count-1001st-live-link-not-captured",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          },
+          "context": {
+            "live_or_trashed_links_already_captured": 1000
+          }
+        },
+        "expect": {
+          "outcome": "row_refused"
+        },
+        "why": "1001st live/trashed link is not captured (not synced)"
+      },
+      {
+        "name": "count-1000th-live-link-captured",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          },
+          "context": {
+            "live_or_trashed_links_already_captured": 999
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "": {
+              "owner": "org.stackdocs.test",
+              "link_id": "30000000-0000-0000-0000-000000000001",
+              "kind": "pdf",
+              "added_at": 1700000000000
+            }
+          }
+        },
+        "why": "the 1000th is captured"
+      },
+      {
+        "name": "count-gone-links-do-not-count",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "gone",
+              "reason": "deleted",
+              "since": 5
+            }
+          },
+          "context": {
+            "live_or_trashed_links_already_captured": 1000
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "/presence": {
+              "state": "gone",
+              "reason": "deleted",
+              "since": 5
+            }
+          }
+        },
+        "why": "gone identities are not counted"
+      },
+      {
+        "name": "protected-link-text-and-preview-never-emitted",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 1,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": "secret",
+            "preview": {
+              "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+              "length": 20
+            },
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "/content": {
+              "hash": "abababababababababababababababababababababababababababababababab",
+              "mime": "application/pdf",
+              "modified": 1700000001000,
+              "shared": 0,
+              "protected": 1
+            },
+            "/text": null,
+            "/preview": null
+          }
+        },
+        "why": "Q1 metadata only: text and preview cells are null"
+      },
+      {
+        "name": "live-presence-uses-since-0",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 123
+            }
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "/presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "why": "live uses since 0"
+      },
+      {
+        "name": "filen-first-locator-used",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "A title",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            },
+            "filen_locators": [
+              {
+                "uuid": "40000000-0000-0000-0000-000000000001",
+                "path": "/a"
+              },
+              {
+                "uuid": "40000000-0000-0000-0000-000000000002",
+                "path": "/b"
+              }
+            ]
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "/filen": {
+              "uuid": "40000000-0000-0000-0000-000000000001",
+              "path": "/a"
+            }
+          }
+        },
+        "why": "several filen locators: the first in locator order is used"
+      }
+    ],
+    "enable_ops": [
+      {
+        "name": "zero-link-enable-marker-only",
+        "operation_changes": {
+          "link_records/enabled/20000000-0000-0000-0000-000000000001": {
+            "since": 1700000000000
+          }
+        },
+        "expect": {
+          "kernel": "accepted",
+          "receiver": "accepted"
+        },
+        "why": "zero-link desktop enable op carries only the marker (C-A)"
+      },
+      {
+        "name": "enable-with-one-link-and-marker",
+        "operation_changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          },
+          "link_records/enabled/20000000-0000-0000-0000-000000000001": {
+            "since": 1700000000000
+          }
+        },
+        "expect": {
+          "kernel": "accepted",
+          "receiver": "accepted"
+        },
+        "why": "marker rides with the link cells"
+      },
+      {
+        "name": "enable-op-with-no-changes",
+        "operation_changes": {},
+        "expect": {
+          "kernel": "rejected",
+          "receiver": "not_applicable"
+        },
+        "why": "kernel rejects an operation with no changes on both sides (stack-sync lib.rs changes.is_empty, SyncProtocol changes.length()==0)"
+      }
+    ]
+  }
 }

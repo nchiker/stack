@@ -139,6 +139,197 @@ struct Hello {
     /// unknown hello fields. Equal frontiers end the session after the hello.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     frontier: Option<BTreeMap<String, u64>>,
+    /// Optional feature list, e.g. `["links"]`. Never sent while
+    /// `ANNOUNCE_LINKS` is false (D4b flips it, shipping last); always accepted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    features: Option<Vec<String>>,
+    /// Sent with `features` by a device that announces `links`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    enabled: Option<bool>,
+}
+
+/// D4b switch (slice 6, section 5): this build never announces `features`.
+/// Flip only when links can be applied, kept, resolved and purged (D5, P1, P2,
+/// D6 all shipped). The send path below is complete but dormant.
+const ANNOUNCE_LINKS: bool = false;
+/// How long a refused ladder level is remembered for one peer.
+const REFUSAL_MEMORY: Duration = Duration::from_secs(15 * 60);
+
+/// What the peer's hello said about optional features. Parsed on receive only.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PeerHello {
+    features: Option<Vec<String>>,
+    enabled: Option<bool>,
+}
+
+impl PeerHello {
+    /// True when the peer announced the `links` feature.
+    pub fn announces_links(&self) -> bool {
+        self.features
+            .as_ref()
+            .is_some_and(|f| f.iter().any(|x| x == "links"))
+    }
+    /// The peer's reported `enabled` flag; `None` when it did not report one.
+    pub fn links_enabled(&self) -> Option<bool> {
+        self.enabled
+    }
+    /// Every feature string the peer announced (empty when none).
+    pub fn features(&self) -> &[String] {
+        self.features.as_deref().unwrap_or(&[])
+    }
+}
+
+/// Parse a received hello frame body. Unknown fields are still refused.
+pub fn parse_peer_hello(body: &[u8]) -> Result<PeerHello> {
+    let hello = parse_remote_hello(body)?;
+    Ok(PeerHello {
+        features: hello.features,
+        enabled: hello.enabled,
+    })
+}
+
+const MAX_FEATURES: usize = 16;
+const MAX_FEATURE_UNITS: usize = 64;
+
+/// A received hello, with the same strict `features` rules as the phone: an explicit `null` for `features` or
+/// `enabled`, a duplicate, empty or over-long entry, or more than 16 entries is refused. Unknown feature names
+/// are accepted and ignored. A hello without these fields (every existing one) parses exactly as before.
+fn parse_remote_hello(body: &[u8]) -> Result<Hello> {
+    let hello: Hello = serde_json::from_slice(body)?;
+    let raw: serde_json::Value = serde_json::from_slice(body)?;
+    if raw.get("features").is_some_and(serde_json::Value::is_null)
+        || raw.get("enabled").is_some_and(serde_json::Value::is_null)
+    {
+        return Err(Error::Protocol);
+    }
+    if let Some(features) = &hello.features {
+        let mut seen = std::collections::BTreeSet::new();
+        if features.len() > MAX_FEATURES
+            || features.iter().any(|f| {
+                f.is_empty() || f.encode_utf16().count() > MAX_FEATURE_UNITS || !seen.insert(f)
+            })
+        {
+            return Err(Error::Protocol);
+        }
+    }
+    Ok(hello)
+}
+
+/// Section 5 / M1 equal-frontier rule: skip only if both announce `links` and
+/// both report enabled, or if either does not announce `links`.
+pub fn equal_frontier_may_skip(
+    local_announces_links: bool,
+    local_enabled: bool,
+    peer: &PeerHello,
+) -> bool {
+    if !local_announces_links || !peer.announces_links() {
+        return true;
+    }
+    local_enabled && peer.enabled == Some(true)
+}
+
+/// Called after the hello exchange, before any bundle moves (so a D5 enable
+/// op lands after the reply and before `receive_bundle`). Not called when the
+/// session is skipped on equal frontiers.
+pub type HelloHook<'a> = &'a mut dyn FnMut(&mut Library, &PeerHello) -> Result<()>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Level {
+    FrontierFeatures,
+    Frontier,
+    Plain,
+}
+
+fn level_hello(local: &Hello, level: Level) -> Hello {
+    let mut hello = Hello {
+        version: local.version,
+        group: local.group.clone(),
+        replica: local.replica.clone(),
+        frontier: local.frontier.clone(),
+        features: local.features.clone(),
+        enabled: local.enabled,
+    };
+    if level >= Level::Frontier {
+        hello.features = None;
+        hello.enabled = None;
+    }
+    if level >= Level::Plain {
+        hello.frontier = None;
+    }
+    hello
+}
+
+fn ladder(local: &Hello) -> Vec<Level> {
+    let mut levels = Vec::new();
+    if local.features.is_some() {
+        levels.push(Level::FrontierFeatures);
+    }
+    levels.push(Level::Frontier);
+    levels.push(Level::Plain);
+    levels
+}
+
+/// A refusal means the peer could not use this hello shape (closed, timed out,
+/// answered garbage). Identity, policy and cancel errors are never refusals,
+/// and only errors raised while waiting for the hello reply can be one.
+fn is_refusal(e: &Error) -> bool {
+    matches!(e, Error::Io(_) | Error::Json(_) | Error::Protocol)
+}
+
+/// An attempt failure: `refusal` is true only for a hello-phase refusal.
+struct Failed {
+    error: Error,
+    refusal: bool,
+}
+
+impl<E: Into<Error>> From<E> for Failed {
+    fn from(error: E) -> Self {
+        Failed {
+            error: error.into(),
+            refusal: false,
+        }
+    }
+}
+
+fn refused() -> &'static Mutex<BTreeMap<String, (Level, Instant)>> {
+    static MAP: Mutex<BTreeMap<String, (Level, Instant)>> = Mutex::new(BTreeMap::new());
+    &MAP
+}
+
+/// Walk the levels within ONE attempt: the first accepted level wins; a
+/// refusal moves down and is remembered (per peer) for 15 minutes. The last
+/// level's error is returned as is.
+fn run_ladder<T>(
+    peer: &str,
+    levels: &[Level],
+    now: Instant,
+    mut attempt: impl FnMut(Level) -> std::result::Result<T, Failed>,
+) -> Result<T> {
+    let floor = {
+        let map = refused().lock().unwrap_or_else(|e| e.into_inner());
+        match map.get(peer) {
+            Some((l, at)) if now.saturating_duration_since(*at) < REFUSAL_MEMORY => Some(*l),
+            _ => None,
+        }
+    };
+    let mut start = levels
+        .iter()
+        .position(|l| floor.is_none_or(|f| *l >= f))
+        .unwrap_or(levels.len() - 1);
+    loop {
+        let level = levels[start];
+        match attempt(level) {
+            Err(f) if f.refusal && start + 1 < levels.len() => {
+                start += 1;
+                refused()
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .insert(peer.to_owned(), (levels[start], now));
+            }
+            Ok(v) => return Ok(v),
+            Err(f) => return Err(f.error),
+        }
+    }
 }
 
 pub fn fingerprint(cert_der: &[u8]) -> String {
@@ -398,6 +589,9 @@ fn check_group(library: &Library, policy: &Policy) -> Result<Hello> {
         group: policy.group.clone(),
         replica,
         frontier: Some(serde_json::from_value(status["frontier"].clone())?),
+        // D5 supplies the real enabled flag when D4b turns announcing on.
+        features: ANNOUNCE_LINKS.then(|| vec!["links".to_owned()]),
+        enabled: ANNOUNCE_LINKS.then_some(false),
     })
 }
 
@@ -481,28 +675,47 @@ fn copy_exact(
     Ok(())
 }
 
-/// Returns the shared frontier when both sides advertised the same one: each
-/// already holds every operation the other has, so no bundle is exchanged.
+/// Outcome of the hello exchange.
+struct HelloResult {
+    /// Shared frontier when the session ends here (nothing to exchange).
+    skip: Option<BTreeMap<String, u64>>,
+    peer: PeerHello,
+}
+
+/// Each side already holds every operation the other has when both advertised
+/// the same frontier, so no bundle is exchanged (subject to the M1 rule).
 fn hello(
     stream: &mut (impl Read + Write),
     local: &Hello,
     policy: &Policy,
     initiator: bool,
-) -> Result<Option<BTreeMap<String, u64>>> {
+) -> Result<HelloResult> {
     if initiator {
         send_frame(stream, b'H', &serde_json::to_vec(local)?, MAX_CONTROL)?;
     }
-    let remote: Hello = serde_json::from_slice(&receive_frame(stream, b'H', MAX_CONTROL)?)?;
+    let remote = parse_remote_hello(&receive_frame(stream, b'H', MAX_CONTROL)?)?;
     if remote.version != 1 || remote.group != policy.group || remote.replica != policy.peer_replica
     {
         return Err(Error::Peer);
     }
+    // The server answers in kind: frontier only to a client that sent one,
+    // features only to a client that announced them.
     let advertised = Hello {
         version: local.version,
         group: local.group.clone(),
         replica: local.replica.clone(),
         frontier: if initiator || remote.frontier.is_some() {
             local.frontier.clone()
+        } else {
+            None
+        },
+        features: if initiator || remote.features.is_some() {
+            local.features.clone()
+        } else {
+            None
+        },
+        enabled: if initiator || remote.features.is_some() {
+            local.enabled
         } else {
             None
         },
@@ -516,10 +729,20 @@ fn hello(
             .map(|(replica, sequence)| (replica.clone(), *sequence))
             .collect::<BTreeMap<_, _>>()
     };
-    Ok(match (advertised.frontier, remote.frontier) {
-        (Some(ours), Some(theirs)) if known(&ours) == known(&theirs) => Some(ours),
+    let peer = PeerHello {
+        features: remote.features,
+        enabled: remote.enabled,
+    };
+    let local_links = advertised
+        .features
+        .as_ref()
+        .is_some_and(|f| f.iter().any(|x| x == "links"));
+    let may_skip = equal_frontier_may_skip(local_links, advertised.enabled == Some(true), &peer);
+    let skip = match (advertised.frontier, remote.frontier) {
+        (Some(ours), Some(theirs)) if may_skip && known(&ours) == known(&theirs) => Some(ours),
         _ => None,
-    })
+    };
+    Ok(HelloResult { skip, peer })
 }
 
 /// Ends a session whose hello found nothing to exchange.
@@ -634,11 +857,42 @@ pub fn sync_now_library(
     address: SocketAddr,
     control: &SessionControl,
 ) -> Result<Value> {
+    sync_now_library_with(library, address, control, &mut |_, _| Ok(()))
+}
+
+/// As `sync_now_library`, calling `on_hello` once the hello is accepted.
+pub fn sync_now_library_with(
+    library: &mut Library,
+    address: SocketAddr,
+    control: &SessionControl,
+    on_hello: HelloHook<'_>,
+) -> Result<Value> {
+    control.check()?;
+    let local = check_group(library, &credentials(library.root())?.0)?;
+    let levels = ladder(&local);
+    let peer = credentials(library.root())?.0.peer_replica;
+    run_ladder(&peer, &levels, Instant::now(), |level| {
+        sync_attempt(
+            library,
+            address,
+            control,
+            &level_hello(&local, level),
+            &mut *on_hello,
+        )
+    })
+}
+
+fn sync_attempt(
+    library: &mut Library,
+    address: SocketAddr,
+    control: &SessionControl,
+    local: &Hello,
+    on_hello: HelloHook<'_>,
+) -> std::result::Result<Value, Failed> {
     control.check()?;
     let root = library.root().to_owned();
     let root = root.as_path();
     let (policy, cert, key, roots) = credentials(root)?;
-    let local = check_group(library, &policy)?;
     let config =
         ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
             .with_protocol_versions(TLS_VERSIONS)
@@ -656,9 +910,14 @@ pub fn sync_now_library(
     auth_peer(tls.conn.peer_certificates(), &policy)?;
     ensure_policy_current(root, &policy)?;
     configure_data_tcp(&tls.sock)?;
-    if let Some(frontier) = hello(&mut tls, &local, &policy, true)? {
-        return skipped(library, &policy, &frontier);
+    let answered = hello(&mut tls, local, &policy, true).map_err(|error| Failed {
+        refusal: is_refusal(&error),
+        error,
+    })?;
+    if let Some(frontier) = answered.skip {
+        return Ok(skipped(library, &policy, &frontier)?);
     }
+    on_hello(library, &answered.peer)?;
     tls.sock.set_read_timeout(Some(PROCESSING_TIMEOUT))?;
     send_bundle(&mut tls, library, root, &policy, control)?;
     let first_ack = receive_receipt(&mut tls)?;
@@ -715,6 +974,17 @@ pub fn serve_accepted_library(
     tcp: TcpStream,
     control: &SessionControl,
 ) -> Result<Value> {
+    serve_accepted_library_with(library, tcp, control, &mut |_, _| Ok(()))
+}
+
+/// As `serve_accepted_library`; `on_hello` runs after the hello reply is sent
+/// and before `receive_bundle` (the D5 enable-op slot).
+pub fn serve_accepted_library_with(
+    library: &mut Library,
+    tcp: TcpStream,
+    control: &SessionControl,
+    on_hello: HelloHook<'_>,
+) -> Result<Value> {
     control.check()?;
     let root = library.root().to_owned();
     let root = root.as_path();
@@ -739,9 +1009,11 @@ pub fn serve_accepted_library(
     auth_peer(tls.conn.peer_certificates(), &policy)?;
     ensure_policy_current(root, &policy)?;
     configure_data_tcp(&tls.sock)?;
-    if let Some(frontier) = hello(&mut tls, &local, &policy, false)? {
+    let answered = hello(&mut tls, &local, &policy, false)?;
+    if let Some(frontier) = answered.skip {
         return skipped(library, &policy, &frontier);
     }
+    on_hello(library, &answered.peer)?;
     tls.sock.set_read_timeout(Some(PROCESSING_TIMEOUT))?;
     let first = receive_bundle(&mut tls, library, root, &policy, control)?;
     send_bundle(&mut tls, library, root, &policy, control)?;
@@ -929,6 +1201,12 @@ mod tests {
         let before = Library::open(&b).unwrap().sync_status().unwrap();
         let (policy, cert, key, roots) = credentials(&a).unwrap();
         let mut local = check_group(&Library::open(&a).unwrap(), &policy).unwrap();
+        assert!(local.features.is_none() && local.enabled.is_none());
+        assert!(
+            !String::from_utf8(serde_json::to_vec(&local).unwrap())
+                .unwrap()
+                .contains("features")
+        );
         local.frontier = None;
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
@@ -1005,5 +1283,274 @@ mod tests {
             Library::open(&b).unwrap().sync_status().unwrap(),
             status_before_revoke
         );
+    }
+
+    // ---- D4a: hello parsing and the ladder ----
+
+    struct Pipe {
+        input: std::io::Cursor<Vec<u8>>,
+        output: Vec<u8>,
+    }
+    impl Read for Pipe {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            self.input.read(buf)
+        }
+    }
+    impl Write for Pipe {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.output.write(buf)
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn test_policy() -> Policy {
+        Policy {
+            version: 1,
+            group: "g".into(),
+            peer_replica: "peer".into(),
+            fingerprint: String::new(),
+            revoked: false,
+        }
+    }
+    fn local_hello(features: bool, enabled: bool) -> Hello {
+        Hello {
+            version: 1,
+            group: "g".into(),
+            replica: "me".into(),
+            frontier: Some(BTreeMap::from([("me".to_owned(), 3)])),
+            features: features.then(|| vec!["links".to_owned()]),
+            enabled: features.then_some(enabled),
+        }
+    }
+    fn remote_frame(json: &str) -> Pipe {
+        let mut input = Vec::new();
+        send_frame(&mut input, b'H', json.as_bytes(), MAX_CONTROL).unwrap();
+        Pipe {
+            input: std::io::Cursor::new(input),
+            output: Vec::new(),
+        }
+    }
+    fn sent_body(pipe: &Pipe) -> Value {
+        let body = receive_frame(&mut pipe.output.as_slice(), b'H', MAX_CONTROL).unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+    const PEER_BASE: &str = r#""version":1,"group":"g","replica":"peer","frontier":{"me":3}"#;
+
+    #[test]
+    fn hello_round_trips_with_and_without_features() {
+        let plain = local_hello(false, false);
+        let bytes = serde_json::to_vec(&plain).unwrap();
+        assert_eq!(
+            String::from_utf8(bytes.clone()).unwrap(),
+            r#"{"version":1,"group":"g","replica":"me","frontier":{"me":3}}"#
+        );
+        assert_eq!(parse_peer_hello(&bytes).unwrap(), PeerHello::default());
+        let with = serde_json::to_vec(&local_hello(true, true)).unwrap();
+        assert_eq!(
+            String::from_utf8(with.clone()).unwrap(),
+            r#"{"version":1,"group":"g","replica":"me","frontier":{"me":3},"features":["links"],"enabled":true}"#
+        );
+        let parsed = parse_peer_hello(&with).unwrap();
+        assert!(parsed.announces_links());
+        assert_eq!(parsed.links_enabled(), Some(true));
+        assert_eq!(parsed.features(), ["links"]);
+        assert!(
+            parse_peer_hello(br#"{"version":1,"group":"g","replica":"p","features":[]}"#).is_ok()
+        );
+    }
+
+    #[test]
+    fn hello_features_follow_the_strict_phone_rules() {
+        let parse = |tail: &str| {
+            parse_peer_hello(
+                format!(r#"{{"version":1,"group":"g","replica":"p"{tail}}}"#).as_bytes(),
+            )
+        };
+        assert!(parse("").is_ok());
+        assert!(parse(r#","features":[]"#).is_ok());
+        assert!(parse(r#","features":["links","future"],"enabled":false"#).is_ok());
+        assert!(parse(r#","features":["unknown"]"#).is_ok());
+        let many: Vec<String> = (0..16).map(|n| format!("f{n}")).collect();
+        assert!(parse(&format!(r#","features":{}"#, json!(many))).is_ok());
+        let too_many: Vec<String> = (0..17).map(|n| format!("f{n}")).collect();
+        assert!(parse(&format!(r#","features":{}"#, json!(too_many))).is_err());
+        assert!(parse(r#","features":["links","links"]"#).is_err());
+        assert!(parse(r#","features":[""]"#).is_err());
+        assert!(parse(&format!(r#","features":["{}"]"#, "x".repeat(64))).is_ok());
+        assert!(parse(&format!(r#","features":["{}"]"#, "x".repeat(65))).is_err());
+        // 33 astral characters are 66 UTF-16 units.
+        assert!(parse(&format!(r#","features":["{}"]"#, "\u{1F600}".repeat(33))).is_err());
+        assert!(parse(r#","features":null"#).is_err());
+        assert!(parse(r#","features":["links"],"enabled":null"#).is_err());
+        assert!(parse(r#","features":["links"],"features":["links"]"#).is_err());
+        // The same rules on the live receive path.
+        let body = format!("{{{PEER_BASE},\"features\":[\"links\",\"links\"]}}");
+        let mut pipe = remote_frame(&body);
+        assert!(hello(&mut pipe, &local_hello(false, false), &test_policy(), true).is_err());
+    }
+
+    #[test]
+    fn unknown_hello_field_is_still_refused() {
+        let body = format!("{{{PEER_BASE},\"surprise\":1}}");
+        assert!(parse_peer_hello(body.as_bytes()).is_err());
+        let mut pipe = remote_frame(&body);
+        assert!(matches!(
+            hello(&mut pipe, &local_hello(false, false), &test_policy(), true),
+            Err(Error::Json(_))
+        ));
+        assert!(
+            parse_peer_hello(br#"{"version":1,"group":"g","replica":"p","features":"links"}"#)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn old_peer_plain_hello_interops_and_nothing_is_announced() {
+        let local = local_hello(false, false);
+        let mut pipe = remote_frame(&format!("{{{PEER_BASE}}}"));
+        let out = hello(&mut pipe, &local, &test_policy(), true).unwrap();
+        assert_eq!(out.peer, PeerHello::default());
+        assert!(out.skip.is_some(), "equal frontiers still skip");
+        let sent = sent_body(&pipe);
+        assert!(sent.get("features").is_none() && sent.get("enabled").is_none());
+        // Server side: a client that sent no features gets none back.
+        let mut pipe = remote_frame(&format!("{{{PEER_BASE}}}"));
+        hello(&mut pipe, &local_hello(true, true), &test_policy(), false).unwrap();
+        let sent = sent_body(&pipe);
+        assert!(sent.get("features").is_none() && sent.get("enabled").is_none());
+        const { assert!(!ANNOUNCE_LINKS) }; // D4b ships last
+    }
+
+    #[test]
+    fn announced_peer_hello_is_parsed_and_skip_rule_follows_m1() {
+        let on = |e: bool| PeerHello {
+            features: Some(vec!["links".into()]),
+            enabled: Some(e),
+        };
+        let none = PeerHello::default();
+        assert!(equal_frontier_may_skip(false, false, &none));
+        assert!(equal_frontier_may_skip(true, false, &none));
+        assert!(equal_frontier_may_skip(false, true, &on(false)));
+        assert!(equal_frontier_may_skip(true, true, &on(true)));
+        assert!(!equal_frontier_may_skip(true, true, &on(false)));
+        assert!(!equal_frontier_may_skip(true, false, &on(true)));
+        // Through hello(): both announce, peer not enabled -> no skip.
+        let peer_json = format!("{{{PEER_BASE},\"features\":[\"links\"],\"enabled\":false}}");
+        let mut pipe = remote_frame(&peer_json);
+        let out = hello(&mut pipe, &local_hello(true, true), &test_policy(), true).unwrap();
+        assert!(out.peer.announces_links() && out.skip.is_none());
+        let peer_json = format!("{{{PEER_BASE},\"features\":[\"links\"],\"enabled\":true}}");
+        let mut pipe = remote_frame(&peer_json);
+        let out = hello(&mut pipe, &local_hello(true, true), &test_policy(), true).unwrap();
+        assert!(out.skip.is_some());
+        // Server replies with features only to a client that announced them.
+        let mut pipe = remote_frame(&peer_json);
+        hello(&mut pipe, &local_hello(true, true), &test_policy(), false).unwrap();
+        assert_eq!(sent_body(&pipe)["features"], json!(["links"]));
+    }
+
+    #[test]
+    fn ladder_levels_strip_fields_in_order() {
+        let local = local_hello(true, false);
+        assert_eq!(
+            ladder(&local),
+            [Level::FrontierFeatures, Level::Frontier, Level::Plain]
+        );
+        assert_eq!(
+            ladder(&local_hello(false, false)),
+            [Level::Frontier, Level::Plain]
+        );
+        let f = level_hello(&local, Level::Frontier);
+        assert!(f.features.is_none() && f.enabled.is_none() && f.frontier.is_some());
+        let p = level_hello(&local, Level::Plain);
+        assert!(p.frontier.is_none() && p.features.is_none());
+        assert_eq!(
+            level_hello(&local, Level::FrontierFeatures).features,
+            local.features
+        );
+    }
+
+    fn refusal() -> Failed {
+        Failed {
+            error: Error::Protocol,
+            refusal: true,
+        }
+    }
+
+    #[test]
+    fn ladder_loops_to_an_old_peer_within_one_attempt_and_remembers() {
+        let levels = ladder(&local_hello(true, false));
+        let mut tried = Vec::new();
+        let t0 = Instant::now();
+        // Fake old peer: refuses anything but plain.
+        let got = run_ladder("old-peer", &levels, t0, |l| {
+            tried.push(l);
+            if l == Level::Plain {
+                Ok(7)
+            } else {
+                Err(refusal())
+            }
+        })
+        .unwrap();
+        assert_eq!(got, 7);
+        assert_eq!(
+            tried,
+            [Level::FrontierFeatures, Level::Frontier, Level::Plain]
+        );
+        // Next attempt within 15 minutes starts at the remembered level.
+        let mut tried = Vec::new();
+        run_ladder("old-peer", &levels, t0 + Duration::from_secs(60), |l| {
+            tried.push(l);
+            Ok(0)
+        })
+        .unwrap();
+        assert_eq!(tried, [Level::Plain]);
+        // After 15 minutes the memory expires.
+        let mut tried = Vec::new();
+        run_ladder("old-peer", &levels, t0 + REFUSAL_MEMORY, |l| {
+            tried.push(l);
+            Ok(0)
+        })
+        .unwrap();
+        assert_eq!(tried, [Level::FrontierFeatures]);
+        // Non-refusal errors (and the last level's error) end the attempt.
+        let mut n = 0;
+        let r = run_ladder(
+            "other-peer",
+            &levels,
+            t0,
+            |_| -> std::result::Result<(), Failed> {
+                n += 1;
+                Err(Error::Peer.into())
+            },
+        );
+        assert!(matches!(r, Err(Error::Peer)) && n == 1);
+        let mut n = 0;
+        let r = run_ladder(
+            "dead-peer",
+            &levels,
+            t0,
+            |_| -> std::result::Result<(), Failed> {
+                n += 1;
+                Err(refusal())
+            },
+        );
+        assert!(matches!(r, Err(Error::Protocol)) && n == 3);
+    }
+
+    #[test]
+    fn only_hello_phase_errors_and_timeouts_are_refusals() {
+        assert!(is_refusal(&Error::Io(std::io::ErrorKind::TimedOut.into())));
+        assert!(is_refusal(&Error::Io(
+            std::io::ErrorKind::UnexpectedEof.into()
+        )));
+        assert!(is_refusal(&Error::Protocol));
+        assert!(!is_refusal(&Error::Peer));
+        assert!(!is_refusal(&Error::Canceled));
+        assert!(!is_refusal(&Error::Policy("x")));
+        // Errors outside the hello phase convert as non-refusals.
+        assert!(!Failed::from(std::io::Error::from(std::io::ErrorKind::TimedOut)).refusal);
     }
 }

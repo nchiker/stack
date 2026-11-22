@@ -88,7 +88,11 @@ final class LinkStore {
             values.put("state", "live");
             if (created || !"live".equals(priorState)) { values.put("state_since", now); values.put("removed_reason", ""); }
             if (created || !titleEdited) values.put("title", record.title);
-            if (contentChanged) { values.put("hash", record.hash); values.put("preview_file", previewName); }
+            if (contentChanged) {
+                values.put("hash", record.hash); values.put("preview_file", previewName);
+                // The saved text and preview are new, so the digests of the old ones must not be reused (M7): capture recomputes them.
+                values.put("text_sha", ""); values.put("text_len", 0); values.put("preview_sha", ""); values.put("preview_len", 0); values.put("preview_mtime", 0); values.put("preview_pending", 0);
+            }
             if (created) {
                 values.put("id", id); values.put("owner", record.owner); values.put("link_id", record.linkId); values.put("added_at", now);
                 db.insertOrThrow("link_records", null, values);
@@ -135,6 +139,10 @@ final class LinkStore {
 
     /** The cached preview PDF, or null if the record has none. */
     File preview(String id) {
+        // L2: the row decides. A file the database no longer claims (a crash between a commit that dropped it and its removal) is stale.
+        try (Cursor c = database.get().rawQuery("SELECT preview_file FROM link_records WHERE id=?", new String[]{id})) {
+            if (!c.moveToFirst() || c.getString(0).isEmpty()) return null;
+        }
         File file = new File(directory, id + ".pdf");
         return file.isFile() ? file : null;
     }
@@ -282,6 +290,273 @@ final class LinkStore {
             db.execSQL("UPDATE link_search SET title=? WHERE record_id=?", new Object[]{title, id});
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
+    }
+
+    // ---- Applying synced link records (slice 6, P1) --------------------------------------------------------------------
+
+    /** What `applySynced` did, per link key (`link_records/["owner","link_id"]`), and which rows still need their preview placed. */
+    static final class Applied {
+        int inserted, updated, ignoredGone, skipped;
+        /** key -> "inserted" | "updated" | "gone_ignored" | "skipped". */
+        final java.util.Map<String, String> status = new java.util.LinkedHashMap<>();
+        /** Row ids whose preview file must be placed after the commit (`preview_pending=1`). */
+        final List<String> pending = new ArrayList<>();
+        /** Row ids whose old preview file must be removed after the commit (the new content has none). */
+        final List<String> dropped = new ArrayList<>();
+        /** True once the link being applied has written to the database (a later failure is then not a per-link skip). */
+        boolean writing;
+    }
+
+    /**
+     * Applies link rows projected from the causal state (`SyncGraph.projectLinks(...).links`) to this phone's rows, with the
+     * sync `applying` flag raised so the capture triggers stay silent (design sections 4 and 7). It never touches `saf`/`owner`
+     * locators (the synced filen locator is merged in), and every applied change bumps `revision`, so an in-flight LinkChecker
+     * write based on the old revision loses. Rules:
+     * - an identity whose presence is `gone` is never inserted and a received `gone` never deletes a phone row;
+     * - a row the phone does not have is inserted `unreachable` when its presence says live, or `trashed` with reason `user`
+     *   when it came with NO presence cell (a link only the desktop has: never live); a row with no filen cell is always inserted trashed with
+     *   the inert placeholder locator (`LinkBudget.PLACEHOLDER_LOCATORS`), because a backup refuses a record without a locator;
+     * - an existing row follows the received content, title, filen, text and preview; presence live brings a trashed row back as
+     *   `unreachable`, presence trashed trashes a live one;
+     * - a link whose text or preview blob is missing or fails its check is skipped (counted), never half applied.
+     * Previews are NOT written here: the row gets `preview_sha` and `preview_pending=1` in the transaction and
+     * `placePreviews` writes the file after the commit.
+     * Conflicted links are never passed in: `LinkSync.install` leaves them out (P2 resolves the decided conflicts first; a tie waits for
+     * the per-link review, `SyncStore.resolveLink`).
+     */
+    Applied applySynced(SQLiteDatabase db, org.json.JSONArray links, File blobs) throws IOException {
+        Applied result = new Applied();
+        long flag = android.database.DatabaseUtils.longForQuery(db, "SELECT applying FROM sync_control WHERE singleton=1", null);
+        // L7: called inside the document install's transaction. A nested transaction that ends without success would mark the OUTER one
+        // failed (Android), so one bad link would roll back the whole document install. So there is no nested transaction: everything
+        // that can fail because of a link (reading cells, blobs, validation) happens BEFORE the first write of that link (`writing`),
+        // and such a failure only skips that link. A failure after the first write is a database failure and is rethrown (the install
+        // fails as a whole, as it always did). Only a call made with no transaction open starts its own.
+        boolean own = !db.inTransaction();
+        if (own) db.beginTransaction();
+        try {
+            db.execSQL("UPDATE sync_control SET applying=1 WHERE singleton=1");
+            for (int i = 0; i < links.length(); i++) {
+                String key = "";
+                result.writing = false;
+                try {
+                    org.json.JSONObject link = links.getJSONObject(i);
+                    key = link.optString("key", "");
+                    applyOne(db, link, blobs, result);
+                } catch (org.json.JSONException | IOException | RuntimeException error) {
+                    if (result.writing) {
+                        if (error instanceof IOException) throw (IOException) error;
+                        if (error instanceof RuntimeException) throw (RuntimeException) error;
+                        throw new IOException("Invalid projected link", error);
+                    }
+                    result.skipped++; result.status.put(key, "skipped");
+                }
+            }
+            db.execSQL("UPDATE sync_control SET applying=? WHERE singleton=1", new Object[]{flag});
+            if (own) db.setTransactionSuccessful();
+        } finally { if (own) db.endTransaction(); }
+        return result;
+    }
+
+    private void applyOne(SQLiteDatabase db, org.json.JSONObject link, File blobs, Applied result) throws org.json.JSONException, IOException {
+        String key = link.getString("key"), owner = link.getString("owner"), linkId = link.getString("link_id"), outcome = link.getString("outcome");
+        String id = null, state = null, storedHash = null, locators = null; long titleEdited = 0, wasProtected = 0;
+        try (Cursor c = db.rawQuery("SELECT id,state,hash,locators,title_user_edited,protected FROM link_records WHERE owner=? AND link_id=?", new String[]{owner, linkId})) {
+            if (c.moveToFirst()) { id = c.getString(0); state = c.getString(1); storedHash = c.getString(2); locators = c.getString(3); titleEdited = c.getLong(4); wasProtected = c.getLong(5); }
+        }
+        if ("gone".equals(outcome)) {
+            // Only the phone produces `gone`. A received one never deletes a row, and never creates one.
+            result.ignoredGone++; result.status.put(key, "gone_ignored"); return;
+        }
+        org.json.JSONObject content = link.optJSONObject("content"), title = link.optJSONObject("title"), filen = link.optJSONObject("filen");
+        org.json.JSONObject text = link.optJSONObject("text"), preview = link.optJSONObject("preview");
+        boolean metadataOnly = "applied_metadata_only".equals(outcome);
+        String body = null;
+        try {
+            if (text != null && !metadataOnly) body = readText(blobs, text);
+            if (preview != null && !metadataOnly) checkPreview(blobs, preview);
+        } catch (IOException bad) { result.skipped++; result.status.put(key, "skipped"); return; }
+        long now = Clock.now();
+        String presenceState = link.getString("state"), reason = link.getString("reason"); long since = link.getLong("since");
+        boolean absent = link.optBoolean("presence_absent", false);
+        if (id == null) {
+            if (content == null || title == null) { result.skipped++; result.status.put(key, "skipped"); return; }
+            // M4: a link only the computer has, with no filen cell, is kept for the record but never live: it gets the same inert
+            // placeholder locator as on the computer (a backup refuses a record with no locator) and sits in Recently deleted.
+            boolean placeholder = filen == null;
+            id = UUID.randomUUID().toString();
+            ContentValues v = new ContentValues();
+            v.put("id", id); v.put("owner", owner); v.put("link_id", linkId); v.put("kind", link.getString("kind"));
+            v.put("title", title.getString("title")); v.put("title_user_edited", title.getLong("title_user_edited"));
+            putContent(v, content);
+            v.put("locators", placeholder ? LinkBudget.PLACEHOLDER_LOCATORS : locatorsFor("[]", filen));
+            v.put("added_at", link.getLong("added_at")); v.put("received_at", now); v.put("checked_at", 0); v.put("revision", 1);
+            if (placeholder) { v.put("state", TRASHED); v.put("removed_reason", "trashed".equals(presenceState) && !reason.isEmpty() ? reason : "user"); v.put("state_since", "trashed".equals(presenceState) && since > 0 ? since : now); }
+            else if (absent) { v.put("state", TRASHED); v.put("removed_reason", "user"); v.put("state_since", now); }
+            else if ("trashed".equals(presenceState)) { v.put("state", TRASHED); v.put("removed_reason", reason.isEmpty() ? "user" : reason); v.put("state_since", since > 0 ? since : now); }
+            else { v.put("state", UNREACHABLE); v.put("removed_reason", ""); v.put("state_since", now); }
+            v.put("preview_file", ""); v.put("preview_mtime", 0);
+            digests(v, metadataOnly ? null : text, metadataOnly ? null : preview);
+            result.writing = true;
+            db.insertOrThrow("link_records", null, v);
+            db.execSQL("INSERT INTO link_search(record_id,title,body) VALUES(?,?,?)", new Object[]{id, title.getString("title"), body == null ? "" : body});
+            if (preview != null && !metadataOnly) result.pending.add(id);
+            result.inserted++; result.status.put(key, "inserted"); return;
+        }
+        ContentValues v = new ContentValues();
+        boolean changedHash = content != null && !content.getString("hash").equals(storedHash);
+        if (content != null) putContent(v, content);
+        String newTitle = null;
+        if (title != null && !(titleEdited != 0 && title.getLong("title_user_edited") == 0)) {
+            newTitle = title.getString("title"); v.put("title", newTitle); v.put("title_user_edited", title.getLong("title_user_edited"));
+        }
+        v.put("locators", locatorsFor(locators, filen));
+        if ("live".equals(presenceState) && TRASHED.equals(state)) { v.put("state", UNREACHABLE); v.put("removed_reason", ""); v.put("state_since", now); }
+        else if ("trashed".equals(presenceState) && !TRASHED.equals(state)) { v.put("state", TRASHED); v.put("removed_reason", reason.isEmpty() ? "user" : reason); v.put("state_since", since > 0 ? since : now); }
+        // A new hash (or a protected link) replaces text and preview wholesale; the same hash replaces only what was received.
+        // M2: a metadata-only outcome for a link that was already protected here (a desktop /filen or title change) leaves the phone's
+        // own text, preview and digests alone; they are cleared only when the hash changed or the link BECOMES protected.
+        boolean resetText = LinkBudget.replacesBlob(metadataOnly, wasProtected != 0, changedHash, text != null);
+        boolean resetPreview = LinkBudget.replacesBlob(metadataOnly, wasProtected != 0, changedHash, preview != null);
+        boolean havePreview = preview != null && !metadataOnly;
+        if (resetText) { v.put("text_sha", metadataOnly || text == null ? "" : text.getString("sha256")); v.put("text_len", metadataOnly || text == null ? 0 : text.getLong("length")); }
+        if (resetPreview) {
+            v.put("preview_sha", havePreview ? preview.getString("sha256") : ""); v.put("preview_len", havePreview ? preview.getLong("length") : 0); v.put("preview_mtime", 0);
+            v.put("preview_pending", havePreview ? 1 : 0); v.put("preview_file", "");
+        }
+        result.writing = true;
+        db.update("link_records", v, "id=?", new String[]{id});
+        db.execSQL("UPDATE link_records SET revision=revision+1 WHERE id=?", new Object[]{id});
+        if (resetText || newTitle != null) {
+            String currentTitle = newTitle != null ? newTitle : titleOf(db, id);
+            String newBody = resetText ? (body == null ? "" : body) : body(db, id);
+            db.execSQL("DELETE FROM link_search WHERE record_id=?", new Object[]{id});
+            db.execSQL("INSERT INTO link_search(record_id,title,body) VALUES(?,?,?)", new Object[]{id, currentTitle, newBody});
+        }
+        if (resetPreview && havePreview) result.pending.add(id);
+        else if (resetPreview) result.dropped.add(id);
+        result.updated++; result.status.put(key, "updated");
+    }
+
+    private static void putContent(ContentValues v, org.json.JSONObject content) throws org.json.JSONException {
+        v.put("hash", content.getString("hash")); v.put("mime", content.getString("mime")); v.put("modified", content.getLong("modified"));
+        v.put("shared", content.getLong("shared")); v.put("protected", content.getLong("protected"));
+    }
+
+    /** Stores the digests of the received blobs; a preview digest comes with `preview_pending=1` until the file is placed. */
+    private static void digests(ContentValues v, org.json.JSONObject text, org.json.JSONObject preview) throws org.json.JSONException {
+        v.put("text_sha", text == null ? "" : text.getString("sha256")); v.put("text_len", text == null ? 0 : text.getLong("length"));
+        v.put("preview_sha", preview == null ? "" : preview.getString("sha256")); v.put("preview_len", preview == null ? 0 : preview.getLong("length"));
+        v.put("preview_pending", preview == null ? 0 : 1);
+    }
+
+    private static String titleOf(SQLiteDatabase db, String id) {
+        try (Cursor c = db.rawQuery("SELECT title FROM link_records WHERE id=?", new String[]{id})) { c.moveToFirst(); return c.getString(0); }
+    }
+
+    /** The existing locators with only the filen entry replaced (first position), or removed when `filen` is null. saf/owner entries stay. */
+    static String locatorsFor(String existing, org.json.JSONObject filen) throws org.json.JSONException {
+        org.json.JSONArray out = new org.json.JSONArray();
+        if (filen != null) out.put(new org.json.JSONObject().put("type", "filen").put("uuid", filen.getString("uuid")).put("path", filen.getString("path")));
+        org.json.JSONArray old = new org.json.JSONArray(existing == null ? "[]" : existing);
+        for (int i = 0; i < old.length(); i++) if (!"filen".equals(old.getJSONObject(i).optString("type"))) out.put(old.getJSONObject(i));
+        // A record needs at least one locator (backups refuse an empty list), so the last filen entry is not removed.
+        return out.length() == 0 && old.length() > 0 ? existing : out.toString();
+    }
+
+    private static String readText(File blobs, org.json.JSONObject cell) throws IOException, org.json.JSONException {
+        String sha = cell.getString("sha256"); long length = cell.getLong("length");
+        File file = new File(blobs, sha);
+        if (!file.isFile() || file.length() != length || length > LinkRecord.MAX_TEXT * 3L) throw new IOException("text blob missing");
+        byte[] bytes = new byte[(int) length];
+        try (java.io.DataInputStream in = new java.io.DataInputStream(new java.io.FileInputStream(file))) { in.readFully(bytes); }
+        try {
+            if (!sha.equals(SyncGraph.hex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)))) throw new IOException("text blob changed");
+        } catch (java.security.NoSuchAlgorithmException error) { throw new AssertionError(error); }
+        String text;
+        try {
+            text = java.nio.charset.StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT).decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+        } catch (java.nio.charset.CharacterCodingException error) { throw new IOException("text blob is not UTF-8"); }
+        LinkRecord.checkText(text);
+        return text;
+    }
+
+    private static void checkPreview(File blobs, org.json.JSONObject cell) throws IOException, org.json.JSONException {
+        File file = new File(blobs, cell.getString("sha256"));
+        if (!file.isFile() || file.length() != cell.getLong("length")) throw new IOException("preview blob missing");
+        byte[] first = new byte[8]; int n;
+        try (java.io.FileInputStream in = new java.io.FileInputStream(file)) { n = in.read(first); }
+        LinkRecord.checkPreview(file.length(), n < 0 ? new byte[0] : java.util.Arrays.copyOf(first, n));
+    }
+
+    /** After the commit that applied `applied`: removes previews the new content no longer has, then places the pending ones. */
+    void afterApply(Applied applied, File blobs) {
+        for (String id : applied.dropped) { new File(directory, id + ".pdf").delete(); new File(directory, id + ".rendering").delete(); }
+        placePreviews(blobs);
+    }
+
+    /**
+     * Places the preview files of rows with `preview_pending=1` after the commit: copy `sync_blobs/<sha>` to a temp file,
+     * fsync, rename to `<id>.pdf`, fsync the directory, then set `preview_file` and clear the marker only while `preview_sha` is
+     * unchanged (L2: the marker is cleared only after the rename is durable). Touches ONLY pending rows (start-up repair calls this
+     * too); restored or migrated rows with an empty digest are never examined. A blob that is not there is left pending. Also
+     * removes what a stop can leave behind: `.pdf.part` temp files, and a `<id>.pdf` of a row that no longer claims a preview
+     * (dropped by an apply whose cleanup did not run). Returns how many were placed.
+     */
+    int placePreviews(File blobs) {
+        SQLiteDatabase db = database.get();
+        cleanLeftovers(db);
+        List<String[]> pending = new ArrayList<>();
+        try (Cursor c = db.rawQuery("SELECT id,preview_sha,preview_len FROM link_records WHERE preview_pending=1", null)) {
+            while (c.moveToNext()) pending.add(new String[]{c.getString(0), c.getString(1), Long.toString(c.getLong(2))});
+        }
+        int placed = 0;
+        for (String[] item : pending) {
+            File source = new File(blobs, item[1]);
+            if (item[1].isEmpty() || !source.isFile() || source.length() != Long.parseLong(item[2])) continue;
+            File target = new File(directory, item[0] + ".pdf"), temporary = new File(directory, item[0] + ".pdf.part");
+            try {
+                if (!directory.isDirectory() && !directory.mkdirs()) throw new IOException("Cannot create the link folder.");
+                try (java.io.FileInputStream in = new java.io.FileInputStream(source); java.io.FileOutputStream out = new java.io.FileOutputStream(temporary)) {
+                    byte[] buffer = new byte[64 * 1024];
+                    for (int n; (n = in.read(buffer)) > 0; ) out.write(buffer, 0, n);
+                    out.getFD().sync();
+                }
+                if (!temporary.renameTo(target)) throw new IOException("Cannot place the preview.");
+                LinkSync.syncDir(directory);
+                new File(directory, item[0] + ".rendering").delete();
+                // The capture triggers must stay silent: placing a received preview is not a change of this phone's own.
+                long flag = android.database.DatabaseUtils.longForQuery(db, "SELECT applying FROM sync_control WHERE singleton=1", null);
+                db.beginTransaction();
+                try {
+                    db.execSQL("UPDATE sync_control SET applying=1 WHERE singleton=1");
+                    db.execSQL("UPDATE link_records SET preview_file=?, preview_pending=0 WHERE id=? AND preview_sha=? AND preview_pending=1", new Object[]{target.getName(), item[0], item[1]});
+                    db.execSQL("UPDATE sync_control SET applying=? WHERE singleton=1", new Object[]{flag});
+                    db.setTransactionSuccessful();
+                } finally { db.endTransaction(); }
+                placed++;
+            } catch (IOException | RuntimeException failure) { temporary.delete(); }
+        }
+        return placed;
+    }
+
+    /** Removes `*.pdf.part` temp files and previews whose row says it has none (and is not waiting for one). */
+    private void cleanLeftovers(SQLiteDatabase db) {
+        File[] files = directory.listFiles();
+        if (files == null) return;
+        java.util.Set<String> claimed = new java.util.HashSet<>();
+        try (Cursor c = db.rawQuery("SELECT id FROM link_records WHERE preview_file<>'' OR preview_pending=1", null)) { while (c.moveToNext()) claimed.add(c.getString(0)); }
+        catch (RuntimeException unreadable) { return; }
+        java.util.Set<String> known = new java.util.HashSet<>();
+        try (Cursor c = db.rawQuery("SELECT id FROM link_records", null)) { while (c.moveToNext()) known.add(c.getString(0)); }
+        catch (RuntimeException unreadable) { return; }
+        for (File file : files) {
+            String name = file.getName();
+            if (name.endsWith(".pdf.part")) { file.delete(); continue; }
+            // Only a file of a row that exists: a publish places its file before its commit, so an unknown id may be in flight.
+            if (name.endsWith(".pdf")) { String id = name.substring(0, name.length() - 4); if (known.contains(id) && !claimed.contains(id)) file.delete(); }
+        }
     }
 
     private static String body(SQLiteDatabase db, String id) {

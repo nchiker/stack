@@ -103,7 +103,19 @@ pub fn execute(library: &mut stack_core::library::Library, request: Request) -> 
     let root = library.root().to_owned();
     let notice = match request {
         Request::Accepted { stream, control } => {
-            let result = stack_transport::serve_accepted_library(library, stream, &control)?;
+            // After the hello reply and before the first bundle: a phone that announces links makes this side
+            // enable once (the phone does not announce yet, so today this never fires).
+            let result = stack_transport::serve_accepted_library_with(
+                library,
+                stream,
+                &control,
+                &mut |library, peer| {
+                    library
+                        .sync_links_on_hello(peer.announces_links())
+                        .map(|_| ())
+                        .map_err(Into::into)
+                },
+            )?;
             stack_transport::pairing::mark_complete(library.root())?;
             stack_transport::pairing::record_sync(library.root())?;
             return Ok(

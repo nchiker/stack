@@ -86,7 +86,7 @@ final class LibraryArchive {
         if(!syncInternal)try {
             SyncProtocol.State sync=new SyncStore(context,repository).load();
             if(sync!=null) {
-                if(sync.conflicts().length()>0)throw new IOException("Resolve sync conflicts before exporting a complete portable backup; document PDF copies remain available.");
+                if(SyncStore.documentConflicts(sync).length()>0)throw new IOException("Resolve sync conflicts before exporting a complete portable backup; document PDF copies remain available.");
                 try { SyncGraph.project(sync.values()); }
                 catch(IOException|JSONException invalid){throw new IOException("Resolve the invalid sync graph before exporting a complete portable backup.",invalid);}
             }

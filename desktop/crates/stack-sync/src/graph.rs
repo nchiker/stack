@@ -6,6 +6,9 @@ use std::collections::BTreeMap;
 
 pub type Cells = BTreeMap<String, Value>;
 
+// Link records live in `crate::links`; re-exported so the graph API stays in one place.
+pub use crate::links::{LinkProjection, project_links};
+
 fn key(table: &str, row: &Value) -> Result<String> {
     let fields: &[&str] = match table {
         "documents" | "pages" | "stacks" | "tags" => &["id"],
@@ -314,6 +317,11 @@ fn validate_primitives(value: &Value) -> Result<()> {
 /// malformed identity keys are never a supported conflict representation.
 pub fn validate_changes(cells: &Cells) -> Result<()> {
     for (cell, value) in cells {
+        // Receive-side link check only; it bypasses `validate_primitives` (M4).
+        if let Some(rest) = cell.strip_prefix(crate::links::PREFIX) {
+            crate::links::validate_cell(rest, value)?;
+            continue;
+        }
         if let Some(document) = cell
             .strip_prefix("page_order/")
             .or_else(|| cell.strip_prefix("filing_review/"))
@@ -490,6 +498,7 @@ pub fn project(cells: &Cells) -> Result<Manifest> {
             || key.starts_with("page_order/")
             || key.starts_with("catalog_order/")
             || key.starts_with("filing_review/")
+            || key.starts_with(crate::links::PREFIX)
         {
             continue;
         }

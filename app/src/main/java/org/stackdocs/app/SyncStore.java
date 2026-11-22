@@ -113,7 +113,13 @@ final class SyncStore {
         try(Cursor rows=db.rawQuery("SELECT id,name FROM stacks",null)){while(rows.moveToNext())stacks.put(rows.getString(0),rows.getString(1));}
         try(Cursor rows=db.rawQuery("SELECT id,position FROM pages",null)){while(rows.moveToNext())pages.put(rows.getString(0),"Page "+(rows.getInt(1)+1));}
 
-        return new JSONObject().put("document_names",names).put("stack_names",stacks).put("page_names",pages).put("adopted",true).put("replica",local).put("library",state.library).put("members",new JSONArray(state.members)).put("frontier",SyncProtocol.json(state.frontier)).put("operations",state.history.size()).put("pending_gaps",state.pending.size()).put("conflicts",state.conflicts()).put("acknowledged_by",receipts);
+        return new JSONObject().put("document_names",names).put("stack_names",stacks).put("page_names",pages).put("adopted",true).put("replica",local).put("library",state.library).put("members",new JSONArray(state.members)).put("frontier",SyncProtocol.json(state.frontier)).put("operations",state.history.size()).put("pending_gaps",state.pending.size()).put("conflicts",documentConflicts(state)).put("link_conflicts",LinkSync.linkConflicts(state,local)).put("acknowledged_by",receipts);
+    }
+    /** Review conflicts of the document graph. Link keys are left out: they have their own per-link review (`status` `link_conflicts`) and must not block backups or show as raw cells. */
+    static JSONObject documentConflicts(SyncProtocol.State state)throws IOException,JSONException {
+        JSONObject all=state.conflicts(),out=new JSONObject();
+        for(String key:SyncProtocol.keys(all))if(!SyncGraph.isLinkKey(key))out.put(key,all.get(key));
+        return out;
     }
     JSONObject manifest()throws IOException,JSONException {
         LibraryArchive.Progress progress=new LibraryArchive.Progress(){@Override void check()throws IOException {control.check();super.check();}};
@@ -150,21 +156,67 @@ final class SyncStore {
         control.check();
         final long cursor;
         try{cursor=DatabaseUtils.longForQuery(db,"SELECT journal_cursor FROM sync_state WHERE singleton=1",null);}catch(SQLiteDoneException absent){return;}
-        if(maxChange()<=cursor)return;
+        long last=maxChange();
+        // Link records have their own capture (LinkSync) and their own dirty flag: it must run when links are enabled even if
+        // no journal row is new (deferred blobs, budget-skipped links, desktop-only arrivals), so it is NOT gated by the cursor.
+        boolean linkWork=LinkSync.dirty(db),journalBehind=last>cursor;
+        if(!journalBehind&&!linkWork)return;
+        boolean documentWork=journalBehind&&DatabaseUtils.longForQuery(db,"SELECT count(*) FROM sync_change WHERE sequence>? AND table_name<>'link_records'",new String[]{Long.toString(cursor)})>0;
         SyncProtocol.State state=load();if(state==null)return;
         // Sync JSON grows with the library and can exceed Android's CursorWindow.
         // Scalar statements read the complete value without putting it in a cursor row.
-        String saved=DatabaseUtils.stringForQuery(db,"SELECT projection FROM sync_state WHERE singleton=1",null);
-        JSONObject current=manifest();db.beginTransaction();try {
-            SyncJournal.Replay replay=SyncJournal.capture(db,state,replica(),ArchiveJson.read(saved),cursor,current,control);
-            control.check();
+        String saved=null;JSONObject current=null;
+        if(documentWork){saved=DatabaseUtils.stringForQuery(db,"SELECT projection FROM sync_state WHERE singleton=1",null);current=manifest();}
+        String replica=replica();
+        db.beginTransaction();try {
+            boolean changed=false;ContentValues value=new ContentValues();
+            if(documentWork) {
+                SyncJournal.Replay replay=SyncJournal.capture(db,state,replica,ArchiveJson.read(saved),cursor,current,control);
+                control.check();
+                if(replay.operations>0||replay.cursor>cursor){value.put("projection",replay.projection.toString());value.put("journal_cursor",replay.cursor);changed=true;}
+            } else if(journalBehind) {value.put("journal_cursor",last);changed=true;}   // only link rows changed: nothing for the document journal
+            if(linkWork) {
+                LinkSync links=linkSync();
+                if(LinkSync.enabled(state,replica)) {
+                    if(links.capture(state,replica,peerAcknowledgement(state,replica))>0)changed=true;
+                    if(links.retry)linkWork=false;   // keep the flag up: something could not be finished and is retried
+                }
+                if(linkWork)LinkSync.clearDirty(db);
+            }
             String text=null;
-            if(replay.operations>0||replay.cursor>cursor) {
-                text=state.saved().toString();ContentValues value=new ContentValues();value.put("state",text);value.put("projection",replay.projection.toString());value.put("journal_cursor",replay.cursor);
+            if(changed) {
+                text=state.saved().toString();value.put("state",text);
                 db.update("sync_state",value,"singleton=1",null);
             }
             db.setTransactionSuccessful();
             if(text!=null)remember(text,state);
+        } finally {db.endTransaction();}
+    }
+    LinkSync linkSync(){return new LinkSync(db,context.getFilesDir(),control);}
+    /** What the single peer of the frozen two-member group has acknowledged of our operations; empty if it never did. */
+    private TreeMap<String,Long> peerAcknowledgement(SyncProtocol.State state,String replica)throws IOException,JSONException {
+        TreeMap<String,Long> out=new TreeMap<>();
+        for(String member:state.members)if(!member.equals(replica))for(Map.Entry<String,Long> entry:receipt(member).entrySet())out.merge(entry.getKey(),entry.getValue(),Math::min);
+        return out;
+    }
+    /**
+     * The phone's links.enable operation (metadata only, never deferred), written when the peer announces links (hello gate) or an
+     * incoming bundle carries link cells. Returns whether an operation was written. The caller must not skip the session on equal
+     * frontiers afterwards: the local frontier moved.
+     */
+    boolean enableLinks()throws IOException,JSONException {
+        capture();
+        SyncProtocol.State state=load();if(state==null)return false;
+        return enableLinks(state);
+    }
+    /** As above on a state the caller holds (it is changed in place and saved). */
+    boolean enableLinks(SyncProtocol.State state)throws IOException,JSONException {
+        String replica=replica();if(LinkSync.enabled(state,replica))return false;
+        db.beginTransaction();try {
+            if(!linkSync().enable(state,replica)){db.setTransactionSuccessful();return false;}
+            String text=state.saved().toString();ContentValues value=new ContentValues();value.put("state",text);
+            if(db.update("sync_state",value,"singleton=1",null)==0)throw SyncProtocol.invalid("no baseline");
+            db.setTransactionSuccessful();remember(text,state);return true;
         } finally {db.endTransaction();}
     }
     private long maxChange(){try(Cursor row=db.rawQuery("SELECT ifnull(max(sequence),0) FROM sync_change",null)){row.moveToFirst();return row.getLong(0);}}
@@ -173,6 +225,8 @@ final class SyncStore {
     }
     void install(SyncProtocol.State state,JSONObject baseline)throws IOException,JSONException {
         JSONObject fallback=baseline;if(fallback==null)fallback=ArchiveJson.read(DatabaseUtils.stringForQuery(db,"SELECT baseline FROM sync_state WHERE singleton=1",null));
+        // P2: the one merge rule per link runs first, so the rows below are applied from the resolved cells.
+        LinkSync.resolveDecided(state,replica());
         JSONObject values=state.values(),projected;
         try {projected=SyncGraph.project(values);}catch(IOException|JSONException invalid) {
             JSONObject safe=SyncProtocol.copy(fallback);for(String key:SyncProtocol.keys(values))if(SyncProtocol.entityBase(key)&&values.isNull(key))safe.put(key,JSONObject.NULL);
@@ -180,9 +234,12 @@ final class SyncStore {
         }
         if(hasDrafts())throw SyncProtocol.invalid("finish or discard saved editor drafts before applying an exchange");
         JSONObject cells=SyncGraph.cells(projected);
+        LinkStore.Applied applied;
         db.beginTransaction();try {
             probe.reached("transaction");
             db.execSQL("UPDATE sync_control SET applying=1 WHERE singleton=1");write(projected);
+            // Link rows come from their own cells and their own projection; the document path above never sees them (finding C1).
+            applied=linkSync().install(state,values,repository.links);
             probe.reached("rows_written");
             String text=state.saved().toString();
             ContentValues row=new ContentValues();row.put("state",text);row.put("projection",cells.toString());row.put("baseline",fallback.toString());row.put("journal_cursor",maxChange());
@@ -191,6 +248,7 @@ final class SyncStore {
             remember(text,state);
         }finally{db.endTransaction();}
         probe.reached("committed");
+        repository.links.afterApply(applied,linkSync().blobs());
         repository.archiveChanged();
     }
     private boolean hasDrafts(){try(Cursor row=db.rawQuery("SELECT 1 FROM editor_drafts LIMIT 1",null)){return row.moveToFirst();}}
@@ -217,6 +275,7 @@ final class SyncStore {
         }
     }
     JSONObject resolve(String key,JSONArray expected,Object selected)throws IOException,JSONException {
+        if(SyncGraph.isLinkKey(key))throw SyncProtocol.invalid("link conflicts are resolved per link");
         capture();SyncProtocol.State state=load();if(state==null)throw SyncProtocol.invalid("no baseline");JSONArray alternatives=state.conflicts().optJSONArray(key);if(alternatives==null)throw SyncProtocol.invalid("conflict changed");
         if(expected.length()!=alternatives.length())throw SyncProtocol.invalid("review changed");for(int i=0;i<expected.length();i++)if(!SyncProtocol.canonical(expected.get(i)).equals(SyncProtocol.canonical(alternatives.getJSONObject(i).getJSONObject("id"))))throw SyncProtocol.invalid("review changed");
         JSONObject changes=new JSONObject().put(key,selected);
@@ -236,9 +295,23 @@ final class SyncStore {
         }
         state.local(replica(),changes,new JSONObject().put("kind","conflict.resolve").put("reviewed",expected));install(state,null);return status();
     }
+    /**
+     * P2 tie review: one choice resolves ALL cells of one link (`side` is "phone" or "desktop"), then the rows are applied.
+     * Only a link that is still conflicted can be chosen.
+     */
+    JSONObject resolveLink(String link,String side)throws IOException,JSONException {
+        if(!SyncGraph.isLinkKey(link))throw SyncProtocol.invalid("unknown link");
+        boolean phone;if("phone".equals(side))phone=true;else if("desktop".equals(side))phone=false;else throw SyncProtocol.invalid("unknown side");
+        capture();SyncProtocol.State state=load();if(state==null)throw SyncProtocol.invalid("no baseline");
+        if(!LinkSync.conflictedBases(state).contains(link))throw SyncProtocol.invalid("link conflict changed");
+        LinkSync.resolveTie(state,replica(),link,phone);
+        install(state,null);
+        return status();
+    }
     private static boolean contains(JSONArray array,String value)throws JSONException {for(int i=0;i<array.length();i++)if(value.equals(array.getString(i)))return true;return false;}
     void receipt(String peer,TreeMap<String,Long> acknowledged)throws JSONException {
         ContentValues row=new ContentValues();row.put("peer",peer);row.put("frontier",SyncProtocol.json(acknowledged).toString());db.insertWithOnConflict("sync_receipts",null,row,SQLiteDatabase.CONFLICT_REPLACE);
+        if(LinkSync.deferralOutstanding(db))LinkSync.markDirty(db);   // only a blob deferred by the unacknowledged-bytes budget may fit now (M3)
     }
     void savePending(SyncProtocol.State state)throws IOException,JSONException {
         String text=state.saved().toString();ContentValues row=new ContentValues();row.put("state",text);db.update("sync_state",row,"singleton=1",null);remember(text,state);

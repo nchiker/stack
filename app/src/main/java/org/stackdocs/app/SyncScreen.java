@@ -29,7 +29,7 @@ final class SyncScreen {
             add(Ui.text(activity,last==null||last.isEmpty()?"Last sync: waiting for first sync":last,14,false),4);
             add(Ui.primary(activity,"Sync now",()->action.accept(Action.CONNECT)),32);
             add(Ui.button(activity,"Disconnect",()->action.accept(Action.REVOKE)),12);
-            if(library!=null&&library.optJSONObject("conflicts")!=null&&library.optJSONObject("conflicts").length()>0)
+            if(library!=null&&((library.optJSONObject("conflicts")!=null&&library.optJSONObject("conflicts").length()>0)||(library.optJSONArray("link_conflicts")!=null&&library.optJSONArray("link_conflicts").length()>0)))
                 add(Ui.button(activity,"Review changes",()->action.accept(Action.REVIEW)),12);
         }else{
             add(Ui.text(activity,"No computer connected",20,true),0);

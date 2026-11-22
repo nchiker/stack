@@ -5,6 +5,7 @@ mod editing;
 mod interchange;
 pub mod keystore;
 pub mod library;
+mod link_sync;
 mod links;
 pub mod reset;
 mod schema;

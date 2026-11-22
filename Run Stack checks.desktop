@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Run Stack checks
+Comment=Run every automatic Stack check and show a PASS/FAIL summary
+Exec=sh -c "exec cosmic-term -- sh \\"\\$(dirname \\"\\$1\\")/desktop/tools/run_checks_window.sh\\"" sh %k
+Terminal=false
+Categories=Development;

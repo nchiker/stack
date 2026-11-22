@@ -24,7 +24,10 @@ final class SyncJournal {
         try(Cursor events=db.rawQuery("SELECT sequence,table_name,action FROM sync_change WHERE sequence>? ORDER BY sequence",new String[]{Long.toString(cursor)})) {
             while(events.moveToNext()) {
                 control.check();
-                long sequence=events.getLong(0);String source=events.getString(1),action=events.getString(2),table=table(source);
+                long sequence=events.getLong(0);String source=events.getString(1),action=events.getString(2);
+                // Link records are captured by LinkSync against their own projection (sync_link_projection), never by this replay.
+                if(source.equals("link_records")){last=sequence;continue;}
+                String table=table(source);
                 JSONObject row=raw(db,source,sequence,action.equals("DELETE")?"old":"new");
                 JSONObject old=action.equals("UPDATE")?raw(db,source,sequence,"old"):null;
                 // A suggestion row is an independent portable cell: no other cell or

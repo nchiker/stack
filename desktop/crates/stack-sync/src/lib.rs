@@ -2,6 +2,7 @@
 //! the receiving transaction; a returned frontier is never a receipt by itself.
 pub mod bundle;
 pub mod graph;
+pub mod links;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

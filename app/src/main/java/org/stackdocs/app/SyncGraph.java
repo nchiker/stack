@@ -78,6 +78,7 @@ final class SyncGraph {
     static void validateChanges(JSONObject changes)throws IOException,JSONException {
         for(String cell:SyncProtocol.keys(changes)) {
             Object value=changes.get(cell);
+            if(isLinkKey(cell)){validateLinkCell(cell,value);continue;}
             if(cell.startsWith("page_order/")||cell.startsWith("filing_review/")) {
                 String document=cell.substring(cell.indexOf('/')+1);SyncProtocol.uuid(document);
                 if(value!=JSONObject.NULL)validateIds(value,cell.startsWith("page_order/"));continue;
@@ -201,7 +202,7 @@ final class SyncGraph {
         for(String table:TABLES)manifest.put(table,new JSONArray());
         manifest.put("decision_evidence",new JSONObject());Set<String> docs=new HashSet<>();
         for(String key:SyncProtocol.keys(cells)) {
-            if(cells.isNull(key)||key.startsWith("page_order/")||key.startsWith("catalog_order/")||key.startsWith("filing_review/")||decision(key))continue;
+            if(cells.isNull(key)||isLinkKey(key)||key.startsWith("page_order/")||key.startsWith("catalog_order/")||key.startsWith("filing_review/")||decision(key))continue;
             int slash=key.indexOf('/');if(slash<0)throw SyncProtocol.invalid("bad graph key");String table=key.substring(0,slash);if(!supported(table))throw SyncProtocol.invalid("unsupported graph row");
             JSONObject row=copy(cells.getJSONObject(key));
             if(table.equals("documents")) {
@@ -261,4 +262,243 @@ final class SyncGraph {
     }
     private static void add(MessageDigest digest,String value){digest.update((value.length()+":").getBytes(StandardCharsets.UTF_8));digest.update(value.getBytes(StandardCharsets.UTF_8));}
     static String hex(byte[] bytes){StringBuilder out=new StringBuilder();for(byte value:bytes)out.append(String.format(java.util.Locale.ROOT,"%02x",value&255));return out.toString();}
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // Link records (slice 6, docs/STACK_LINK_SLICE6_DESIGN.md sections 2, 4, 8). Pure functions only: no database, no
+    // files, no clock. The receive-side validator checks shape, arity, JSON types, safe-integer range and string bounds
+    // for memory safety and nothing else (a receiver that rejects poisons the whole contiguous operation chain). Every
+    // semantic limit lives in the writer self-check (linkWriter) and is applied again, as a skip, by projectLinks.
+    // It deliberately bypasses validatePrimitives (its integer list lacks modified/shared/protected/since, finding M4).
+    // ---------------------------------------------------------------------------------------------------------------
+    static final String LINK_PREFIX="link_records/",LINK_MARKER_PREFIX="link_records/enabled/";
+    static final int LINK_LIMIT=1000,LINK_TITLE_UNITS=200,LINK_OWNER_UNITS=200,LINK_PATH_UNITS=1024;
+    static final long LINK_TEXT_BYTES=1L<<20,LINK_PREVIEW_BYTES=32L<<20;
+    private static final String[] LINK_SUFFIXES={"","content","text","preview","title","filen","presence"};
+    private static final java.util.regex.Pattern LINK_UUID=java.util.regex.Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+    private static final java.util.regex.Pattern LINK_OWNER=java.util.regex.Pattern.compile("[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+");
+    private static final java.util.regex.Pattern LINK_KIND=java.util.regex.Pattern.compile("[a-z]{1,16}");
+    private static final java.util.regex.Pattern LINK_MIME=java.util.regex.Pattern.compile("[a-z0-9][a-z0-9.+-]*/[a-z0-9][a-z0-9.+-]*");
+    private static final java.util.regex.Pattern LINK_HASH=java.util.regex.Pattern.compile("[0-9a-f]{64}");
+    private static final List<String> LINK_REASONS=java.util.Arrays.asList("","deleted","trashed","user","forgotten");
+    private static final List<String> LINK_STATES=java.util.Arrays.asList("live","trashed","gone");
+
+    static boolean isLinkKey(String key){return key.startsWith(LINK_PREFIX);}
+    /** `link_records/["<owner>","<link_id>"]` (canonical JSON array, the same form as `memberships/`). */
+    static String linkKey(String owner,String linkId)throws IOException,JSONException {
+        return LINK_PREFIX+SyncProtocol.canonical(new JSONArray().put(owner).put(linkId));
+    }
+    /** `link_records/enabled/<replica>`; the marker value is {"since": ms}. */
+    static String linkMarkerKey(String replica){return LINK_MARKER_PREFIX+replica;}
+
+    // ----- receive side -----
+    private static void validateLinkCell(String cell,Object value)throws IOException,JSONException {
+        String rest=cell.substring(LINK_PREFIX.length());
+        if(rest.startsWith("enabled/")) {
+            String replica=rest.substring(8);if(replica.isEmpty()||replica.length()>128)throw SyncProtocol.invalid("invalid link marker replica");
+            JSONObject marker=linkObject(value,"link marker must be an object");SyncProtocol.exact(marker,"since");SyncProtocol.integer(marker.get("since"));return;
+        }
+        int end=rest.lastIndexOf(']');if(!rest.startsWith("[")||end<0)throw SyncProtocol.invalid("invalid link identity");
+        String array=rest.substring(0,end+1),tail=rest.substring(end+1),suffix;
+        if(tail.isEmpty())suffix="";else if(tail.startsWith("/"))suffix=tail.substring(1);else throw SyncProtocol.invalid("invalid link identity");
+        if(!java.util.Arrays.asList(LINK_SUFFIXES).contains(suffix))throw SyncProtocol.invalid("unsupported link suffix");
+        JSONArray ids;try{ids=new JSONArray(array);}catch(JSONException error){throw SyncProtocol.invalid("invalid link identity array");}
+        if(!SyncProtocol.canonical(ids).equals(array))throw SyncProtocol.invalid("noncanonical link identity");
+        if(ids.length()!=2)throw SyncProtocol.invalid("wrong link identity arity");
+        if(!(ids.get(0) instanceof String)||!(ids.get(1) instanceof String))throw SyncProtocol.invalid("non-string link identity");
+        if(!LINK_UUID.matcher(ids.getString(1)).matches())throw SyncProtocol.invalid("link identity needs a canonical UUID");
+        if(ids.getString(0).isEmpty()||ids.getString(0).length()>1024)throw SyncProtocol.invalid("link owner too long");
+        if(value==JSONObject.NULL){if(suffix.isEmpty()||suffix.equals("presence"))throw SyncProtocol.invalid("link cell is not nullable");return;}
+        JSONObject row=linkObject(value,"link cell must be an object");
+        switch(suffix) {
+            case "":
+                SyncProtocol.exact(row,"owner,link_id,kind,added_at");linkString(row,"owner",1024);linkString(row,"link_id",36);linkString(row,"kind",64);SyncProtocol.integer(row.get("added_at"));
+                if(!ids.getString(0).equals(row.getString("owner"))||!ids.getString(1).equals(row.getString("link_id")))throw SyncProtocol.invalid("link row identity changed");break;
+            case "content":
+                SyncProtocol.exact(row,"hash,mime,modified,shared,protected");linkString(row,"hash",64);linkString(row,"mime",100);SyncProtocol.integer(row.get("modified"));linkBit(row,"shared");linkBit(row,"protected");break;
+            case "text":SyncProtocol.exact(row,"sha256,length");linkString(row,"sha256",64);linkLength(row,LINK_TEXT_BYTES);break;
+            case "preview":SyncProtocol.exact(row,"sha256,length");linkString(row,"sha256",64);linkLength(row,LINK_PREVIEW_BYTES);break;
+            case "title":SyncProtocol.exact(row,"title,title_user_edited");linkString(row,"title",LINK_TITLE_UNITS);linkBit(row,"title_user_edited");break;
+            case "filen":SyncProtocol.exact(row,"uuid,path");linkString(row,"uuid",64);linkString(row,"path",LINK_PATH_UNITS);break;
+            default:SyncProtocol.exact(row,"state,reason,since");linkString(row,"state",32);linkString(row,"reason",32);SyncProtocol.integer(row.get("since"));
+        }
+    }
+    private static JSONObject linkObject(Object value,String message)throws IOException {
+        if(!(value instanceof JSONObject))throw SyncProtocol.invalid(message);return (JSONObject)value;
+    }
+    /** String of at most `max` UTF-16 units (Java String.length() counts UTF-16 units). */
+    private static void linkString(JSONObject row,String field,int max)throws IOException,JSONException {
+        Object value=row.get(field);if(!(value instanceof String)||((String)value).length()>max)throw SyncProtocol.invalid("link text field has another type or is too long");
+    }
+    private static void linkBit(JSONObject row,String field)throws IOException,JSONException {
+        if(SyncProtocol.integer(row.get(field))>1)throw SyncProtocol.invalid("link flag must be 0 or 1");
+    }
+    private static void linkLength(JSONObject row,long max)throws IOException,JSONException {
+        long length=SyncProtocol.integer(row.get("length"));if(length<1||length>max)throw SyncProtocol.invalid("link blob length outside its limit");
+    }
+
+    // ----- semantic checks, shared by the writer self-check and the receive-side projection -----
+    /** LinkRecord.free: non-empty, at most `max` UTF-16 units, no control or direction characters, no unpaired surrogate. Surrounding spaces are fine. */
+    static boolean linkFree(Object value,int max) {
+        if(!(value instanceof String))return false;String s=(String)value;if(s.isEmpty()||s.length()>max)return false;
+        for(int i=0;i<s.length();i++) {
+            char c=s.charAt(i);
+            if(c<0x20||(c>=0x7f&&c<=0x9f)||(c>=0x202a&&c<=0x202e)||(c>=0x2066&&c<=0x2069)||c==0x200e||c==0x200f||c==0x061c)return false;
+            if(Character.isHighSurrogate(c)){if(i+1>=s.length()||!Character.isLowSurrogate(s.charAt(i+1)))return false;i++;}
+            else if(Character.isLowSurrogate(c))return false;
+        }
+        return true;
+    }
+    private static boolean linkMatch(java.util.regex.Pattern pattern,Object value,int max){
+        return value instanceof String&&((String)value).length()<=max&&pattern.matcher((String)value).matches();
+    }
+    private static boolean linkSafe(Object value,long min,long max) {
+        return (value instanceof Integer||value instanceof Long)&&((Number)value).longValue()>=min&&((Number)value).longValue()<=max;
+    }
+    private static boolean linkIdentityOk(JSONObject row) {
+        return linkMatch(LINK_OWNER,row.opt("owner"),LINK_OWNER_UNITS)&&linkMatch(LINK_UUID,row.opt("link_id"),36)&&linkMatch(LINK_KIND,row.opt("kind"),16)
+                &&linkSafe(row.opt("added_at"),0,SyncProtocol.MAX_SEQUENCE);
+    }
+    private static boolean linkContentOk(JSONObject row) {
+        return linkMatch(LINK_HASH,row.opt("hash"),64)&&linkMatch(LINK_MIME,row.opt("mime"),100)&&linkSafe(row.opt("modified"),0,SyncProtocol.MAX_SEQUENCE)
+                &&linkSafe(row.opt("shared"),0,1)&&linkSafe(row.opt("protected"),0,1);
+    }
+    private static boolean linkPresenceOk(JSONObject row) {
+        return LINK_STATES.contains(row.opt("state"))&&LINK_REASONS.contains(row.opt("reason"))&&linkSafe(row.opt("since"),0,SyncProtocol.MAX_SEQUENCE);
+    }
+    private static boolean linkFilenOk(JSONObject row) {
+        Object path=row.opt("path");return linkMatch(LINK_UUID,row.opt("uuid"),36)&&path instanceof String&&((String)path).length()>=1&&((String)path).length()<=LINK_PATH_UNITS;
+    }
+    private static boolean linkTitleOk(JSONObject row){return linkFree(row.opt("title"),LINK_TITLE_UNITS)&&linkSafe(row.opt("title_user_edited"),0,1);}
+    private static boolean linkBlobOk(JSONObject row,long max){return linkMatch(LINK_HASH,row.opt("sha256"),64)&&linkSafe(row.opt("length"),1,max);}
+
+    // ----- writer self-check -----
+    /**
+     * The writer side of the link graph: turns one link row into its cells, or refuses/skips what the receiver would skip.
+     * Input row (a JSON object, the golden `input.row` shape): owner, link_id, kind, added_at, hash, mime, modified, shared (0/1),
+     * protected (0/1), title (String or null), title_user_edited (0/1), filen ({uuid,path} or null) or filen_locators (list of
+     * {uuid,path}; the FIRST is used), text (String or null; the caller writes the UTF-8 bytes of this String as the blob),
+     * preview ({sha256,length} of the caller's already hashed file, or null), presence ({state,reason,since}; absent = omit the
+     * presence cell, the desktop enable op). `liveOrTrashedAlreadyCaptured` counts identities already emitted whose presence is not gone.
+     * Returns {outcome: "emitted"|"row_refused"|"cell_skipped", cells: {suffix: value|null} where suffix is "" (identity) or "/content", "/text", "/preview", "/title", "/filen", "/presence", reasons: [..], key: "link_records/[..]"}.
+     * Skipped cells are ABSENT from `cells`; null cells are JSONObject.NULL. A refused row has no cells and no key.
+     */
+    static JSONObject linkWriter(JSONObject row,long liveOrTrashedAlreadyCaptured)throws JSONException,IOException {
+        JSONArray reasons=new JSONArray();JSONObject cells=new JSONObject(),result=new JSONObject();
+        JSONObject presence=row.optJSONObject("presence");
+        if(!linkIdentityOk(row))return refused(result,"identity");
+        if(presence!=null&&!linkPresenceOk(presence))return refused(result,"presence");
+        boolean gone=presence!=null&&"gone".equals(presence.getString("state"));
+        if(!gone) {
+            if(liveOrTrashedAlreadyCaptured>=LINK_LIMIT)return refused(result,"link limit");
+            if(!linkContentOk(row))return refused(result,"content");
+            Object title=row.opt("title");
+            if(title!=null&&title!=JSONObject.NULL&&!linkTitleOk(new JSONObject().put("title",title).put("title_user_edited",row.opt("title_user_edited")==null?0:row.opt("title_user_edited"))))return refused(result,"title");
+        }
+        cells.put("",new JSONObject().put("owner",row.getString("owner")).put("link_id",row.getString("link_id")).put("kind",row.getString("kind")).put("added_at",row.get("added_at")));
+        if(gone) {
+            for(String suffix:new String[]{"/content","/text","/preview","/title","/filen"})cells.put(suffix,JSONObject.NULL);
+        } else {
+            cells.put("/content",new JSONObject().put("hash",row.get("hash")).put("mime",row.get("mime")).put("modified",row.get("modified")).put("shared",row.get("shared")).put("protected",row.get("protected")));
+            Object title=row.opt("title");
+            cells.put("/title",title==null||title==JSONObject.NULL?JSONObject.NULL:new JSONObject().put("title",title).put("title_user_edited",row.opt("title_user_edited")==null?0:row.get("title_user_edited")));
+            JSONObject filen=firstFilen(row);
+            if(filen==null)cells.put("/filen",JSONObject.NULL);
+            else if(linkFilenOk(filen))cells.put("/filen",new JSONObject().put("uuid",filen.getString("uuid")).put("path",filen.getString("path")));
+            else reasons.put("filen cell skipped");
+            boolean isProtected=((Number)row.get("protected")).longValue()==1;
+            if(isProtected){cells.put("/text",JSONObject.NULL).put("/preview",JSONObject.NULL);}   // metadata only (decision 6)
+            else {
+                Object text=row.opt("text");
+                if(text==null||text==JSONObject.NULL||"".equals(text))cells.put("/text",JSONObject.NULL);   // empty text is a null cell, never length 0
+                else if(!(text instanceof String)||((String)text).indexOf('\0')>=0)reasons.put("text cell skipped");
+                else {
+                    byte[] bytes=((String)text).getBytes(StandardCharsets.UTF_8);
+                    if(bytes.length>LINK_TEXT_BYTES)reasons.put("text cell skipped");
+                    else cells.put("/text",new JSONObject().put("sha256",sha256(bytes)).put("length",bytes.length));
+                }
+                JSONObject preview=row.optJSONObject("preview");
+                if(preview==null)cells.put("/preview",JSONObject.NULL);
+                else if(linkSafe(preview.opt("length"),0,0))cells.put("/preview",JSONObject.NULL);
+                else if(linkBlobOk(preview,LINK_PREVIEW_BYTES))cells.put("/preview",new JSONObject().put("sha256",preview.getString("sha256")).put("length",preview.get("length")));
+                else reasons.put("preview cell skipped");
+            }
+        }
+        if(presence!=null) {
+            String state=presence.getString("state");boolean live=state.equals("live");
+            cells.put("/presence",new JSONObject().put("state",state).put("reason",live?"":presence.getString("reason")).put("since",live?0:presence.get("since")));
+        }
+        return result.put("outcome",reasons.length()==0?"emitted":"cell_skipped").put("cells",cells).put("reasons",reasons).put("key",linkKey(row.getString("owner"),row.getString("link_id")));
+    }
+    private static JSONObject refused(JSONObject result,String reason)throws JSONException {
+        return result.put("outcome","row_refused").put("cells",new JSONObject()).put("reasons",new JSONArray().put(reason));
+    }
+    private static JSONObject firstFilen(JSONObject row) {
+        JSONArray locators=row.optJSONArray("filen_locators");
+        if(locators!=null&&locators.length()>0)return locators.optJSONObject(0);
+        return row.optJSONObject("filen");
+    }
+    private static String sha256(byte[] bytes) {
+        try{return hex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(java.security.NoSuchAlgorithmException error){throw new AssertionError(error);}
+    }
+    /** A writer result as a changes map: full cell keys (`key` + `/suffix`). Empty for a refused row. */
+    static JSONObject linkChanges(JSONObject writerResult)throws JSONException {
+        JSONObject changes=new JSONObject();if(!writerResult.has("key"))return changes;
+        String key=writerResult.getString("key");JSONObject cells=writerResult.getJSONObject("cells");
+        for(String suffix:SyncProtocol.keys(cells))changes.put(key+suffix,cells.get(suffix));
+        return changes;
+    }
+    /** The enable marker cell: {key: {"since": ms}}. Written once per replica. */
+    static JSONObject linkMarker(String replica,long since)throws JSONException {
+        return new JSONObject().put(linkMarkerKey(replica),new JSONObject().put("since",since));
+    }
+
+    // ----- receive-side projection -----
+    /** True when `cells` holds a valid enable marker for `replica` (the proof that the device enabled links). */
+    static boolean linkEnabled(JSONObject cells,String replica) {
+        JSONObject marker=cells.optJSONObject(linkMarkerKey(replica));return marker!=null&&linkSafe(marker.opt("since"),0,SyncProtocol.MAX_SEQUENCE);
+    }
+    /**
+     * Projects the link cells of a causal projection into link rows. Never throws on bad data and never deletes by absence: it
+     * returns only the links it saw. A link is skipped (counted in `skipped`) when any used cell fails a semantic check; a link with a
+     * conflicted cell is passed over (counted in `conflicted`). Presence absent = live. A protected link is applied metadata only:
+     * text and preview cells are ignored (nulled). `gone` links carry only identity and presence.
+     * Returns {links: [{key, owner, link_id, kind, added_at, outcome: applied|applied_metadata_only|gone, state, reason, since,
+     * presence_absent, content, title, filen, text, preview}], skipped: n, conflicted: n}; absent cells are null.
+     */
+    static JSONObject projectLinks(JSONObject cells,Set<String> conflicted)throws JSONException,IOException {
+        List<String> bases=new ArrayList<>();
+        for(String key:SyncProtocol.keys(cells)) {
+            if(!isLinkKey(key)||key.startsWith(LINK_MARKER_PREFIX))continue;
+            int end=key.lastIndexOf(']');if(end<0||!key.startsWith(LINK_PREFIX+"["))continue;
+            String base=key.substring(0,end+1);if(!bases.contains(base))bases.add(base);
+        }
+        JSONArray links=new JSONArray();int skipped=0,passed=0;
+        for(String base:bases) {
+            boolean conflict=false;for(String suffix:LINK_SUFFIXES)if(conflicted!=null&&conflicted.contains(suffix.isEmpty()?base:base+"/"+suffix))conflict=true;
+            if(conflict){passed++;continue;}
+            JSONObject link=projectLink(cells,base);if(link==null)skipped++;else links.put(link);
+        }
+        return new JSONObject().put("links",links).put("skipped",skipped).put("conflicted",passed);
+    }
+    private static JSONObject projectLink(JSONObject cells,String base)throws JSONException {
+        JSONObject identity=cells.optJSONObject(base);if(identity==null||!linkIdentityOk(identity))return null;
+        JSONObject presence=cells.optJSONObject(base+"/presence");
+        String state="live",reason="";long since=0;
+        if(presence!=null){if(!linkPresenceOk(presence))return null;state=presence.getString("state");reason=presence.getString("reason");since=((Number)presence.get("since")).longValue();}
+        else if(cells.has(base+"/presence")&&!cells.isNull(base+"/presence"))return null;
+        JSONObject out=new JSONObject().put("key",base).put("owner",identity.getString("owner")).put("link_id",identity.getString("link_id")).put("kind",identity.getString("kind"))
+                .put("added_at",identity.get("added_at")).put("state",state).put("reason",reason).put("since",since).put("presence_absent",presence==null);
+        for(String suffix:new String[]{"content","title","filen","text","preview"})out.put(suffix,JSONObject.NULL);
+        if(state.equals("gone"))return out.put("outcome","gone");
+        JSONObject content=cells.optJSONObject(base+"/content");
+        if(content!=null){if(!linkContentOk(content))return null;out.put("content",content);}
+        JSONObject title=cells.optJSONObject(base+"/title");if(title!=null){if(!linkTitleOk(title))return null;out.put("title",title);}
+        JSONObject filen=cells.optJSONObject(base+"/filen");if(filen!=null){if(!linkFilenOk(filen))return null;out.put("filen",filen);}
+        boolean metadataOnly=content!=null&&((Number)content.get("protected")).longValue()==1;
+        if(!metadataOnly) {
+            JSONObject text=cells.optJSONObject(base+"/text");if(text!=null){if(!linkBlobOk(text,LINK_TEXT_BYTES))return null;out.put("text",text);}
+            JSONObject preview=cells.optJSONObject(base+"/preview");if(preview!=null){if(!linkBlobOk(preview,LINK_PREVIEW_BYTES))return null;out.put("preview",preview);}
+        }
+        return out.put("outcome",metadataOnly?"applied_metadata_only":"applied");
+    }
 }

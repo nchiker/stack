@@ -1,0 +1,475 @@
+# Stack Link, slice 6: sync of link records between phone and desktop (design, rev 3)
+
+Status: design, nothing implemented (2026-11-22). Rev 3 folds in the second Opus review (rev 2); section 13 maps every finding of both reviews to its fix. Decisions of the user are fixed (section 1).
+Items marked **[CODE != PLAN]** are where reading the code corrected the plan. Rust paths are under `desktop/crates/` (`stack-core/src/sync.rs`, `stack-sync/src/graph.rs`,
+`stack-transport/src/lib.rs`, `stack-archive/src/validation.rs`); Java under `app/src/main/java/org/stackdocs/app/`.
+
+## 1. Goal, decisions, non-goals
+
+Goal: the link records on the phone appear on the desktop (title, locator, hash, text, preview, presence) through the existing paired LAN sync, with no new transport, no archive format bump (stays 4)
+and wire version 1.
+
+Fixed decisions:
+1. The desktop is a read-only mirror of links. The phone is the authority for content, hash, text, preview and presence.
+2. First-pairing disagreement (same `(owner, link_id)`, different hash): the later `modified` wins automatically, the other value stays in history; review only for a tie (phone only).
+3. Text and previews sync. Limits: preview 32 MiB, 1000 links, text 1 MiB, title 200.
+4. Upgrade by a hello announcement (section 5). Link cells are never created for a peer that has not announced it. Models 2 and 3 are accepted; existing pairings keep working.
+5. AmiPro-Linux Open / Flatpak launch test is slice 6b.
+6. (Q1) Protected links (`protected=1`) sync metadata ONLY to the desktop: identity, content (hash, mime, modified, shared, protected), title, filen, presence. No text and no preview cell, no blob.
+7. (Q2) A link that only the desktop has, whose identity the phone purged (presence `gone`) or never had, arrives on the phone as Recently deleted (`trashed`), never live, and never at all if the identity is `gone`.
+8. (Q3) Purge removes retained blob bytes after the peer acknowledges the `gone` operation. Accepted and stated plainly in section 4: text may survive inside `sync_snapshots` (3 DB copies per device), and titles and Filen paths stay inline in history.
+9. (Q4) The phone's value wins automatically for title, filen, shared and every other non-hash conflict.
+10. Size caps: 2 GiB of link blobs per device, 6 GiB unacknowledged (section 2).
+
+Non-goals: editing, deleting, renaming or opening links on the desktop; syncing `saf`/`owner` locators, `unreachable`/`missing`, `checked_at`, `state_since`, `revision`; stacks/tags/notes for links;
+the backup key; partner publish (slice 7); a third device (LAN pairing is a frozen two-member group, `stack-transport/src/lib.rs:384-393`, `PairingTransport.java:258-260`, so no third device ever sees link ops).
+
+Setup rule (CLAUDE.md): nothing to install or run. After both apps are updated, the next Sync does everything (hello announces links, each side sends its baseline once). No script, env var or path.
+
+## 2. Identity and cells
+
+Identity is `(owner, link_id)`, never the local row id. Cell key: `link_records/` + canonical JSON array `["<owner>","<link_id>"]` (same form as `memberships/`), plus a suffix.
+
+**Enable marker (C-A, rev 3).** Every enable op also carries one marker cell `link_records/enabled/<replica>` = `{"since": ms}` (replica = the writer's own replica uuid). The kernel rejects an operation with no changes
+(`stack-sync/src/lib.rs:215` `self.changes.is_empty()`; Java `SyncProtocol.java:84` `changes.length()==0` -> "change limit"), and most desktops have zero links, so "enabled" cannot be "an op with rows exists": without the marker the desktop's `state.local` fails inside `sync_import_staged` (document sync stops) and the phone's `local()` throws after hello.
+The marker is the proof of enabled; it is written once per replica and never changed. At most 7 cells per link (8 only counting the marker in the enable op).
+
+| Cell (suffix) | Value (exact fields) | Receive-side check (key shape, arity, JSON type, range, memory bound only) | Writer self-check (semantic limits) |
+|---|---|---|---|
+| `` (identity) | `{owner, link_id, kind, added_at}` | object with exactly these fields; strings; added_at integer 0..2^53-1; key equals the row's own `[owner, link_id]`. NOT nullable | owner matches package pattern, **at most 200** (`LinkRecord.java:67,99`, not 255); link_id canonical lowercase UUID; kind `[a-z]{1,16}` |
+| `/content` | `{hash, mime, modified, shared, protected}` or null | exactly these fields; modified integer 0..**2^53-1**; shared, protected 0 or 1; strings at most 100 / 64 | hash 64 lowercase hex; mime contract pattern |
+| `/text` | `{sha256, length}` or null | exactly these fields; length integer 1..1,048,576 (**bytes** of UTF-8); sha string at most 64 | sha 64 lowercase hex; absent (null) for protected links; **empty text maps to a null cell** (`LinkRecord.checkText` `:121-123` accepts "", a length-0 blob cell is invalid) |
+| `/preview` | `{sha256, length}` or null | length integer 1..33,554,432 | sha 64 hex; null for protected links |
+| `/title` | `{title, title_user_edited}` or null | exactly these fields; title string at most 200 UTF-16 units; flag 0 or 1 | `LinkRecord.free` semantics (see below) |
+| `/filen` | `{uuid, path}` or null | exactly these fields; path string at most 1024 **UTF-16 units** (not bytes) | uuid canonical lowercase; path 1..1024. If a row has several filen locators the FIRST in locator order is used |
+| `/presence` | `{state, reason, since}` | exactly these fields; state, reason strings from the sets below; since integer 0..2^53-1. NOT nullable | state `live`, `trashed`, `gone`; reason one of `""`, `deleted`, `trashed`, `user`, `forgotten`; **`live` uses since 0** |
+
+Null is accepted for every suffix except identity and presence. It is required: `graph::diff` turns removed keys into null (`graph.rs:146-155`; Java `SyncGraph.java:74-76`), and section 4 sends `/content`, `/title` etc. as null on `gone`.
+The marker cell: `{since}` integer 0..2^53-1, not nullable.
+
+Why text is a blob **[CODE != PLAN, clarified]**: operations carry at most 32 MiB of metadata and the whole causal state is one re-parsed JSON text that keeps every old value; a `{sha256,length}` cell keeps history tiny.
+
+Blob limits **[CODE != PLAN, the old "body at most 256 MiB" was wrong]**: each blob at most 256 MiB (`stack-archive/src/lib.rs:17` `FILE_LIMIT`), all blobs of a bundle at most 8 GiB (`:18` `TOTAL_BYTES`, `bundle.rs` validate), 10,000 blobs, `MAX_BUNDLE` = 8 GiB + 32 MiB + 12 (`stack-transport/src/lib.rs:24`).
+Receivers check each link cell length (<= 32 MiB preview, <= 1 MiB text) against the declared blob, so a 256 MiB blob cannot hide behind a small cell.
+
+### Validation: writers refuse, receivers skip (H-A, H-B)
+`validate_changes` / `validateChanges` runs over the WHOLE bundle (`sync.rs:1203-1205`, `SyncExchange.java:81`), so one rejected cell kills the bundle and, because operations form a contiguous per-origin chain (`stack-sync/src/lib.rs:210`, `operations_after` `:688-710`), every later session. Therefore:
+- **Receive side (`link_records` arm, both languages):** checks only the "Receive-side check" column: key shape, exact field set, JSON types, safe-integer range, string bounds needed for memory safety. It rejects nothing else. It bypasses `validate_primitives` (**M4 [verified]**: `graph.rs:158`, call `:414`; its integer list lacks `modified`, `shared`, `protected`, `since`) and uses `validation::keys` / `SyncProtocol.exact`.
+- **Writer side:** every semantic limit (patterns, 1000 count, byte budget, text UTF-8 length, title rules, content checks PDF `%PDF-` / UTF-8 / no NUL, number range) is enforced by the writer's self-check: `LinkSync.capture` (phone) and the desktop enable op, BEFORE `state.local`. A row that fails is not written and is marked "not synced". The writer never publishes what the receive side would reject.
+- **Receive side projection:** `project_links` (Rust) and `LinkStore.applySynced` (Java) apply every semantic limit again, skip an invalid link and count it; the operation is accepted and the chain continues. This is the only place semantic limits reject, and it only skips.
+- Numbers (H-B): `LinkRecord.parse` accepts any long >= 0 (`LinkRecord.java:73-74`) and desktop archive restore accepts `modified` 0..i64::MAX (`stack-archive/src/links.rs:81`); the kernel rejects numbers above 2^53-1 (`lib.rs:12` MAX_SEQUENCE, `:231-251` `validate_numbers`; Java canonical `SyncProtocol.java:43` "unsafe number"). Capture runs inside `hello()` (`PairingTransport.java:256` `current.capture()`), so one such row would fail every Sync. Writers skip any row whose `modified`, `added_at` or `since` exceeds 2^53-1 (marked "not synced"); the table range above stops it on receive.
+- Title: `LinkRecord.free` (`LinkRecord.java:167-175`) accepts leading/trailing spaces; `clean_name` (`stack-archive/src/validation.rs:113-118`, used by `graph.rs:216`) trims and would reject. The LINK title check is `LinkRecord.free` semantics (1..200 UTF-16 units, no control/direction chars, no unpaired surrogate), NOT `clean_name`; the documents arm is untouched.
+- Text size: `LinkRecord.MAX_TEXT = 1<<20` is UTF-16 units (`LinkRecord.java:23,122`), up to 3 MiB of UTF-8; the cell `length` is bytes. The writer computes the UTF-8 length and skips the text cell (link still syncs, "text not synced") when it exceeds 1,048,576. The **desktop's** text cap is also 1 MiB in UTF-16 units (`links.rs:11,94` `MAX_TEXT`, `validation.rs:138-141` `utf16_len`), also not bytes: the desktop enable applies the same UTF-8 byte rule.
+- Count: the phone has no 1000 cap at publish (**[CODE != PLAN]**: `LinkArchive.LINK_LIMIT` is only used for backups, `LinkArchive.java:15,42`, `LibraryArchive.java:339`). The writer counts only identities whose presence is not `gone`. The 1001st live/trashed link is not captured ("not synced").
+- `LinkSync.capture` runs `validateChanges` over its own changes before `state.local`.
+
+Presence mapping: phone `live|unreachable|missing` become `live`; `trashed` stays `trashed` (reason = `removed_reason`, since = `state_since`); deleting the row (Delete for good, 30-day sweep, Remove) becomes `gone`.
+
+### Blobs are kept at write time, ALWAYS BY COPY (C2, H-D)
+**[verified]** Export reads live files: Java `SyncExchange.java:62-63` reads the original path, else `files/sync_blobs/<sha>`; only RECEIVED blobs are kept (`:129-140`). Rust export hashes `root.join(path)` (`sync.rs:1078`). Link text and previews are mutable, so a preview that changes before the peer acknowledges would make `send_bundle` fail verification on every session.
+Rule: when a device writes a link operation it COPIES (never hard-links) each text and preview blob it references into `sync_blobs/<sha>` (desktop `<root>/sync_blobs`, phone `files/sync_blobs`), through temp file + rename. **[CODE != PLAN]** why not hard links: `LinkStore.publish` falls back to `copy(previewFile, target)` (`LinkStore.java:71`, `:320-325`), a truncate-and-write on the existing inode; if that inode were hard-linked into `sync_blobs/<sha>` the kept blob would change and export verification (`SyncExchange.java:63`, `sync.rs:1078`) would fail every session. A copy has its own inode, so in-place writers elsewhere stay harmless.
+**Order (durability):** (1) blob copied to temp in `sync_blobs`, (2) fsync the file, (3) rename, fsync the directory, (4) hash re-verified from the kept copy, (5) only then the DB commit of the operation (and projection). A kill before (5) leaves an orphan blob, which is harmless (cleaned by purge reference counting). A kill after (5) cannot lose a blob, so no permanent wedge. Export reads link blobs ONLY from `sync_blobs/<sha>`. The phone writes text from `link_search.body` at capture time.
+
+### Reference maps (path safety and blob limits)
+`refs_ops` (`sync.rs:187`) and `SyncExchange.refs` return link references in a SEPARATE map keyed by digest (no path). The install loops do `root.join(path)` / `file(path)` (`sync.rs:1312-1358`, `SyncExchange.java:145-148`) and iterate only the document map, so a link ref never becomes a path.
+The "unreferenced blob" import check (`sync.rs:1250-1259`, `SyncExchange.java:137`) must test against the UNION of both maps. A link blob that is missing or fails its check skips that link (counted), it does not fail the import.
+
+### Total byte budget (H5, M-e)
+Chosen: **cap and defer, no operation splitting** (export cannot split by size, and splitting would need new export logic in both languages).
+- Per link: preview <= 32 MiB, text <= 1 MiB.
+- Total of distinct link blob bytes referenced by CURRENT link cells at most **2 GiB** per device.
+- Before writing a link operation that carries blobs, the device computes the bytes referenced by all unacknowledged operations plus the new blobs; if that exceeds **6 GiB** the operation is deferred (retried after the next ack). Document originals are not capped, so unacked bytes can still exceed 8 GiB `TOTAL_BYTES` when originals are large; the 6 GiB figure is headroom only for the link share.
+- **(i) The enable op is ALWAYS metadata-only on the phone and is never deferred** (identity, content, title, filen, presence, marker; no text/preview cells). Blobs follow in later capture ops under the budget. Reason: if the phone's enable were deferred, the desktop's would arrive first and the phone's enable would be causally after it, bypassing resolution rule 2.
+- **(ii)** "not captured" excludes only text/preview cells. Metadata, presence and `gone` are always captured.
+- **(iii) Deterministic inclusion order:** links whose blobs were already synced first, then by `added_at` ascending (sticky: a link once in stays in).
+- **(iv)** A shrink under the cap needs capture to run (section 7, runs whenever enabled).
+- Test: an enable of 1000 x 32 MiB is trimmed to the 2 GiB budget and the bundle stays under 8 GiB.
+
+## 3. Merge and conflict rules
+
+Each cell is the existing multi-value register (kernel unchanged, wire version 1). `entity_base` is NOT extended to `link_records/` (a tombstone would make a gone link impossible to share again).
+
+- Authors. Phone: all cells, on every local change. Desktop: never, except its one enable operation (section 5). After it each cell has one writer.
+- Presence: later causal value wins. `trashed` then `live` is an ordinary successor; `gone` then a new publish: `live` as a successor, cells set again.
+  **[CODE != PLAN]** "concurrent trashed vs live goes to review" cannot occur: the desktop never writes presence, and the kernel's provisional pick is the LAST alternative by replica/counter order (`stack-sync/src/lib.rs:443,648`), not "the phone's own" and not by `since`.
+- **ONE rule per link over all its conflicted cells.** The phone applies it inside the transaction that applies the received bundle (before `install`), and emits one resolution operation (`evidence.kind = "link.resolve"`) carrying, for the link, the winning values:
+  1. if either side's presence is `gone`: the phone's cells win;
+  2. else if the two `/content` hashes differ and `modified` differs: the later `modified` wins (all cells of that alternative);
+  3. else (same hash): the phone's values win for every cell;
+  4. only a `modified` tie with different hashes goes to review, on the phone only.
+  **Coverage (H-C):** the resolution covers EVERY link the desktop's enable op touched, not only conflicted cells. For each such link it writes the winner's full 7-cell set (null where the winner lacks a cell), whether or not each cell is individually conflicted. Otherwise an unconflicted desktop text/preview cell, where the phone has none or where the phone lost the hash, would stay and not match the hash, or keep protected text in the kernel.
+  The loser stays in history (its blob stays until purge rules in section 4). The desktop never resolves.
+- **Tie review is one link, not one key (M-g).** `SyncStore.resolve` handles one key at a time (`SyncStore.java:219-237`) and capture skips conflicted keys, so a tied link would otherwise never sync new publishes until every cell was reviewed. One choice resolves ALL cells of the link (the conflict screen shows the link once). The phone's own NEW local write to a conflicted link supersedes both alternatives (capture does not skip a key whose conflict a newer local write has already covered).
+- Provisional values (M8): while a key is conflicted the kernel's value is "last alternative", so `LinkStore.applySynced`, `project_links` and the capture diff skip every conflicted link key. The desktop does not apply conflicted link keys to its own rows.
+- Conflicts never block anything else: link keys are hidden from the desktop review UI (the conflict view in `stack-desktop/src/sync_pages.rs:27-31` is shown when ANY conflict exists, so it needs the same link-key filter) and excluded from both backup gates (section 6).
+- The resolution operation reaches the desktop in the same session (send, receive, send). Until then the desktop keeps its row unchanged.
+- A desktop link with no phone counterpart is carried by the desktop's enable op and arrives on the phone per decision 7 (never live).
+- Desktop apply never writes `unreachable`/`missing`/`checked_at`. The phone's apply never touches its own `saf`/`owner` locators and replaces only the `filen` entry.
+
+## 4. Presence and purge ("gone")
+
+On the desktop, applying presence:
+- **Presence absent = live (M-d).** Desktop enable ops omit presence; `project_links` and `applySynced` treat a link with no presence cell as `live`, never as an error.
+- `live`: row visible. **[M6]** A locally trashed row is moved back to visible by presence `live`. `trashed`: row stays but is hidden from list and search (`state<>'trashed'`). `gone`: delete the row, its `link_search` entry and `links/<row_id>.pdf`, then purge below.
+- The desktop deletes a row ONLY when presence is `gone`. Never by absence (a link missing from a bundle, a restore or a reset deletes nothing).
+- On the phone, `gone` is only produced locally (delete). The phone never applies a received `gone` and **never inserts an identity whose presence register holds `gone`** (H3a/b).
+- When `gone`, the phone also sends `/content`, `/text`, `/preview`, `/title`, `/filen` as null (the identity cell stays; small).
+- **What happens to desktop-only links, said plainly (M-d).** A desktop-only link arrives on the phone `trashed` with reason **`user`** (reason `trashed` would make `LinkStore.restore` return the row as missing, `LinkStore.java:257`; with `user` restore gives `unreachable`). Once the phone then publishes that row, its presence is `trashed` and the row VANISHES from the desktop's list. The phone's 30-day sweep (`LinkStore.java:262-269`) turns it `gone` unless the person restores it, and then the DESKTOP DELETES it. So desktop-only rows are not kept forever once sync is on; the phone user has 30 days in Recently deleted to restore them.
+- **Purge (Q3, decided; widened M-f).** A retained blob `sync_blobs/<sha>` of a LINK is deleted by a cleanup pass whenever its sha has zero references in: (a) `files/` refs anywhere in history plus pending operations (document originals share `sync_blobs/<sha>`), (b) current link cells, (c) conflicted alternatives, (d) unacknowledged/pending operations (i.e. after the peer's ack has passed them). This covers three cases: a link that became `gone`; a link that became protected (its text cell is nulled, the old blob would otherwise stay forever); superseded previews of live links (up to 32 MiB per change would otherwise pile up). Delete only at zero references; two links may share a digest. Unacknowledged operations keep their blobs, so no export fails.
+- **What purge does NOT remove, accepted and stated plainly:** (1) the kernel keeps every old register value; cells hold digests only, but old text may still survive inside `sync_snapshots`, so up to 3 DB copies per device; (2) titles and Filen paths of any link stay inline in sync history forever. "Delete for good" in the UI should say text is removed from retained sync files, not that sync history is erased.
+- Protected links (Q1) never put text or preview into any blob; a link that BECOMES protected has its old blobs removed by the pass above once unreferenced and acknowledged. Titles/filen stay in history as stated.
+
+## 5. The hello gate
+
+**[CODE != PLAN]** Operations form a contiguous per-origin chain, so a peer that cannot parse one cannot skip it: link cells must not be created until the peer announced support. The gate is at creation.
+
+Announcement: optional hello field `features: ["links"]` (an array; baselines still say model 2 and a feature list needs no model constant). A device that announces `links` also announces `enabled` (bool), see M1. Both hello parsers reject unknown fields today:
+- Rust: `struct Hello` (`stack-transport/src/lib.rs:134`, `deny_unknown_fields`); built in `check_group` (:375), answered in `hello()` (:486). The server includes the fields only if the client sent `features`.
+- Java: `PairingTransport.hello()` (:252) builds it; `session()` (:321) does `SyncProtocol.exact(remote, ...)` with an exact field list.
+Fallback ladder (M3): levels `frontier+features`, `frontier`, plain. Today `syncNow` retries ONCE after a `HelloRefused` (`PairingTransport.java:295-296`; any IOException counts as a refusal, `:320`). New rule: within ONE Sync, loop down all levels until one is accepted, then remember the accepted level for 15 minutes. This makes 0.1.0 desktops work on the first Sync. The Rust client (`sync_now`, CLI/tests only) must never send `features`.
+
+**Upgrade consequence (said plainly):** desktop schema 6 makes an older desktop refuse the library (`schema.rs:42`, `version > VERSION` -> Invalid). Once a library is opened by the new desktop it cannot go back to an older desktop build; this is the same as any past schema bump.
+
+**Enabled is derived from history (M2, cached):** a device is enabled iff its own enable marker `link_records/enabled/<own replica>` exists in its sync history (an op with its own replica id and `evidence.kind = "links.enable"`). No `meta`/`sync_meta` flag. This survives a connection reset (Rust `reset.rs:366-367` deletes only `sync_state`/`sync_receipts`; phone `LibraryReset.resetConnection` `:70-72` clears `sync_meta`), after which links enable again with a fresh replica. Deriving it needs a full history parse in `check_group`, whereas `sync_summary` avoids one (`sync.rs:851-874`): cache the result on the loaded state (invalidate when the state changes) and expose it from `sync_summary`.
+
+Enable step (each side once). The enable op ALWAYS has the marker, so it is never empty (C-A).
+1. **Desktop trigger (H4, M-a, M-h).** The desktop enable fires on the FIRST of: (a) the peer's hello announces `links`; (b) an incoming bundle's `evidence.kind == "links.enable"` or any `link_records/` key. **Timing (M-a):** the desktop builds its hello reply before TLS (`stack-transport/src/lib.rs:722`) and the phone waits 45 s for it (`PairingTransport.java:59,320`); a timeout counts as `HelloRefused` and downgrades the ladder for 15 minutes. So the enable op is written AFTER the desktop's hello reply and BEFORE `receive_bundle` (read timeout 180 s, `:745`), never while the hello is pending. That reply's `enabled`/frontier stay pre-op, and by the M1 rule that means no equal-frontier skip. In case (b), and when adopting by file (`adopting=true`: `sync_import_staged` has no state yet), the enable op is written with an EMPTY context like `add_reviewed_local` (`sync.rs:385-397`) so it is concurrent with the phone baseline; writing it after `state.receive` would make it causally later and override the phone, breaking decision 1. (Alternative: exclude identities already in the received history.) Chosen: empty context.
+   The desktop enable uses the SAME `link_cells` builder and writer self-check as the phone (H-C): protected = metadata only, text by UTF-8 bytes (<= 1,048,576), 1000 count, 2 GiB budget, number range 2^53-1, unreadable rows skipped (M10). Desktop rows come from archive restores, and phone backups include protected link text (`LinkArchive.java:24-25`) and unlimited `modified`, so the checks matter. Presence omitted (absent = live).
+2. **Phone trigger:** after the hello exchange, if the peer announced `links` and the phone has no own enable marker: author `links.enable` with marker and all rows, metadata only (section 2 (i)). No rows: still write the op (the marker keeps it valid).
+3. **Equal-frontier skip (M1):** skip only if both announce `links` and both report `enabled=true`, or if either does not announce `links`. Otherwise run the session normally. With the desktop op written after its reply, a desktop that has just enabled still reports `enabled=false` for that session, so no skip.
+4. From then on the phone captures link changes (section 7); the desktop only applies.
+
+Version checks (all exact equality with 2 today; Java `optInt` at `SyncStore.java:88` and `SyncExchange.java:124` is looser than Rust):
+
+| Where | Today | Change |
+|---|---|---|
+| `stack-sync/src/graph.rs:55` `GRAPH_MODEL = 2` | constant | **no change.** The enable op is recognised by `evidence.kind` and the marker, not by model |
+| `stack-core/src/sync.rs:58` `load()`; `:395`; `:797` `sync_start`; `:1290` `sync_import_staged` | exact 2 | unchanged |
+| `SyncGraph.java:17`, `SyncStore.java:88,145`, `SyncExchange.java:124`, `SyncAdoption.java:101` | exact 2 | unchanged |
+
+**Older device adopting a link-enabled history:** a pre-slice-6 device that adopts or receives a history containing `link_records/` cells fails at `validate_changes` (`sync.rs:551-552,1203`) with "unknown graph table". This cannot happen through the gate but can through a copied backup or a re-pairing with an old app after a connection reset on the new side. Document the exact error in `INTEROP_SYNC_PROTOCOL_V1.md`; no silent fallback. Update that document's title ("graph model 2") and blob-limit wording (256 MiB each, 8 GiB total, per-link caps of section 2).
+
+## 6. Desktop changes
+
+- Schema 6 (`stack-core/src/schema.rs`, `VERSION` 5 to 6, `V6`, `version >= 6` probe; additive: `schema.rs:42-46,89-92`): `link_records` gains `state_since INTEGER NOT NULL DEFAULT 0`, `removed_reason TEXT NOT NULL DEFAULT ''`, `preview_sha TEXT NOT NULL DEFAULT ''`, `preview_pending INTEGER NOT NULL DEFAULT 0`, plus a new table `link_projection(key TEXT PRIMARY KEY, value TEXT NOT NULL)`.
+  **[CODE != PLAN]** The desktop table has no `revision`, `state_since`, `removed_reason`, `checked_at`, and `preview` is a 0/1 flag with no digest. Restored rows (and migrated rows) have `preview_sha=''`.
+- **Separate link projection (C1) [verified].** `install_sync_state` computes `graph::cells(&projected)` (`sync.rs:1012`) and `save(&tx, state, &cells, ...)` (`:1022`) from the document projection only; Java does the same (`SyncJournal.java:21,60,93,103`, `SyncStore.java:182,188`). Link cells in `sync_state.projection` would be nulled/dropped after the first document edit or received bundle.
+  Resolution, **no carve-outs in capture/install/SyncJournal/sync_start:** `sync_state.projection` and every existing function stay as they are. Link cells live in a separate store (`link_projection` desktop, `sync_link_projection` phone). Link capture diffs ONLY against it; `install` rewrites it in the same transaction as the link rows. `project()` skips `link_records/` keys.
+- `stack-sync/src/graph.rs`: `link_cells(rows)`, `link_records` arm in `validate_changes` (receive-side checks only, section 2), `project_links(cells) -> Vec<LinkRow>` (skips conflicted keys, skips and counts invalid links; never fails the library projection).
+- `stack-core/src/sync.rs`: `install_sync_state`: after `write_graph`, in the same IMMEDIATE transaction, apply `project_links` (insert, update by `(owner, link_id)`, keep local `row_id`; `link_search` rewritten; new rows `unreachable`; presence per section 4; **delete only on presence `gone`**) and rewrite `link_projection`. `refs_ops` second map; enable op (section 5); the blob-keeping step lives here in stack-core because it needs the library root; `sync_summary` exposes cached `links_enabled`.
+- **Link count after the union (decided, see section 14).** After a union the desktop can hold more than 1000 non-trashed links (its own restored rows plus the phone's), and archive export validates `LINK_LIMIT` (`validation.rs:648`, `links::LINK_LIMIT`). Rule: `project_links` does not insert a phone link when the desktop's count of non-trashed links would exceed 1000; it is skipped and counted ("not shown"). Existing desktop rows are never dropped.
+- **Reset and restore (M-b).** Connection reset (`reset.rs:366-367`) deletes `sync_state`/`sync_receipts`; it must also delete `link_projection`. Phone `LibraryReset.resetConnection` (`:70-72`) must also delete `sync_link_projection`. Both reset paths list the new tables. A reset deletes NO link rows. `install_archive` inserts link rows (`interchange.rs:960-1000`), erroring `Stale` for existing ones, and never deletes; it does not touch the projection. **Rows restored after enabling stay desktop-only** (chosen: the desktop never writes link ops after its one enable; a new pairing after a reset runs a fresh enable op that includes them). Because the desktop deletes only on presence `gone`, a reset followed by a new pairing cannot delete any desktop link.
+- **Conflict UI and backups (H1) [verified].** `conflict_entries` (`stack-desktop/src/sync_ui.rs:53-98`) lists every key and `sync_resolve` (`sync.rs:903-987`) can write link cells; `ensure_sync_exportable` (`sync.rs:890-899`, used `interchange.rs:1045,1051`) and `LibraryArchive.java:89` refuse backups while any conflict exists. Rules: hide `link_records/` keys from the desktop review UI (show "resolve on the phone"), **including the check at `sync_pages.rs:27-31`** that decides whether to show the conflict view; `sync_resolve` refuses `link_records/` keys; the conflict check in BOTH export gates ignores `link_records/` keys.
+- **Preview and text install (M5).** A blob is already durable in `sync_blobs/<sha>` before the transaction. The transaction sets `preview_sha` and `preview_pending=1`; after commit the preview is written to `links/<row_id>.pdf` via temp + rename and `preview_pending` cleared. Startup repair re-installs ONLY rows with `preview_pending=1`. Restored/migrated rows with `preview_sha=''` are not touched by repair. While pending, the row shows "preview not ready" and export skips the preview file for pending rows. `gone` deletes `links/<row_id>.pdf`, any temp file and `preview_pending`. Text is in the same transaction.
+- UI: filter `trashed`; no edit/delete actions; "synced from phone"; a protected record keeps its lock label. Nothing to configure.
+- Exports read `link_records` as today, except pending previews.
+
+## 7. Phone changes
+
+- Schema 13 (`LibraryDatabase`: `onUpgrade` guard `oldVersion > 11 || newVersion != 12` becomes 13; `onCreate` uses the same helper). Migration `addLinkSync` **(P1)**: columns `text_sha`, `text_len`, `preview_sha`, `preview_len`, **`preview_pending INTEGER NOT NULL DEFAULT 0`** (used below), a table `sync_link_projection(key, value)`, and the triggers below.
+- **Digest columns (M7).** `LinkStore.publish` resets `text_sha`/`preview_sha` whenever content changes. The preview is placed before commit (`LinkStore.java:64-73`), so a stop can leave a new file under the old hash. Capture therefore verifies file length and hash against the stored digest before reuse; mismatch recomputes. Capture copies the blob to `sync_blobs/<sha>` by the section 2 order. For text, capture writes `link_search.body` to the blob file.
+- Triggers on `link_records` (same guard `WHEN (SELECT enabled=1 AND applying=0 FROM sync_control ...)`), inserting `('link_records', action)` into `sync_change`: `AFTER INSERT`, `AFTER DELETE`, `AFTER UPDATE OF owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,preview_file,title_user_edited,removed_reason` with a `WHEN` comparing old/new with `IS NOT`. Writes of only `checked_at`, `state_since`, `revision`, `received_at` never fire.
+- `SyncJournal.capture` skips `link_records` events in the raw-row replay and is otherwise UNCHANGED. New `LinkSync.capture(db, state, replica, ...)` run by `SyncStore.capture()` after the replay. **It runs whenever the device is enabled (M-c), not only when `sync_change` has new rows.** `SyncStore.capture` returns early when `maxChange()<=cursor` (`SyncStore.java:153`) and install runs with `applying=1` and sets `journal_cursor=maxChange()` (`:185-190`), so deferred operations, budget-skipped links and trashed desktop-only links whose presence must be published would otherwise wait for an unrelated link change. Implementation: link capture is placed before that early return, guarded by a dirty flag (`link_dirty`, set by triggers, install, ack and a budget/deferral state) so an idle device does O(1) work. Steps: read all rows (at most 1000), build cells (section 2 writer rules, inclusion order, budgets), `SyncGraph.diff` against `sync_link_projection`, skip conflicted keys, `validateChanges`, copy blobs (section 2 order), then `state.local(replica, changes, {"kind":"link.capture"})` and update `sync_link_projection` in the same transaction.
+- **`install` updates the link projection (M-c).** After applying received link rows (with `applying=1`), `SyncStore.install` rewrites `sync_link_projection` to the cells of the rows as applied, so the next capture does not re-send or re-diff what was just received. Install does not today (`SyncStore.java:182-190`).
+- `SyncGraph.java`: `validateChanges` arm (bypassing primitive checks), `project()` skips `link_records/`, `linkCells`/`projectLinks`. `SyncExchange.refs` returns link refs in a separate map; `export` reads link blobs only from `files/sync_blobs/<sha>`.
+- `LinkStore.applySynced(db, rows)` (from `SyncStore.install`, after `write(projected)`, with `applying=1`): only for identities not present as `gone`, not conflicted, and either missing on the phone or resolved to the desktop alternative.
+  - New rows: random id, `unreachable`, `revision=1`; **a row the phone does not have that arrives from a desktop baseline is inserted `trashed`, reason `user`, never live; an identity whose presence is `gone` is not inserted at all** (Q2, H3). Presence absent = live for rows that came with no presence cell, except for this desktop-only arrival rule.
+  - Existing rows: content, text, preview, title, filen updated, `revision=revision+1`, other locators untouched. Preview placed after commit with `preview_pending` and a start-up repair only for pending rows.
+  - Concurrent purge (H3b): purge writes `gone`; a desktop enable op in flight is concurrent with it, so the kernel keeps both. `applySynced` consults the presence register and sees `gone`, so nothing is inserted; the phone's resolution operation (rule 1) settles it.
+- Auto-resolution (section 3) in `SyncExchange.importFile` between `state.receive` and `store.install`. Conflict screen (`SyncUi`) needs link-title display names, one entry per link.
+- Hello ladder loop in `PairingTransport` (M3).
+
+## 8. Golden cases (`desktop/protocol/golden-v1.json`; wire version stays 1)
+
+Cases 1-6 test only the UNCHANGED kernel with link-shaped keys and are cheap (**[CODE != PLAN]**: the golden file today tests only the kernel with generic keys). The valuable part is `graph_cases`.
+1. `link-cells-independent-registers`. 2. `link-presence-trash-restore`. 3. `link-gone-then-reshare`. 4. `link-concurrent-baselines-differing-hash`. 5. `link-resolution-by-modified`. 6. `link-modified-tie-stays-conflicted`.
+7. New top-level array `graph_cases`, loaders added to `golden.rs` (reads named keys, `golden.rs:8,30`) and `desktop/tools/java/SyncGolden.java`. Split into two lists (H-A):
+   - **`receiver_rejects`** (key shape, arity, JSON type, range, memory bound only): non-canonical key, wrong arity, unknown suffix, extra field, missing field, wrong JSON type, uppercase link_id key shape, `modified`/`added_at`/`since` = 2^53 (rejected) and 2^53-1 (accepted), negative `since`, null identity, null presence, title string over 200 UTF-16 units, text length 0 or 1 MiB+1 (out of memory bound), preview 32 MiB+1, key differs from identity row, `modified`/`shared`/`protected` as strings, marker cell missing `since`.
+   - **`receiver_accepts_skips`** (valid on the wire; `project_links` / `applySynced` skip and count): title with leading/trailing space (accepted AND applied), title with control char (accepted, skipped), bad presence reason, uppercase hash, filen empty path, protected link with a text cell (accepted; phone never writes it, desktop ignores it), null `/content`, `/title`, `/text`, `/preview`, `/filen` (accepted), **a null `/content` op** as emitted on `gone`.
+   - **`writer_refuses`** (the writer's self-check never emits): title 201, text 1,048,577 UTF-8 bytes (1,048,576 emitted), 1001st link, empty text (emits null), `modified` 2^53 (row skipped, "not synced"), owner 201 chars.
+   - **Enable op shapes:** zero-link enable (marker only) accepted; enable op with no changes rejected by the kernel on both sides.
+
+## 9. Test plan
+
+- Golden: sections above, Rust (`cargo test -p stack-sync`) and Java host (`test_sync_java.py`, `test_sync_graph_java.py`).
+- `stack-core` integration (`tests/sync_links.rs`, synthetic link builders from the interop bed):
+  - baseline phone to desktop; update, trash, restore, gone; **trashed -> live on the desktop (M6)**;
+  - **zero-link desktop + zero-link phone enable (C-A)**: both write a marker-only op, sync continues, `enabled` derived on both;
+  - **a document edit after enabling emits no link change and install keeps the link projection (C1)**; received bundle keeps it too;
+  - **export works after a preview changes before the peer ack (C2)**; desktop side too; **`LinkStore` copy fallback (`LinkStore.java:71`) with a kept blob: the kept blob does not change (H-D)**;
+  - **title with surrounding spaces, 1 MiB text in UTF-16 vs bytes, over-1000 links (C3)**: nothing wedges, bad rows not synced; an invalid received link is skipped and the chain continues;
+  - **`modified` = 2^53 on a row: row not synced, Sync still works (H-B)**; **empty text maps to a null cell**; **a null `/content` op (gone) accepted and applied (H-A)**;
+  - **desktop enable carrying protected text (metadata only on the wire), text over 1 MiB in bytes (skipped), more than 2 GiB (trimmed) (H-C)**;
+  - **non-conflicted desktop-only text/preview cells under rule 2 are overwritten by the winner's 7-cell set (H-C)**;
+  - **desktop backup export with a link conflict present succeeds; a link conflict resolve is refused (H1); `sync_pages` conflict view hidden when only link keys conflict**;
+  - auto-resolution: gone vs live, hash difference with later `modified`, same hash with different preview/title/added_at, tie goes to review once per link and one choice resolves all cells (M-g), a new local phone write supersedes a tie;
+  - **enable op > 8 GiB** trimmed by the 2 GiB budget and deferral at 6 GiB unacknowledged (H5); **enable is never deferred and is metadata-only on the phone (M-e i)**;
+  - **defer, then shrink, then capture with NO new `sync_change` rows**: deferred and budget-skipped links are written (M-c); install rewrites `sync_link_projection`;
+  - **big enable inside the hello timeout: the desktop hello reply is sent before the enable op; the phone's 45 s read does not time out (M-a)**;
+  - **asymmetric enable flags at equal frontiers**: skip not taken (M1); both enabled and equal: skipped;
+  - **after a connection reset links enable again (M2)**; **reset clears `link_projection` and `sync_link_projection` and deletes no link row; reset then new pairing deletes no desktop link (M-b)**; **restore after enabling: restored rows stay desktop-only and appear on a new pairing**;
+  - **desktop-only link: arrives trashed with reason `user`, restore gives `unreachable`; phone publishes trashed, desktop hides it; sweep to `gone` deletes it on the desktop (M-d)**; presence-absent treated as live;
+  - **purge concurrent with the desktop's enable op: no resurrection (H3b)**; identity `gone` never inserted; protected link: no text/preview cells and no blobs on the desktop (Q1);
+  - purge deletes a blob only at zero references across `files/` history, current cells, conflicted alternatives and pending ops; a link becoming protected and a superseded preview of a live link are purged after ack (M-f);
+  - adoption by file: the enable op uses an empty context and does not override the phone (M-h);
+  - **repair pass with restored rows having empty `preview_sha`** does nothing and touches only `preview_pending` rows (M5);
+  - desktop's own newer link survives a downgraded hello and an incoming bundle arriving before its enable op (H4);
+  - desktop link count > 1000 after the union: phone link skipped, archive export still valid;
+  - model-2 library loads and syncs unchanged; peer without `links`: no link ops created; link failure does not set `projection_valid=false`; an older desktop refuses a schema-6 library with the expected error.
+- Process-kill (SIGKILL cases like the existing seven, `test_sync_process_stops.py`): after blob copy before fsync, **after blob fsync and rename before the DB commit (orphan blob, harmless, next capture succeeds)**, **after the DB commit (blob present, no wedge)**, after preview temp written, after transaction, after preview rename, before receipt; repair pass restores the preview; phone `sync_*` probes at `transaction`, `rows_written`, `committed`; **phone: kill between preview file written and row commit (M7)**.
+- Phone `androidTest` (new `LinkSyncChecks`): migration 12 to 13 keeps rows (with `preview_pending`); triggers ignore `checked_at`/`state_since`/`revision`-only writes; delete produces `gone`; `applySynced` bumps `revision`; a concurrent `LinkChecker` write loses; publish resets digests; capture rehashes a mismatching preview; hello ladder against a stub that rejects each level within one Sync.
+- Real LAN, **test phone `0A121JEC203530` only**: new step `sync-links` in the interop bed: synthetic links, one Sync now, compare titles/hashes/text digest/preview digest; trash, restore, delete for good; first-pairing disagreement; **new phone vs old 0.1.0 desktop (ladder in one Sync) and old phone vs new desktop**. Synthetic data only; no install/uninstall/clear.
+
+## 10. Risks
+
+- Hello ladder and enabling race: the only part that can make existing pairings fail; guarded by cross-version tests, the M1 rule and the timing rule of section 5.
+- Capture cost: 1000 links with up to 2 GiB of previews; digests stored, verified by length+hash on first use after a change; capture is O(rows) but runs only when dirty.
+- State growth: blobs retained for all history until unreferenced and acknowledged (section 4 purge); bounded by the 2 GiB budget plus superseded versions not yet acked.
+- A received PDF is rendered on the desktop (page 1, PDFium). The sender is the authenticated paired phone; existing size/crash-marker caps stay.
+- Protected records sync metadata only (Q1).
+- **Desktop-only restored rows are not safe from deletion (M-d).** They arrive on the phone trashed (reason `user`); if the person does not restore them within 30 days the phone's sweep makes them `gone` and the desktop deletes them. Nothing else deletes a desktop row.
+- Purge does not erase sync history: text may remain in `sync_snapshots`, titles and Filen paths remain inline.
+- Hard links are not used; copies double disk use for retained link blobs (bounded by the 2 GiB budget).
+- `docs/STACK_LINK_CONTRACT.md` ("Flatpak launch test first") must be edited to point at 6b when this lands.
+
+## 11. Work breakdown (S = under half a day, M = 1 to 2 days, L = 3 or more)
+
+| # | Item | Size | Who |
+|---|---|---|---|
+| D1 | Golden cases and `graph_cases` (JSON **plus loaders in `golden.rs` and `desktop/tools/java/SyncGolden.java`**) | M | cheap agent, then review |
+| D2 | Rust `graph.rs`: link cells and marker, receive-side validator, writer self-check, `project_links` (skip bad/conflicted/gone-only delete), refs second map, byte budget and counts | M | cheap agent, reviewed |
+| D3 | Java `SyncGraph` validators/projection, `LinkSync` capture (dirty flag, runs whenever enabled) with `sync_link_projection`, install rewrites projection, `validateChanges` of own changes, blob copy and order, UTF-8 text length, digest verification | M | cheap agent, reviewed |
+| D4a | Hello parsing only: accept `features`/`enabled`, ladder loop (Rust `stack-transport`, Java `PairingTransport`). Does not announce | M | reviewed |
+| D5 | Desktop schema 6, `link_projection`, apply in `install_sync_state`, **blob keeping (copy, fsync order; needs the library root, so it lives here, not in D2)**, enable op (marker, hello or incoming trigger, after reply and before `receive_bundle`, empty context for adopt/in-bundle case, same builder and self-check), cached derived `enabled`, preview_pending install and repair, reset clearing of `link_projection`, UI filter and review hiding (`sync_pages.rs`), export gates, `sync_resolve` refusal, 1000-count, trashed->live. Depends on D4a for Hello parsing | L | reviewed |
+| P1 | Phone schema 13 (incl. `preview_pending`), triggers, digest columns and publish reset, `sync_link_projection` (reset clears it), `LinkStore.applySynced` (trashed `user` arrival, never-gone), journal skip, blob copy order, enable op metadata-only | L | reviewed |
+| P2 | Auto-resolution (one rule, whole-link coverage), tie review per link, conflict-screen names | M | reviewed |
+| D6 | Purge cleanup of unreferenced retained blobs (gone, newly protected, superseded) after acknowledgement, reference counting over history, current, conflicted and pending | M | reviewed |
+| D4b | Hello announcement: start sending `features`/`enabled`. **Ships LAST** | S | reviewed |
+| T1 | stack-core integration tests, process-kill tests | M | cheap agent |
+| T2 | Phone `androidTest` `LinkSyncChecks` | M | cheap agent |
+| T3 | Real LAN step in the interop bed on `0A121JEC203530` | M | cheap agent, user present for the phone |
+| Doc | Update contract, `INTEROP_SYNC_PROTOCOL_V1.md` (title, blob limits, adopt-error), archive and sync docs | S | cheap agent |
+
+Order: D1, D2 and D3 (parity, writer self-check, budget), then D4a, then D5 and P1 in parallel, then P2, then D6, then **D4b last**; T1-T3 run throughout and fully before D4b. Nothing announces `links` before both sides can apply, keep blobs, resolve and purge links.
+
+## 12. Needs higher-cost review (per CLAUDE.md, suggest and wait for approval)
+
+1. Hello gate: ladder loop, `enabled` skip rule, derived enabled state and cache, enable timing relative to the hello timeout, empty-context enable on the desktop, all old/new combinations (D4a/b, D5).
+2. Merge rules: single resolution rule with whole-link coverage, per-link tie review, resolution operation shape, no kernel change.
+3. Separate link projection, install rewriting it, reset clearing it, desktop apply transaction, preview_pending and its repair, every SIGKILL boundary including the blob copy/fsync/commit order.
+4. Phone triggers, migration 13, capture-when-enabled with the dirty flag, `LinkChecker` compare-and-set, digest resets and hash verification.
+5. Validator split (receive-side vs writer self-check vs projection skip) in Rust and Java; marker cell; null and range rules; blob handling (separate ref map, union check, copy not hard link).
+6. Purge semantics (reference set, three cases) and protected-record metadata-only.
+7. Byte budget, inclusion order and deferral logic (2 GiB / 6 GiB), metadata-only enable.
+
+## 13. Review resolutions
+
+### Review 1 (rev 1 -> rev 2)
+
+| Finding | Verified against code | Fixed in |
+|---|---|---|
+| C1 projection nulled in 5 places | Yes: `sync.rs:1012,1022`, `SyncJournal.java:21,60,93,103`, `SyncStore.java:182,188`, desktop `capture()` | s6 "Separate link projection", s7, D2/D3/D5/P1 |
+| C2 blobs not kept | Yes: `SyncExchange.java:62-63,129-140`, `sync.rs:1078` | s2 "Blobs are kept at write time" (now copy, rev 3) |
+| C3 validators stricter than phone | Yes: `LinkRecord.java:23,122,167-175`, `validation.rs:113-118`, `graph.rs:216` | s2 validation split, s7 capture |
+| H1 conflict UI and backup gates | Yes: `sync_ui.rs:53-98`, `sync.rs:890-899,903-987`, `interchange.rs:1045,1051`, `LibraryArchive.java:89` | s3, s6 |
+| H2 incomplete auto rule | Yes | s3 single four-step rule |
+| H3 purged links return | Yes | decisions 7, s4, s7 |
+| H4 desktop overwrites own newer copy | Yes | s5 enable step 1 |
+| H5 large baseline | Yes: `lib.rs:17-18`, `MAX_BUNDLE:24` | s2 byte budget |
+| M1 asymmetric skip | Yes | s5 step 3 |
+| M2 flag survives reset | Yes: `reset.rs:366-367`, `LibraryReset.java:70-72` | s5 derived enabled |
+| M3 ladder once per Sync | Yes: `PairingTransport.java:295-296,320` | s5 |
+| M4 `validate_primitives` | Yes (`graph.rs:158` def, `:414` call) | s2 |
+| M5 preview install | Yes | s6 |
+| M6 trashed rows | Yes | s4 |
+| M7 phone digests | Yes: `LinkStore.java:64-73` | s7 |
+| M8 provisional value | Yes: `stack-sync/src/lib.rs:443,648` | s3, s7 |
+| M9, M10 | Q1, Q3; order | decisions 6, 8; s11 |
+| LOWs (since for live, `features` naming, separate refs, older adopter, golden 1-6, protocol doc) | Yes | s2, s5, s8 |
+
+### Review 2 (rev 2 -> rev 3)
+
+All findings checked against the code; none was contradicted. Notes in the third column.
+
+| Finding | Verified against code | Fixed in |
+|---|---|---|
+| C-A empty enable op | Yes: `stack-sync/src/lib.rs:215`, `SyncProtocol.java:84` | s2 marker cell, s5 enable step 1/2, s8 enable shapes; test zero-link enable; D2/D3/D5 |
+| H-A receiver rejects vs skips, null rules | Yes: `sync.rs:1203-1205`, `SyncExchange.java:81`, `graph.rs:146-155`, `SyncGraph.java:74-76`, `LinkRecord.java:121-123` | s2 table and "writers refuse, receivers skip"; s8 split into three lists; null-/content and empty-text tests |
+| H-B unbounded numbers | Yes: `LinkRecord.java:73-74`, `links.rs:81`, `lib.rs:12,231-251`, `SyncProtocol.java:43`, `PairingTransport.java:256` | s2 range 2^53-1 and writer skip; s8; test modified 2^53 |
+| H-C desktop enable not held to capture rules | Yes. Detail: desktop text cap is in UTF-16 units via `utf16_len` (`validation.rs:138-141`), cap in `links.rs:11,94`; phone backups carry protected text `LinkArchive.java:24-25` | s2, s3 coverage, s5 enable step 1; tests |
+| H-D hard links vs in-place copy | Yes: `LinkStore.java:71,320-325`, `SyncExchange.java:63`, `sync.rs:1078` | s2 "ALWAYS BY COPY", durability order; process-kill tests |
+| M-a enable inside hello timeout | Yes: desktop hello before TLS `stack-transport/src/lib.rs:722`, phone 45 s `PairingTransport.java:59,320`, desktop 180 s `lib.rs:33,745` | s5 enable step 1 and 3; test |
+| M-b reset and restore | Yes: `reset.rs:366-367`, `LibraryReset.java:70-72`. **Code differs in part:** current `install_archive` (`interchange.rs:960-1000`) only inserts and errors `Stale` for existing rows; it deletes nothing "by absence". The hazard exists only for the new `project_links`, so the rule is stated there | s4 "only on presence gone", s6 reset and restore; tests |
+| M-c capture not run when idle | Yes: `SyncStore.java:153,185-190` | s7 capture whenever enabled with dirty flag; install rewrites projection; tests |
+| M-d presence-absent, desktop-only rows deleted | Yes: `LinkStore.java:257,262-269` | s4 plain statement, reason `user`, absent = live; s10 risk rewritten; test |
+| M-e cap-and-defer semantics | Yes (design) | s2 budget (i)-(iv); s11 |
+| M-f purge too narrow | Yes (design) | s4 purge, widened reference set; s4 protected line; tests |
+| M-g tie per key | Yes: `SyncStore.java:219-237` | s3 per-link tie review; tests |
+| M-h adoption by file, sync_pages | Yes: `sync.rs:385-397`; `sync_pages.rs:27-31` | s5 empty context; s3/s6 `sync_pages` filter; tests |
+| LOW: enabled derivation cost, table fixes, union ref check, >1000 after union, schema 6 refusal, work breakdown, P1 column | Yes: `sync.rs:851-874,1250-1259`, `SyncExchange.java:137`, `validation.rs:648`, `schema.rs:42`, `LinkRecord.java:67,99` | s2 table (owner 200, filen UTF-16, first filen, 7 cells), s2 reference maps, s5 cache and schema 6 note, s6 count rule, s7 P1, s11 D1/D2/D4a/D4b/D5 |
+
+Confirmed OK and kept: contiguity claim; model-comparison table; old/new combinations; frozen two-member LAN group; LinkChecker race; path traversal safe with separate link refs; schema 5->6 additive migration.
+
+### D2 implementation notes (Rust, `stack-sync`)
+
+Code is in `desktop/crates/stack-sync/src/links.rs` (new module, re-exported `graph::{project_links, LinkProjection}`); hooks in `graph.rs` (`validate_changes` link arm before the table dispatch, `project()` skips `link_records/`). `validate_primitives` and `GRAPH_MODEL` are untouched.
+- Receive validator `links.rs` `validate_cell` (called from `graph.rs` `validate_changes`); writer `writer_self_check` / `link_cells`; `project_links`; budget helpers `trim_blobs_to_budget`, `fits_device_budget`, `must_defer`, `distinct_blob_bytes`; second refs map `link_blob_refs` / `link_blob_declared` (digest -> declared lengths, never a path). Line numbers: `grep -n "^pub fn" links.rs`.
+- Settled: a bad presence reason or state is accepted on the wire and skipped (`skipped`); hash at most 64 chars and mime at most 100 on receive; owner 201 is a writer refusal only (receiver bound is 1024 units, projection skips); no uuid-shape check on the marker replica or the filen locator uuid on receive (the key's `link_id` IS shape-checked); row refusal = owner/link_id/kind/hash/mime/title/modified/added_at/since problems, cell skip = text/preview/filen problems (skipped cells are absent, not null); a writer `gone` row sends five null cells plus presence.
+- `project_links(cells, conflicted_keys)` skips conflicted links (counted in `conflicted`) and invalid links (counted in `skipped`); it reports `gone` identities and never deletes by absence; presence absent = live; a protected link keeps no text/preview.
+- Golden cases found wrong (fixed): `key-uppercase-link-id` and `link-id-uppercase-refuses-row` now use a real uppercase hex id (`...00000000000A`), and `owner-200-emitted` / `owner-201-refuses-row` use dotted owners of exactly 200 / 201 units so the boundary is real; `owner-no-dot-refuses-row` was added. The `KNOWN_WRONG_GOLDEN` special handling in `tests/golden.rs` is removed; every case is asserted as named.
+
+## 14. Open choices made in rev 3 that the user has not decided
+
+1. Desktop enable carries text/preview for its rows within the budget (not metadata-only), because the desktop writes no later ops. Recommendation: keep (otherwise desktop-only links reach the phone with no text/preview).
+2. More than 1000 non-trashed links on the desktop after the union: phone links beyond the cap are skipped and counted; desktop rows never dropped. Recommendation: keep; alternatives (raise the archive limit, refuse export) change the archive format.
+3. Rows restored on the desktop after enabling stay desktop-only until the next fresh pairing after a reset. Recommendation: keep (the desktop stays read-only and writes one enable op).
+4. Desktop-only rows arrive trashed with reason `user` and are deleted from the desktop when the phone's 30-day sweep makes them `gone`. Recommendation: keep, but show a one-time notice on the phone ("Recently deleted: N items from the desktop") so the person can restore them.
+5. If a row has several filen locators the first is used. Recommendation: keep.
+6. `enabled` is derived and cached, not stored. Recommendation: keep.
+
+## 15. D3 implementation notes (Java `SyncGraph`, 2026-11-22)
+
+Pure functions only; no LinkSync capture, triggers, schema, `LinkStore` or hello change (those are P1/D4). All in `app/src/main/java/org/stackdocs/app/SyncGraph.java` (link section from line 266):
+- Receive side: `validateChanges` has a first arm `isLinkKey(cell)` -> `validateLinkCell` (`:81`, `:294`). It checks key shape (canonical 2-array, lowercase-UUID link_id, owner at most 1024, as in Rust), suffix set, exact fields, JSON types, safe-integer range 0..2^53-1 (`SyncProtocol.integer`), string bounds (hash 64, mime 100, sha 64, title 200 and path 1024 UTF-16 units, state/reason/kind/uuid/replica at most 64), blob length (text 1..1 MiB, preview 1..32 MiB), key equals identity row, null allowed for every suffix except identity and presence, marker `link_records/enabled/<replica>` = `{since}` not nullable. It never calls `validatePrimitives` (M4). No UUID-shape check on the marker replica or the filen locator uuid. A bad presence state or reason is accepted on the wire and skipped by the projection.
+- Writer self-check: `linkWriter(row, liveOrTrashedAlreadyCaptured)` (`:385`) returns `{outcome: emitted|row_refused|cell_skipped, cells: {"" | "/content" | "/text" | ..., value|null}, reasons, key}`. Row refused: identity (owner 1..200 matching the package charset, canonical lowercase link_id, kind `[a-z]{1,16}`, added_at range), bad presence, 1001st non-gone identity, bad content (hash 64 lowercase hex, mime pattern, modified/shared/protected), title not `LinkRecord.free` (1..200 units) or flag not 0/1, any number above 2^53-1. Cell skipped (absent from `cells`): text over 1,048,576 UTF-8 bytes or containing NUL, preview digest bad or over 32 MiB, filen uuid/path bad (path 1..1024 UTF-16 units). Null cells: empty/absent text, absent preview/title/filen, protected links (text and preview, metadata only), and the five cells of a `gone` row. `live` presence is written with reason `""` and since 0; absent presence is omitted. First of `filen_locators` is used.
+- Helpers for P1: `linkKey(owner, linkId)` `:287`, `linkMarkerKey`, `linkMarker(replica, since)` `:451`, `linkChanges(writerResult)` `:444` (full cell keys, ready for `diff`/`validateChanges`/`state.local`), `isLinkKey`, `linkEnabled(cells, replica)` `:457`.
+- Projection: `projectLinks(cells, conflictedKeys)` `:468` returns `{links, skipped, conflicted}`. It skips and counts invalid links, passes over conflicted links, never deletes by absence, treats presence absent as live, ignores text/preview of protected links (`applied_metadata_only`), and returns `gone` links with identity and presence only. `project()` now skips `link_records/` keys (`:205`); `cells()`, `diff()` and every existing key are unchanged.
+- Settled by the decision list: hash at most 64, mime at most 100, owner 201 is a writer refusal only, bad presence reason accepted then skipped.
+- Owner rule (fixed, identical on both sides): the owner pattern is `[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+` (at least one dot), max 200, the same as `LinkRecord.PACKAGE` and Rust `valid_owner`. Receive-side owner bound 1024 (matches `RECV_OWNER_UNITS` in `stack-sync/src/links.rs`) and kind/state/reason/replica bounds were aligned to D2's `links.rs` constants.
+- Golden cases `key-uppercase-link-id` and `link-id-uppercase-refuses-row` use link_id `30000000-0000-0000-0000-000000000001`, which has no hex letters, so there is no uppercase in it and the case cannot fail as written (fix: use a letter, e.g. `...00000000000A`).
+- Tooling: `desktop/tools/java_archive_host.py` was stale (did not compile): production `LibraryArchive` now calls `validateSuggestion`, `LinkArchive.validate` and `LinkRecord.MAX_PREVIEW`, and `SyncGraph.project` uses `Clock`; the tool now extracts those. `test_sync_java.py` always compiles `SyncGraph` and needs `--archive-classes`; `SyncGolden` runs all link checks, also asserts each `receiver_accepts_skips` projection/skip_count and that nothing the writer emits is rejected by the receiver.
+
+## 16. D4a implementation notes (Java)
+
+Hello parsing and the ladder only. The phone does not announce: `PairingTransport` has `private static final boolean ANNOUNCE_LINKS=false` (D4b flips it and supplies `linksEnabled()`, now a stub returning false). Pure logic is in `app/src/main/java/org/stackdocs/app/HelloGate.java` (no Android classes, so host tests run it unchanged); `PairingTransport` calls it.
+- Wire shape (same as Rust): hello gains optional `"features":["links"]` and optional `"enabled":true|false`; absent means a peer that does not announce. `HelloGate.parse` builds the exact field list from what is present (`version,group,replica` plus `frontier`, `features`, `enabled` when present), so every pre-D4a hello stays valid. `features` must be an array of at most 16 distinct non-empty strings of at most 64 units (unknown names are ignored, only `links` counts); `enabled` must be a real boolean (strings and numbers are refused). `enabled` without `features` parses but does not count as announcing links.
+- Ladder: levels `FRONTIER_FEATURES`(0), `FRONTIER`(1), `PLAIN`(2). `syncNow` loops down through ALL levels inside one Sync; a refusal (any IOException while reading the hello, timeouts included as the design note says, unless the Sync was canceled) moves to the next level and remembers it for 15 minutes (`HelloGate.refused`, `startLevel`). A refusal at `PLAIN` is final and rethrown. With `ANNOUNCE_LINKS=false` the first level is `FRONTIER`, so behaviour on the wire is unchanged (frontier, then plain) except that the second step now also runs in the same Sync.
+- Equal-frontier skip: `HelloGate.mayEndEqual(localAnnounced, localEnabled, peer)`: skip if either side does not announce, otherwise only if both report enabled. Today the phone never announces, so the skip is unchanged.
+- API for P1 (all package-private): `HelloGate.Peer {boolean hasFrontier; boolean announcesLinks; Boolean enabled; boolean linksEnabled()}`; `PairingTransport.lastPeerHello()` (last accepted peer hello); `PairingTransport.helloListener` (`HelloGate.Listener.peerHello(Peer)`), called after the hello is validated and BEFORE the equal-frontier decision, for the phone enable trigger (an op written there changes the local frontier, so P1 must treat that session as non-skippable); `PairingTransport.announcesLinks()`.
+- Tests: `python3 -I desktop/tools/test_hello_gate_java.py --json-classes <aosp json classes>` runs `desktop/tools/java/HelloGateHost.java` (valid and malformed hellos, skip matrix, nothing announced at any level with the switch off, source check that `ANNOUNCE_LINKS` is false, full ladder walk and 15 minute memory).
+
+## 16. D4a implementation notes (Rust)
+
+All in `desktop/crates/stack-transport/src/lib.rs`. Hello parsing and the client ladder only; the Rust side NEVER sends `features` (private `const ANNOUNCE_LINKS: bool = false`, the D4b switch; the send path is complete behind it and `check_group` leaves `features`/`enabled` as `None`; tests assert nothing announces).
+- **Wire shape** (`Hello` is still `deny_unknown_fields`; both new fields are optional and omitted when absent, so every existing hello is byte-identical):
+  - plain/old: `{"version":1,"group":"<g>","replica":"<r>"}`
+  - frontier: `{"version":1,"group":"<g>","replica":"<r>","frontier":{"<replica>":<seq>}}`
+  - frontier+features (D4b only): `{"version":1,"group":"<g>","replica":"<r>","frontier":{...},"features":["links"],"enabled":true}` (field order: version, group, replica, frontier, features, enabled). `features` is an array of strings (unknown strings tolerated); `enabled` is a bool. Any other field is still refused.
+  - Server reply rule: frontier only if the client sent one; `features` and `enabled` only if the client sent `features` (and this build announces, i.e. never yet).
+- **Public API for D5** (`stack_transport`): `PeerHello` with `announces_links() -> bool`, `links_enabled() -> Option<bool>`, `features() -> &[String]`; `parse_peer_hello(&[u8]) -> Result<PeerHello>`; `equal_frontier_may_skip(local_announces_links, local_enabled, &PeerHello) -> bool` (M1 rule); `type HelloHook = &mut dyn FnMut(&mut Library, &PeerHello) -> Result<()>`; `serve_accepted_library_with(library, tcp, control, hook)` and `sync_now_library_with(library, address, control, hook)`. The hook runs after the hello reply is on the wire and before `receive_bundle` / the first bundle (the D5 enable-op slot), and is not called when the session is skipped on equal frontiers. The old `serve_accepted_library`, `sync_now_library`, `sync_now`, `listen_once` keep their signatures (no-op hook). D5 must supply the real local `enabled` in `check_group` (currently `false` behind the flag) when D4b flips the switch.
+- **Skip rule:** skip on equal frontiers only if both announce `links` and both report `enabled`, or either does not announce. With no announcement on either side this is exactly today's behaviour.
+- **Ladder** (`run_ladder`, client only): levels `frontier+features` (omitted while nothing is announced, so it never costs a redundant connection), `frontier`, plain (no frontier). One sync attempt loops down all levels, a fresh TLS connection per level, until the hello is answered; later errors (bundles, receipts) are never retried. Refusal = Io (including read timeout and EOF), Json, or Protocol raised while waiting for the hello reply; identity, policy, TLS, cancel errors are not refusals. A timeout counts as a refusal (note in section 5, M-a). The level a refusal moved to is remembered per peer replica, in process memory, for 15 minutes, and the next attempt starts there; the last level's error is returned unchanged. Behaviour change versus before: a peer that rejects the frontier hello is now retried plain in the same call.
+- Tests: `hello_round_trips_with_and_without_features`, `unknown_hello_field_is_still_refused`, `old_peer_plain_hello_interops_and_nothing_is_announced`, `announced_peer_hello_is_parsed_and_skip_rule_follows_m1`, `ladder_*`, `only_hello_phase_errors_and_timeouts_are_refusals`, plus a no-`features` assertion in the existing LAN test on the real `check_group` hello.
+
+## 17. D5 implementation notes (desktop, `stack-core` + `stack-desktop`)
+
+Nothing announces: `ANNOUNCE_LINKS` is still false. Link data is written/applied only by the incoming-bundle trigger and by the hello hook when a peer announces (tests use a fake announcing peer: `sync_links_on_hello(true)`). Code is in `desktop/crates/stack-core/src/link_sync.rs` (new) with small hooks in `sync.rs`; tests in `stack-core/tests/sync_links.rs` and `schema.rs` (migration). Line numbers below are at the time of writing.
+- **Schema 6** `schema.rs:4,37-49,104-108,122-124` (`VERSION` 6, `V6`: four columns + `link_projection`). An older build refuses it through the unchanged `version > VERSION` check (`schema.rs:54`). `interchange.rs:976` now names its columns (the table has 20 columns).
+- **Separate store** `link_sync.rs:73-92` (`read_projection`/`write_projection`). Nothing in capture/`save`/`write_graph` reads or writes it. Rewritten inside the install transaction (`link_sync.rs` `apply_link_plan`, end). Only links that were applied, unchanged or `gone` take their new cells; a conflicted, skipped or blob-missing link keeps its OLD group, so it is retried at the next install.
+- **Apply** `sync.rs:1008-1075` (`install_sync_state_with`): plan before the transaction (`link_sync.rs:574` `plan_link_apply`: `project_links` with conflicted link keys excluded, group diff against the stored projection, text blob fully verified, preview blob checked by presence and length), apply inside the SAME IMMEDIATE transaction (`:674`), previews after the commit (`:931`, `:942`). Deletion only for `project_links().gone` (`:900-925`). Presence absent = live; trashed->live sets `unreachable`; a new trashed identity is inserted hidden; a `gone` identity is never inserted (it is not in `rows`).
+- **Blobs** `link_sync.rs:163` `keep_link_blob`: temp file, fsync, rename, directory fsync, hash re-check, then (and only then) the DB commit. Always by copy. Probe points: `link_blob_temp`, `link_blob_kept`, `link_enable_transaction`, `link_enable_committed`, `link_preview_temp`, `link_preview_renamed` (plus the existing `sync_transaction`/`sync_committed`). Export (`sync.rs:1127`) reads link blobs only from `sync_blobs/<sha>`; import union check `sync.rs:1314-1325` (`link_blob_refs` / `link_blob_declared`; a link ref never becomes a path).
+- **Enable** `link_sync.rs:263` `sync_enable_links` (hook) and `:295` `link_enable_operation` (the builder: `trim_blobs_to_budget` + `link_cells`, `/presence` dropped, marker, `validate_changes` self-check with marker-only fallback). Incoming trigger `sync.rs:1384` (`bundle_has_links`), runs after `state.receive` and `add_reviewed_local`. Derived and cached `enabled`: `link_sync.rs:130,236`, `Library.links_enabled` (AtomicU8), cleared in `install_sync_state_with` and `reset.rs:370-376`; exposed by `sync_summary`/`sync_status` as `links_enabled`.
+- **Reset** `reset.rs:370`: `DELETE FROM link_projection`, cache cleared; no link row is touched.
+- **Gates/UI**: `sync.rs:896` (`ensure_sync_exportable` ignores `link_records/` conflicts), `:914` (`sync_resolve` refuses link keys), `sync_ui.rs:60,81-88,372-392` and `sync_pages.rs:30` (hidden from the review; plain "Resolve them on the phone" note), `network_ui.rs:106-114` (the hook is wired on the serving side only; the desktop never initiates). `links.rs` hides `trashed` rows from list/search/count; `preview AND NOT preview_pending` in `linked_document` and the export query ("preview not ready", export skips pending previews).
+
+Decisions the note did not specify:
+1. **Enable op context**: `{own replica: seq-1}` only (the kernel requires exactly the previous own op, so a context that is truly empty is possible only for sequence 1). Used for the hello, in-bundle and adopt cases alike; concurrent with every phone cell. Written after `state.receive` in the kernel (and after `add_reviewed_local`, whose sequence-1 op it follows), but it carries only the desktop's own rows: the phone's rows of the same bundle are written to the table after the enable op, so the enable never covers them (cross-kernel test `cross_a_*` confirms Java and Rust project the same); adoption yields sequence 1 only when no reviewed-local op exists. An import that only enabled (no new operations) still runs `install_sync_state_with`, so the op is persisted.
+2. **Desktop enable has no `/presence` cells** (absent = live), so a link the phone holds as trashed does not become a presence conflict. Trashed local rows are not written.
+3. **Locators**: a mirrored row without a Filen cell stores `[]`; the archive requires 1-8 locators, so export substitutes an inert `owner` locator (`exportable_locators`). Unreachable either way.
+4. **Becoming protected** (old row unprotected, phone now protected): text and preview are cleared locally; an already-protected desktop row (archive restore) keeps whatever text it has (metadata-only means "nothing received", not "wipe").
+5. **Export of a missing link blob** is skipped silently (the receiver skips that link); a blob that is present but fails its hash is an error. A header blob must match a `files/` ref OR a link cell with the same length.
+6. **Apply is diff-based** against `link_projection`, so an unchanged link is never re-applied (a locally trashed row stays so until the phone writes a different presence).
+7. **1000 rule** counts non-trashed rows inside the transaction; new phone links beyond it (and trashed->live beyond it) are `not_shown`; no desktop row is dropped. `link_count()` now counts non-trashed rows.
+8. The post-commit preview install failing on I/O returns the error after the commit (rows and text are already visible, preview pending, repaired at the next open or install). Content problems (missing or wrong blob) just leave the row pending.
+9. **Startup** `recover_link_previews`: removes `links/.link-*.part` and `links/<uuid>.pdf` without a row (after `recover_operations`), installs only `preview_pending=1` rows. Best effort, never blocks opening.
+
+Not verified / known limits: the 2 GiB budget trim and the 6 GiB deferral are unit-tested only in `stack-sync` (a real 2 GiB enable is not run here); `INTEROP` document and the Java side were not touched; a link whose blob never arrives is skipped and, because the ack still advances, is only applied when the phone later writes that link again; archive restore after enabling stays desktop-only until a fresh pairing (test `a_restore_after_enabling_stays_desktop_only_until_a_fresh_pairing`).
+
+### Review fixes (Opus review of the D5 work)
+
+Supersedes decision 8 and the last "known limit" above. All in `link_sync.rs`, `sync.rs`, `stack-sync/src/links.rs`, `stack-transport/src/lib.rs`; tests at the end of `stack-core/tests/sync_links.rs`.
+- **H1, a link never fails the import.** `finish_link_apply` is best effort: any file-system problem installing a preview (unwritable or non-directory `links/`, a directory at `links/<row_id>.pdf`, rename or fsync failure) leaves the row `preview_pending=1`, removes the temp file, is counted as `preview_failed` in the report and writes a fixed note (`meta.link_preview_error`, no path, key or text) and the import returns Ok, so the receipt is produced. Only the injected probe stops (`link_preview_temp`, `link_preview_renamed`) still propagate, for the kill tests. The startup repair finishes the preview later.
+- **H2, enabling never fails on content.** `keep_link_blob` returns kept / not kept / write failed. A source problem (preview changed, shrunk mid-copy, unreadable) or an existing `sync_blobs/<sha>` that does not verify (wrong length or bytes: it is removed and copied again) only leaves that cell out. A failure to write the new file ends in a marker-only enable. Only the probe stops (`link_blob_temp`, `link_blob_kept`) are errors. Left-out cells are counted in `enable_dropped` (import report; the hello hook has no report). `read_projection` skips undecodable `link_projection` rows (the link is then applied again).
+- **M1, `gone` is diff-based.** A `gone` identity is deleted only when its stored cell group differs from the new one; a link restored from an archive after enabling is not deleted again by an unrelated install.
+- **M2, a missing blob no longer stalls the link.** Metadata, presence, title and Filen parts are applied; the blob part keeps `Change::Keep` and its OLD value in `link_projection`, so the link is planned again at the next install. The link counts in both `applied` and `missing_blob`. A link blob that arrives with no new operation (bundle blobs only) also triggers an install (`link_blob_arrived` in `sync.rs`). An invalid (not UTF-8, NUL, too long) text blob still skips the link (`skipped`).
+- **M3.** `plan_link_apply` takes the `values` already computed; link conflicts are computed directly from `state.registers` (link keys with differing alternatives). The cached `enabled` is set from the committed state (`derive_enabled`) instead of being cleared, so `sync_summary` does no full state parse after an install (it still does one on the first call after the library is opened); `sync_status` derives it from the state it already loaded.
+- **M4.** The plan holds no text: it only checks that a blob is present with the declared length. The text is read once (length, sha-256, UTF-8) per item inside `apply_link_plan`.
+- **Low.** The startup repair also removes `links/<row_id>.pdf` of a row with `preview=0`. A pending preview whose kept blob has the wrong bytes removes that blob instead of copying it again every install. `LinkReport.applied` doc corrected. The receive side of stack-sync `parse_link` now applies `valid_free` to the Filen path (no control or direction characters), so a hostile peer cannot make an export fail; golden cases still pass. The placeholder owner locator `{"type":"owner","token":"stack-sync"}` is unchanged on purpose: it is a valid archive locator and a different token would change archive bytes the phone validates; it is documented as inert (the link is `unreachable` either way). UI labels untouched.
+- **Hello `features`** (stack-transport): the Rust parse now matches Java: `features: null` or `enabled: null`, a duplicate, empty or over-64-UTF-16-unit entry, or more than 16 entries is refused; unknown names are ignored; every existing hello parses and serialises as before.
+- **Not reproduced as a test:** a source preview shrinking in the middle of the copy (the preview is hashed and copied inside one call, so an outside test cannot interleave); the code path returns "not kept". The 2 GiB and 6 GiB cases remain unit-only.
+
+## 17. P1 implementation notes (phone side, 2026-11-22)
+
+Written and compiled (`:app:assembleDebug :app:assembleDebugAndroidTest`), NOT run: no phone was available. Paths are under `app/src/main/java/org/stackdocs/app/`. Not in this item and marked in the code: `TODO(P2)` (conflict resolution, tie review, conflict-screen names, resolution operation) and `TODO(D6)` (purge of unreferenced `sync_blobs`).
+
+Where each mechanism lives:
+- Schema 13: `LibraryDatabase.java:10` (`VERSION`), `:89` (upgrade step), `:103` `addLinkSync` (digest columns `text_sha text_len preview_sha preview_len preview_pending`, `sync_link_projection(key,value)`, three triggers `sync_link_records_insert/_update/_delete`). `CREATE ... IF NOT EXISTS` keeps older test fixtures that drop and rebuild link tables working. A second constructor `LibraryDatabase(Context,String name)` exists only so a test can migrate a throwaway file.
+- Triggers: same guard as the other sync triggers (`enabled=1 AND applying=0`); the update trigger fires only when something SYNCED changed (`IS NOT` per column). `state` is compared as trashed-or-not, so LinkChecker's live/unreachable/missing flips do not fire; `checked_at`, `state_since`, `revision`, `received_at` are not in the column list. Each trigger also writes `sync_change('link_records',...)` (as the note says) and raises `sync_meta.link_dirty`. SQL checked on a host sqlite.
+- Journal: `SyncJournal.java:29` skips `link_records` events (cursor still advances). `SyncStore.capture` (`SyncStore.java:155`) runs the document replay only when a non-link journal row is new, advances the cursor over link-only rows, and runs `LinkSync.capture` whenever the dirty flag is up, BEFORE and independent of the cursor test. It clears the flag unless `LinkSync.retry` is set (a blob copy failed). `install` (`:240`) calls `LinkSync.install`; `receipt()` (`:300`) raises the flag (an ack may free deferred blobs).
+- `LinkSync.java`: `enabled` (`:62`, derived from this replica's own `links.enable` op that carries the marker, cached once true), `plan` (`:188`, the one builder for capture and enable: `linkWriter` self-check per row, inclusion order, 2 GiB meter, 6 GiB unacked meter via `unackedBlobs` `:279`, gone rows, conflicted keys skipped, per-link `validateChanges`, diff ONLY against `sync_link_projection`), `texts` (`:300`), `preparePreview` (`:326`), `keep` (`:360`: temp file, hash while writing, fsync file, rename, fsync directory, re-hash the kept copy; always a copy), `capture` (`:406`), `enable` (`:429`, marker plus metadata-only cells, never deferred, raises the flag), `install` (`:454`).
+- `LinkStore.java`: publish resets the digests (`:94`); `applySynced` (`:320`) with `applyOne` (`:337`), `afterApply` (`:461`), `placePreviews` (`:472`, touches only `preview_pending=1` rows; also called from `LibraryRepository.initialize`, `:69`).
+- `SyncExchange.java`: `linkRefs` (`:177`, digest -> length, never a path), export adds link blobs read only from `sync_blobs` (`:55`), the unreferenced-blob check tests the union, the phone enable runs BEFORE `state.receive` when an incoming op carries link cells or `links.enable` evidence (`:122`, not when adopting).
+- `PairingTransport.java:264` `onPeerHello` (writes the enable op for a peer that announces links); `:351-354` a session in which it wrote an op is never ended as "equal frontier". With `ANNOUNCE_LINKS=false` nothing announces, so on a real session this never runs.
+- `LibraryReset.java:71` clears `sync_link_projection` (the dirty flag and the replica live in `sync_meta`, already cleared, so enabled starts over with the fresh replica).
+- `LinkBudget.java`: pure rules (inclusion order, distinct-blob meter, UTF-8 length, presence mapping). Host test: `desktop/tools/test_link_budget_java.py` (passes). Device tests: `LinkSyncChecks` (`-e linkSync true`), plus `LinkStoreChecks`/`FeatureChecks` updated for version 13 and for link rows now writing `sync_change('link_records')`.
+
+Decisions the note left open:
+1. Dirty flag is `sync_meta.link_dirty` (no new table). It is raised by the triggers, `install`, `receipt`, `enable` and a failed blob copy; one extra capture per Sync is the price (O(rows), no blob work when digests are intact).
+2. A refused row keeps its previous cells (nothing is written for it). A cell skipped for a permanent reason (text over 1,048,576 UTF-8 bytes, NUL, over the 2 GiB budget) is absent, so the diff nulls an older value. A cell that cannot be produced now (blob copy failed) or is deferred by the 6 GiB budget keeps its previous value and is retried. Identity and presence are never nulled.
+3. Deferral is per blob cell, never per operation; metadata, presence and `gone` always go out.
+4. `gone` carries reason `deleted` and since = now; later captures keep it (no repeat).
+5. Text digest is trusted when the stored digest is present and the kept blob has that length; the preview is re-hashed once per process and (id, length, mtime) and compared with the stored digest (M7). All text is read in ONE pass over `link_search` (an equality lookup per row scans the whole FTS table).
+6. `applySynced` is given only links the caller selected. `LinkSync.install` selects: a link the phone has no row for, or an existing row whose received cells differ from a NON-EMPTY projection (a change authored elsewhere). An existing row with no projection is the phone's own and is left alone for capture to publish. After applying, the projection holds the RECEIVED cells of applied links (so a desktop-only arrival still publishes its trashed/`user` presence on the next capture), the received cells of a never-inserted `gone` identity, and nothing for skipped or conflicted links.
+7. A link that is new to the phone and has no filen locator is skipped and counted, because a backup refuses a record without a locator (`LinkArchive.validate`). Existing rows never lose their last locator.
+8. Title: a locally edited title is kept unless the received flag says the desktop's was edited too.
+9. A digest declared with two different lengths in one history is refused in `linkRefs` (hostile only).
+10. `SyncStore.documentConflicts` removes link keys from `status()`, the import result and the backup gate (`LibraryArchive`), and `resolve` refuses link keys; P2 gives them a per-link review.
+11. Blob copies happen inside the capture transaction (the write lock is held while copying up to the budget). A failure while PLANNING is caught: the session and the document sync go on, the flag stays up.
+
+Not verifiable without a phone: everything in `LinkSyncChecks` (SQL on the device SQLite, Keystore-free but file fsync/rename behaviour, FTS access, `Os.fsync` on a directory), real LAN sessions, process-kill boundaries (after blob copy, before commit, after commit, between preview placement and `preview_pending` clear), the duration of a 1000-link first capture, memory with 1 MiB bodies in the FTS cursor (CursorWindow), and upgrade of a real library.
+
+### P1 review fixes (Opus review of the uncommitted P1/D4a-Java work, 2026-11-22)
+
+Compiled (`:app:assembleDebug :app:assembleDebugAndroidTest`), NOT run on a device. Host tests that ran and passed: `test_link_budget_java.py`, `test_link_rules_java.py` (new, placeholder locator through the production `LinkRecord`), `test_hello_gate_java.py`, `test_sync_java.py`. The device checks are in `LinkSyncChecks` (`reviewTextAndEnable`, `reviewExportAndCaps`, `reviewApply`, `reviewPreviewFiles`, `-e linkSync true`). All findings were reproduced by reading the code; H1 by arithmetic (`LinkRecord.MAX_TEXT` is 1,048,576 UTF-16 units, so 1,000,000 euro signs are 3,000,000 UTF-8 bytes, over the 2 MB CursorWindow), none on a device.
+
+- H1 `LinkSync.texts`: one pass reads only `rowid, record_id, length(CAST(body AS BLOB))` (no body crosses a CursorWindow); empty = no cell, over 1,048,576 bytes = that cell skipped (`LinkSync.textSkipped`), the rest are read later one row at a time by rowid (`readText`) in inclusion order; a failed row read (or a failed size pass) returns CARRY: only text cells are retried, metadata, presence and `gone` are always written. Pure rule: `LinkBudget.textSize`.
+- H2 `LinkSync.enable`: planning or validation failure of the link cells (any exception, the cancel check excepted) writes the marker-only enable (`enableFallback`), keeps the dirty flag up, and an unwritable projection is only a stale diff base.
+- M1 `SyncExchange.export`: a link blob not in `sync_blobs` (or whose kept length is not a declared one) is left out and counted (`skippedLinkBlobs`). Not covered: a kept blob that EXISTS but fails its hash still throws "retained original changed" (corruption, not loss).
+- L1 `linkRefs` now maps digest -> all declared lengths; the export sends the length the kept file has (`LinkBudget.declaredLengthFor`), the import accepts any declared one.
+- M2 `LinkStore.applyOne`: `LinkBudget.replacesBlob`: text, preview and digests are replaced only by a new hash, a received cell, or a metadata-only outcome for a link that was NOT protected here (it becomes protected).
+- M3: (a) `LinkBudget.CAPTURE_BLOB_BYTES` = 256 MiB of NEW work per capture (first hash of a preview, verify of a kept copy not yet verified in this process, copy of a blob), counted in the sticky inclusion order; a blob that does not fit keeps its previous cell, reserves its place in the 2 GiB meter, raises `retry` and is done by a later capture (`LinkSync.Deferred`). Blobs are now kept only after the device and unacknowledged budgets accepted them (before, every text and preview was copied first). (b) New column `preview_mtime` (schema 13, added to `addLinkSync`): a stored preview digest is trusted when length and modified time match, so a restart no longer re-hashes it; it is reset with the digest (publish, apply). A kept copy that was not verified in this process is still hashed once after a restart, but that hashing now counts against the cap. (c) `sync_meta.link_deferred` is set by a capture that deferred a blob for the 6 GiB unacknowledged budget; `receipt()` raises the dirty flag only while it is set.
+- M4: a new link with no filen cell is inserted trashed (reason `user`, or the received trashed reason) with `LinkBudget.PLACEHOLDER_LOCATORS`, the same text as the computer's; capture emits no filen for it (`firstFilen` ignores owner locators) and `applyCheck` never writes a trashed row. This replaces note 7 above (link skipped).
+- M5: `TODO(P2)` at the conflicted-key skip in `plan` (a newer local write of a conflicted key stays unpublished until P2).
+- L2 `placePreviews`: fsync of the link directory after the rename and before `preview_pending` is cleared, the previous `applying` value is restored, `.pdf.part` leftovers and a `<id>.pdf` whose row claims no preview are removed (start-up repair and every apply), and `LinkStore.preview(id)` returns a file only when the row's `preview_file` is non-empty, so a stale file is never shown.
+- L3 `PairingTransport`: `onPeerHello(peer)` enables only when the phone itself announces (`onPeerHello(peer, weAnnounce)`; tests pass true), and the hello's `enabled` field is `ANNOUNCE_LINKS && LinkSync.enabled(state, replica)`. The flag stays false.
+- L5 `LinkSync.forget()` clears the static `ENABLED` and `VERIFIED` caches; called from `LibraryRepository.closeForReset()` and `LibraryReset.resetConnection`.
+- L7 `LinkStore.applySynced`: no nested transaction (an ending nested transaction without success fails the OUTER one on Android). Anything that can fail because of one link (cells, blobs, validation) happens before that link's first write; such a failure skips only that link (`skipped`). A failure after the first write is a database failure and is rethrown. A SAVEPOINT was rejected: `db.execSQL("ROLLBACK TO ...")` is classified as a rollback by `SQLiteSession` and would end the outer transaction. A call with no transaction open still starts its own.
+- L6, L8: left as they are.
+
+Risks and limits: `preview_mtime` extends the unreleased schema-13 migration, so a phone whose library was already migrated to 13 by an earlier debug build lacks the column and must be reinstalled or reset (no released library is affected). `LinkStore.text(id)` still reads a body through one cursor row, so a body over 2 MB of UTF-8 can fail on the detail screen (separate from sync, not changed). The 256 MiB cap, the restart-proof check, the rowid text read and the SAVEPOINT-free L7 path are untested on a device.
+
+## 18. P2 implementation notes (phone side, 2026-11-22)
+
+Written and compiled (`:app:assembleDebug :app:assembleDebugAndroidTest`), NOT run on a device. Host tests that ran and passed: `test_link_resolve_java.py` (new), `test_link_budget_java.py`, `test_link_rules_java.py`, `test_hello_gate_java.py`, `test_sync_java.py` (the last three need the pinned AOSP org.json, built from the sources that match `desktop/tools/android-json-sources.json`). `ANNOUNCE_LINKS` stays false. Wire version stays 1, no kernel change.
+
+Where each mechanism lives (`app/src/main/java/org/stackdocs/app/`):
+- The rule: `LinkResolve.java` (pure, `decide`). Host test: `desktop/tools/java/LinkResolveHost.java` via `desktop/tools/test_link_resolve_java.py`.
+- Auto-resolution: `LinkSync.resolveDecided`, called at the top of `SyncStore.install` (before `state.values()`), so the rows are applied from the resolved cells. It writes ONE `link.resolve` operation for every decided link (chunked at 256 links, a bound on size, not normally reached). Each link carries the winner's full 7-cell set (null where the winner has no such cell, live presence where it has none, because the desktop omits presence for a live link).
+- Sides: `LinkSync.sideValues` reads each side's LATEST value per cell from the history (phone = this replica, desktop = every other replica), not from the registers. Reason: after the phone's new local write covers one key, the desktop alternative of that key is gone from the register, but the desktop's value is still what the desktop wrote, so a later "keep desktop" choice keeps it.
+- Tie review: `LinkSync.linkConflicts` (status field `link_conflicts`, once per link: `link`, `owner`, `link_id`, `title`, two `choices` with side, title, hash, modified, gone) and `SyncStore.resolveLink(link, "phone"|"desktop")`, which writes one `link.resolve` operation with the chosen side's full cell set, then `install`. Only a link that is still conflicted can be chosen.
+- UI: `SyncActivity.review()` shows a link tie when no document conflict is open (title, both versions, "Keep phone version", "Keep desktop version", "Decide later"). `SyncScreen` shows "Review changes" when `link_conflicts` is not empty. Document review and the backup gate still ignore link keys (`documentConflicts`).
+- Plan: the conflicted-key skip in `LinkSync.plan` is removed. A key is emitted when this phone changed it; that write is newer than both alternatives and supersedes them for THAT key. The other keys of a tied link stay conflicted until the review.
+- `LinkStore.applySynced` is unchanged: conflicted links are still never passed in (`LinkSync.install` leaves them out).
+
+Decisions taken where the design left room (please check):
+1. A side with no `/content` cell cannot be compared, so the phone wins (`LinkResolve.decide`). Not in the design text; it is the same as "same hash".
+2. A new local write over a tie is per key. A link with one edited key and one still-tied key stays in review; the edit is not applied to the desktop until the resolution or the next capture.
+3. Resolution happens at install, so it is written during the exchange that carried the conflicting cells. It reaches the desktop on the next send of that session or the next Sync (not checked on a device).
+4. The golden cases named for this item (`link-resolution-by-modified`, `link-modified-tie-stays-conflicted`) are NOT in `desktop/protocol/golden-v1.json` (its `graph_cases` have no resolution group). The existing `graph_cases` still pass (`test_sync_java.py`, enforced). Resolution is covered by `LinkResolveHost` and the device checks, not by golden cases. A Rust golden for the rule was not added (not in this item).
+5. Not covered: a desktop-only link with no conflict is not "resolved" (nothing competes for its cells, so the phone's copy is not touched). This reads H-C as "every link that has a conflicted cell", not every link the desktop's enable touched.
+
+Tests:
+- `LinkSyncChecks.resolution` (new, `-e linkSync true`): a gone desktop side loses to a live phone link (the phone row stays, one `link.resolve` operation carries the phone's content); a later desktop modified wins every cell; same hash, the phone's title wins; a modified tie is not applied, is listed ONCE with its title (several conflicted cells), a new local title edit supersedes the title key only, and one desktop choice applies every cell and leaves no link in review.
+- `LinkSyncChecks.receiveAndApply` assertion changed: the conflicting link from P1 (desktop modified later) is now resolved to the desktop cells (it used to be asserted "left alone", which P2 replaces).
+
+Not verified: all of `LinkSyncChecks` (not run, no phone), the conflict dialog on a device, the next-send delivery of the resolution operation, and the `link.resolve` evidence in a real LAN session. The Rust desktop does not resolve (unchanged), so its review and resolution of link cells is still D5 behaviour.

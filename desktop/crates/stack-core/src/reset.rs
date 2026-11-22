@@ -365,9 +365,15 @@ pub(crate) fn connection(library: &mut Library) -> Result<()> {
     let tx = library.db.transaction()?;
     tx.execute("DELETE FROM sync_state", [])?;
     tx.execute("DELETE FROM sync_receipts", [])?;
+    // A reset deletes no link row. The applied-cells store goes with the sync history, so a fresh pairing
+    // enables links again with the new replica (derived, never a flag).
+    tx.execute("DELETE FROM link_projection", [])?;
     put_meta(&tx, "library_id", &intent.new_library)?;
     put_meta(&tx, "replica_id", &intent.new_replica)?;
     tx.commit()?;
+    library
+        .links_enabled
+        .store(0, std::sync::atomic::Ordering::Relaxed);
     for item in [
         "pairing/policy.json",
         "pairing/peer.der",

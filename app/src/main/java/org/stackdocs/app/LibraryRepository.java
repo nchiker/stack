@@ -64,6 +64,9 @@ final class LibraryRepository {
             recoverOcr();
             suggestions.recover();
             metadata.recover();
+            // Previews received from the computer are placed after their transaction commits; a stop in between leaves
+            // preview_pending=1. Only those rows are repaired; restored and migrated rows (empty digest) are never touched.
+            try{links.placePreviews(new File(context.getFilesDir(),"sync_blobs"));}catch(RuntimeException ignored){}
             try(Cursor rows=db.rawQuery("SELECT id,title FROM documents",null)){while(rows.moveToNext())index(db,rows.getString(0),rows.getString(1));}
             mkdir(originals);
             mkdir(incoming);
@@ -87,7 +90,7 @@ final class LibraryRepository {
         }
     }
 
-    void closeForReset(){helper.close();}
+    void closeForReset(){helper.close();LinkSync.forget();}
     void blockAfterResetFailure(Exception error){initializationError=new IllegalStateException("Library reset did not finish. Original data is retained; close and reopen Stack to recover.",error);}
     LibraryArchive archive() { return new LibraryArchive(context,this,db()); }
     void archiveChanged() { if(!db().inTransaction())ocrChanged.run(); if(!db().inTransaction())suggestionChanged.run(); }

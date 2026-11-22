@@ -35,6 +35,8 @@ final class SyncExchange {
     SyncExchange(Context context,LibraryRepository repository){this(context,repository,()->{});}
     SyncExchange(Context context,LibraryRepository repository,Control control){this.context=context.getApplicationContext();store=new SyncStore(context,repository,control);this.control=control;}
     void probe(LibraryArchive.Probe probe){store.probe=probe;}
+    /** How many link blobs the last export left out because they are not kept (M1). */
+    volatile int skippedLinkBlobs;
     static final class Staged implements AutoCloseable {
         final File directory;final JSONObject header;final List<SyncProtocol.Operation> operations;
         Staged(File directory,JSONObject header,List<SyncProtocol.Operation> operations){this.directory=directory;this.header=header;this.operations=operations;}
@@ -51,6 +53,15 @@ final class SyncExchange {
         for(SyncProtocol.Operation op:state.history.values())if(op.sequence>ack.getOrDefault(op.replica,0L)){operations.put(op.json);outgoing.add(op);}
         if(operations.length()>SyncProtocol.MAX_OPERATIONS)throw SyncProtocol.invalid("exchange operation limit; import a peer receipt first");
         Map<String,Ref> refs=refs(outgoing);TreeMap<String,Ref> blobs=new TreeMap<>();for(Ref ref:refs.values())blobs.putIfAbsent(ref.sha,ref);
+        // Link blobs have no path: they are read ONLY from files/sync_blobs/<sha>, where the writer kept a copy before committing.
+        // M1: a link blob that is not kept (lost, or its length is not a declared one) is left out and counted; the receiver skips a
+        // link whose blob never arrives, so one lost blob must not block every bundle. Document originals stay mandatory.
+        skippedLinkBlobs=0;
+        for(Map.Entry<String,java.util.SortedSet<Long>> link:linkRefs(outgoing).entrySet()) {
+            File kept=new File(context.getFilesDir(),"sync_blobs/"+link.getKey());long length=LinkBudget.declaredLengthFor(link.getValue(),kept.isFile()?kept.length():-1);
+            if(length<0){skippedLinkBlobs++;continue;}
+            blobs.putIfAbsent(link.getKey(),new Ref(null,link.getKey(),length));
+        }
         if(blobs.size()>10000)throw SyncProtocol.invalid("exchange blob limit");
         JSONArray descriptors=new JSONArray();for(Ref ref:blobs.values())descriptors.put(new JSONObject().put("sha256",ref.sha).put("length",ref.length));
         JSONObject header=new JSONObject().put("format","org.stackdocs.exchange").put("version",1).put("library",state.library).put("sender",store.replica()).put("acknowledged",SyncProtocol.json(state.frontier)).put("operations",operations).put("blobs",descriptors);
@@ -59,7 +70,7 @@ final class SyncExchange {
         try {
             File complete=new File(stage,"complete");try(FileOutputStream stream=new FileOutputStream(complete)){
                 DataOutputStream output=new DataOutputStream(stream);output.write(MAGIC);output.writeInt(metadata.length);output.write(metadata);
-                for(Ref ref:blobs.values()) {File original=file(ref.path),cached=new File(context.getFilesDir(),"sync_blobs/"+ref.sha);File source=original.isFile()?original:cached;
+                for(Ref ref:blobs.values()) {File original=ref.path==null?null:file(ref.path),cached=new File(context.getFilesDir(),"sync_blobs/"+ref.sha);File source=original!=null&&original.isFile()?original:cached;
                     if(!SyncStore.hash(source,ref.length,control).equals(ref.sha))throw SyncProtocol.invalid("retained original changed");
                     try(FileInputStream input=new FileInputStream(source)){copy(input,output,ref.length);}
                 }
@@ -115,6 +126,9 @@ final class SyncExchange {
         }
         if(!state.library.equals(library)||!state.members.contains(sender))throw SyncProtocol.invalid("unreviewed sender or group");
         for(SyncProtocol.Operation op:staged.operations)if(op.replica.equals(local)&&!state.history.containsKey(op.key)&&!state.pending.containsKey(op.key))throw SyncProtocol.invalid("incoming peer cannot create a local-origin operation");
+        // The peer announced links by sending link cells: write our own metadata-only enable operation BEFORE receiving, so it is
+        // concurrent with theirs (decision 1, the phone stays the authority). With adoption there is no state yet; the hello does it.
+        if(!adopting&&!LinkSync.enabled(state,local)&&LinkSync.announcesLinks(staged.operations))store.enableLinks(state);
         // Receiving only adds operations, to history or pending, so the counts
         // show a change without serializing the whole state twice.
         java.util.Set<String> known=new HashSet<>(state.history.keySet());int held=state.history.size()+state.pending.size();
@@ -125,7 +139,7 @@ final class SyncExchange {
             if(baseline==null)throw SyncProtocol.invalid("model 2 explicit baseline required");SyncGraph.project(baseline);
             if(review!=null)SyncAdoption.addLocal(state,store.manifest(),review,local);
         }
-        List<SyncProtocol.Operation> accepted=new ArrayList<>(state.history.values());accepted.addAll(state.pending.values());Map<String,Ref> declared=refs(accepted);
+        List<SyncProtocol.Operation> accepted=new ArrayList<>(state.history.values());accepted.addAll(state.pending.values());Map<String,Ref> declared=refs(accepted);Map<String,java.util.SortedSet<Long>> linkDeclared=linkRefs(accepted);
         File cache=new File(context.getFilesDir(),"sync_blobs");if(!cache.isDirectory()&&!cache.mkdirs())throw new IOException("Could not retain incoming originals");
         if(adopting&&review!=null){JSONArray files=store.manifest().getJSONArray("files");for(int i=0;i<files.length();i++){
             JSONObject entry=files.getJSONObject(i);String sha=entry.getString("sha256");long length=entry.getLong("length");File original=file(entry.getString("path")),target=new File(cache,sha);
@@ -134,7 +148,7 @@ final class SyncExchange {
         }}
         JSONArray received=header.getJSONArray("blobs");for(int i=0;i<received.length();i++){
             JSONObject blob=received.getJSONObject(i);String sha=blob.getString("sha256");long size=blob.getLong("length");File target=new File(cache,sha);
-            boolean used=false;for(Ref ref:declared.values())if(ref.sha.equals(sha)&&ref.length==size){used=true;break;}if(!used)throw SyncProtocol.invalid("exchange contains an unreferenced original blob");
+            boolean used=false;for(Ref ref:declared.values())if(ref.sha.equals(sha)&&ref.length==size){used=true;break;}if(!used&&linkDeclared.containsKey(sha)&&linkDeclared.get(sha).contains(size))used=true;if(!used)throw SyncProtocol.invalid("exchange contains an unreferenced original blob");
             if(target.exists()){if(!SyncStore.hash(target,size,control).equals(sha))throw SyncProtocol.invalid("retained blob changed");}
             else {copyFile(new File(staged.directory,sha),target,size);if(!SyncStore.hash(target,size,control).equals(sha))throw SyncProtocol.invalid("retained blob changed");}
         }
@@ -156,13 +170,28 @@ final class SyncExchange {
         for(Map.Entry<String,Long> prior:store.receipt(sender).entrySet())receipt.merge(prior.getKey(),prior.getValue(),Math::max);
         store.receipt(sender,receipt);
         store.probe.reached("receipt");
-        return new JSONObject().put("applied",applied).put("pending_gaps",state.pending.size()).put("durable_frontier",SyncProtocol.json(state.frontier)).put("conflicts",state.conflicts().length()).put("adopted",adopting);
+        return new JSONObject().put("applied",applied).put("pending_gaps",state.pending.size()).put("durable_frontier",SyncProtocol.json(state.frontier)).put("conflicts",SyncStore.documentConflicts(state).length()).put("adopted",adopting);
     }
     private Map<String,Ref> refs(Collection<SyncProtocol.Operation> operations)throws IOException,JSONException {
         TreeMap<String,Ref> result=new TreeMap<>();for(SyncProtocol.Operation op:operations)for(String key:SyncProtocol.keys(op.changes))if(key.startsWith("files/")&&!op.changes.isNull(key)) {
             JSONObject value=op.changes.getJSONObject(key);String path=value.getString("path"),sha=value.getString("sha256");long length=SyncProtocol.integer(value.get("length"));file(path);if(!sha.matches("[0-9a-f]{64}")||length>LibraryArchive.FILE_BYTES)throw SyncProtocol.invalid("invalid file reference");
             Ref old=result.putIfAbsent(path,new Ref(path,sha,length));if(old!=null&&(!old.sha.equals(sha)||old.length!=length))throw SyncProtocol.invalid("immutable original changed");
         }return result;
+    }
+    /**
+     * Blob references of link cells (`link_records/.../text` and `/preview`), keyed by digest with EVERY declared length (a digest
+     * declared with several lengths is tolerated, as on the computer: the export sends the length the kept file really has, the import
+     * accepts any declared one) and NEVER a path, so no link cell can become a file path. The unreferenced-blob import check tests
+     * against the union of this map and the document map.
+     */
+    private Map<String,java.util.SortedSet<Long>> linkRefs(Collection<SyncProtocol.Operation> operations)throws IOException,JSONException {
+        TreeMap<String,java.util.SortedSet<Long>> result=new TreeMap<>();
+        for(SyncProtocol.Operation op:operations)for(String key:SyncProtocol.keys(op.changes))if(SyncGraph.isLinkKey(key)&&(key.endsWith("/text")||key.endsWith("/preview"))&&!op.changes.isNull(key)) {
+            JSONObject cell=op.changes.getJSONObject(key);String sha=cell.getString("sha256");long length=SyncProtocol.integer(cell.get("length"));
+            if(!sha.matches("[0-9a-f]{64}"))continue;   // a malformed link cell is skipped by the projection, it declares no blob
+            result.computeIfAbsent(sha,ignored->new java.util.TreeSet<>()).add(length);
+        }
+        return result;
     }
     private File file(String relative)throws IOException {
         String[] parts=relative.split("/");if(parts.length!=3||!parts[0].equals("originals")||!parts[2].matches("source|[a-f0-9-]{36}\\.jpg"))throw SyncProtocol.invalid("invalid original path");SyncProtocol.uuid(parts[1]);

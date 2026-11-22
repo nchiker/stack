@@ -1,6 +1,7 @@
 //! Explicit group adoption and file exchange use the same serialized writer as
 //! edits. Portable backups never carry this causal state or enroll a replica.
 use crate::library::{Error, Library, Result, meta, put_meta, read_graph, write_graph};
+use crate::link_sync::{LinkReport, bundle_has_links, is_link_key};
 
 /// Folder (in the library root) for the database copies taken before a sync applies.
 pub(crate) const SYNC_SNAPSHOTS: &str = "sync_snapshots";
@@ -12,6 +13,7 @@ use stack_sync::{
     Frontier, State,
     bundle::{self, Blob, Header},
     graph::{self, Cells},
+    links as wire,
 };
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::{
@@ -42,7 +44,7 @@ fn snapshot_input(path: &Path, target: &Path, control: &stack_archive::Control) 
     Ok(hash)
 }
 
-fn load(db: &Connection) -> Result<Option<State>> {
+pub(crate) fn load(db: &Connection) -> Result<Option<State>> {
     let value: Option<String> = db
         .query_row("SELECT state FROM sync_state WHERE singleton=1", [], |r| {
             r.get(0)
@@ -844,7 +846,7 @@ impl Library {
             receipts.insert(p, serde_json::from_str(&f)?);
         }
         Ok(
-            json!({"document_names":names,"stack_names":stacks,"page_names":pages,"adopted":true,"replica":replica,"library":state.library,"members":state.members,"frontier":state.frontier,"operations":state.history.len(),"pending_gaps":state.pending.len(),"conflicts":state.conflicts(),"projection_valid":projected.is_ok(),"projection_error":projected.as_ref().err().map(ToString::to_string),"acknowledged_by":receipts}),
+            json!({"document_names":names,"stack_names":stacks,"page_names":pages,"adopted":true,"replica":replica,"library":state.library,"members":state.members,"frontier":state.frontier,"operations":state.history.len(),"pending_gaps":state.pending.len(),"conflicts":state.conflicts(),"links_enabled":crate::link_sync::derive_enabled(&state, &replica),"projection_valid":projected.is_ok(),"projection_error":projected.as_ref().err().map(ToString::to_string),"acknowledged_by":receipts}),
         )
     }
 
@@ -868,8 +870,10 @@ impl Library {
             return Ok(json!({"adopted":false,"replica":replica}));
         };
         let summary: Summary = serde_json::from_str(&value)?;
+        // Derived from this device's own links.enable operation and cached; never a stored flag.
+        let links_enabled = self.sync_links_enabled()?;
         Ok(
-            json!({"adopted":true,"replica":replica,"library":summary.library,"members":summary.members,"frontier":summary.frontier}),
+            json!({"adopted":true,"replica":replica,"library":summary.library,"members":summary.members,"frontier":summary.frontier,"links_enabled":links_enabled}),
         )
     }
 
@@ -889,7 +893,8 @@ impl Library {
 
     pub(crate) fn ensure_sync_exportable(&self) -> Result<()> {
         if let Some(state) = load(&self.db)?
-            && (!state.conflicts().is_empty() || graph::project(&state.values()).is_err())
+            && (state.conflicts().keys().any(|key| !is_link_key(key))
+                || graph::project(&state.values()).is_err())
         {
             return Err(Error::Invalid(
                 "Resolve sync conflicts before exporting a complete portable backup; document PDF copies remain available",
@@ -906,6 +911,9 @@ impl Library {
         expected: &[stack_sync::Dot],
         value: Value,
     ) -> Result<()> {
+        if is_link_key(key) {
+            return Err(Error::Invalid("Link conflicts are resolved on the phone"));
+        }
         let mut state = load(&self.db)?.ok_or(Error::Invalid("No sync baseline"))?;
         let conflicts = state.conflicts();
         let current = conflicts
@@ -984,10 +992,25 @@ impl Library {
             changes,
             json!({"kind":"conflict.resolve","reviewed":expected}),
         )?;
-        self.install_sync_state(&state, None)
+        self.install_sync_state(&state, None).map(|_| ())
     }
 
-    fn install_sync_state(&mut self, state: &State, baseline: Option<&Cells>) -> Result<()> {
+    fn install_sync_state(
+        &mut self,
+        state: &State,
+        baseline: Option<&Cells>,
+    ) -> Result<LinkReport> {
+        self.install_sync_state_with(state, baseline, None)
+    }
+
+    /// `own_links`: the cells of the enable operation this call's caller just wrote (already the rows' own values,
+    /// so they are not applied back onto the rows).
+    fn install_sync_state_with(
+        &mut self,
+        state: &State,
+        baseline: Option<&Cells>,
+        own_links: Option<&Cells>,
+    ) -> Result<LinkReport> {
         let fallback: Cells = if let Some(baseline) = baseline {
             baseline.clone()
         } else {
@@ -1010,6 +1033,9 @@ impl Library {
             graph::project(&safe)
         })?;
         let cells = graph::cells(&projected)?;
+        // Link cells never enter `sync_state.projection`: they have their own store, applied in this same
+        // transaction. The plan (blob checks) is made before the transaction opens.
+        let link_plan = self.plan_link_apply(state, &values, own_links)?;
         let tx = self
             .db
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
@@ -1033,10 +1059,27 @@ impl Library {
                 .ok_or(Error::Invalid("Revision exhausted"))?
                 .to_string(),
         )?;
+        let applied = link_plan
+            .map(|plan| Library::apply_link_plan(&tx, plan))
+            .transpose()?;
         (self.probe)("sync_transaction")?;
         tx.commit()?;
+        // The cached `enabled` comes from the state just committed (no later full load).
+        if let Ok(replica) = meta(&self.db, "replica_id") {
+            let enabled = crate::link_sync::derive_enabled(state, &replica);
+            self.links_enabled.store(
+                if enabled { 2 } else { 1 },
+                std::sync::atomic::Ordering::Relaxed,
+            );
+        }
         (self.probe)("sync_committed")?;
-        Ok(())
+        let mut report = LinkReport::default();
+        if let Some(applied) = applied {
+            report = applied.report;
+            // After the commit: previews are written from the kept blobs (marker `preview_pending`).
+            report.preview_failed = self.finish_link_apply(&applied.removals)?;
+        }
+        Ok(report)
     }
 
     pub fn sync_export(&self, peer: &str, destination: &Path) -> Result<Value> {
@@ -1084,6 +1127,30 @@ impl Library {
                     fs::hard_link(self.root.join(path), stage.join(entry.key()))?;
                     entry.insert(length);
                 }
+            }
+            // Link blobs come ONLY from the kept copies in sync_blobs/<sha>, never from a live file. A blob that
+            // is not there is left out (the receiver skips that link); one that does not verify is an error.
+            let link_refs =
+                wire::link_blob_refs(operations.iter().flat_map(|op| op.changes.iter()));
+            for (sha, lengths) in link_refs {
+                if unique.contains_key(&sha) {
+                    continue;
+                }
+                let kept = self.root.join("sync_blobs").join(&sha);
+                let Ok(file) = stack_archive::read_regular(&kept) else {
+                    continue;
+                };
+                let length = file.metadata()?.len();
+                if !lengths.contains(&length) {
+                    continue;
+                }
+                if stack_archive::file_hash(&kept, length, control)? != sha {
+                    return Err(Error::Invalid(
+                        "Retained link blob failed integrity verification",
+                    ));
+                }
+                fs::hard_link(&kept, stage.join(&sha))?;
+                unique.insert(sha, length);
             }
             let header = Header {
                 format: "org.stackdocs.exchange".into(),
@@ -1248,10 +1315,20 @@ impl Library {
         let applied = state.receive(&header.operations)?;
         let inbox_changed = state_before != serde_json::to_vec(&state)?;
         let declared = refs_ops(state.history.values().chain(state.pending.values()))?;
+        // A blob matches a `files/` original OR a link text/preview cell with the same declared length. Link
+        // references live in their own digest-keyed map and never become paths.
+        let link_declared = wire::link_blob_refs(
+            state
+                .history
+                .values()
+                .chain(state.pending.values())
+                .flat_map(|op| op.changes.iter()),
+        );
         for blob in &header.blobs {
             if !declared
                 .values()
                 .any(|(sha, length)| sha == &blob.sha256 && length == &blob.length)
+                && !wire::link_blob_declared(&link_declared, &blob.sha256, blob.length)
             {
                 return Err(Error::Invalid(
                     "Exchange contains an unreferenced original blob",
@@ -1260,9 +1337,17 @@ impl Library {
         }
         let blobs = self.root.join("sync_blobs");
         crate::library::private_dir(&blobs)?;
+        // A link blob that is new here may be the one a link part was waiting for: apply again even when no new
+        // operation arrived.
+        let mut link_blob_arrived = false;
         for blob in &header.blobs {
             control.check()?;
             let target = blobs.join(&blob.sha256);
+            if !target.exists()
+                && wire::link_blob_declared(&link_declared, &blob.sha256, blob.length)
+            {
+                link_blob_arrived = true;
+            }
             if target.exists() {
                 if stack_archive::file_hash(&target, blob.length, control)? != blob.sha256 {
                     return Err(Error::Invalid(
@@ -1305,6 +1390,22 @@ impl Library {
             return Err(Error::Invalid(
                 "Reviewed identity mappings do not form a valid combined library; review organization tags and catalog names before adopting",
             ));
+        }
+        // The peer has enabled links (its enable operation, or any link cell, is in this bundle): enable here
+        // too, once. Own-only context keeps the operation concurrent with the phone's baseline, so it never
+        // overrides the phone (decision 1). Same builder and writer self-check as the phone.
+        let mut own_links = None;
+        let mut enable_dropped = 0;
+        if bundle_has_links(&header.operations)
+            && !state
+                .history
+                .values()
+                .any(|op| op.id.replica == replica && op.evidence["kind"] == "links.enable")
+        {
+            let (operation, cells, dropped) = self.link_enable_operation(&state, &replica)?;
+            state.receive(std::slice::from_ref(&operation))?;
+            own_links = Some(cells);
+            enable_dropped = dropped;
         }
         let needed = refs(&state)?;
         // All immutable data is durably installed before the metadata transaction.
@@ -1371,8 +1472,10 @@ impl Library {
             acknowledged.insert(origin.clone(), (*sequence).min(current));
         }
         control.check()?;
-        if adopting || applied > 0 {
-            self.install_sync_state(&state, baseline.as_ref())?;
+        let mut links = LinkReport::default();
+        if adopting || applied > 0 || own_links.is_some() || link_blob_arrived {
+            links = self.install_sync_state_with(&state, baseline.as_ref(), own_links.as_ref())?;
+            links.enable_dropped = enable_dropped;
         } else if inbox_changed {
             self.db.execute(
                 "UPDATE sync_state SET state=?1 WHERE singleton=1",
@@ -1385,7 +1488,7 @@ impl Library {
         merge_receipt(&self.db, &header.sender, acknowledged)?;
         (self.probe)("sync_receipt")?;
         Ok(
-            json!({"applied":applied,"pending_gaps":state.pending.len(),"durable_frontier":state.frontier,"conflicts":state.conflicts().len(),"adopted":adopting}),
+            json!({"applied":applied,"pending_gaps":state.pending.len(),"durable_frontier":state.frontier,"conflicts":state.conflicts().len(),"adopted":adopting,"links":links.to_json()}),
         )
     }
 }

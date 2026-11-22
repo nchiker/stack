@@ -48,10 +48,10 @@ def main():
         target.parent.mkdir(exist_ok=True)
         shutil.copyfile(path, target)
     sources = {}
-    for name in ['LibraryArchive', 'ArchiveJson', 'PageGeometry', 'PageState', 'DetailValue', 'SuggestionRules', 'LibraryRepository', 'SuggestionStore']:
+    for name in ['LibraryArchive', 'ArchiveJson', 'PageGeometry', 'PageState', 'DetailValue', 'SuggestionRules', 'LibraryRepository', 'SuggestionStore', 'LinkArchive', 'LinkRecord', 'Clock']:
         text = (JAVA / (name + '.java')).read_text()
         sources[name] = text
-        if name in ['ArchiveJson', 'PageGeometry', 'PageState', 'DetailValue']:
+        if name in ['ArchiveJson', 'PageGeometry', 'PageState', 'DetailValue', 'LinkRecord', 'Clock']:
             (package / (name + '.java')).write_text(text)
     header = 'package org.stackdocs.app;\nimport org.json.*;\nimport java.io.*;\nimport java.util.*;\nimport java.nio.*;\nimport java.nio.charset.*;\nimport java.security.*;\n'
     source = sources['LibraryArchive']
@@ -63,12 +63,17 @@ def main():
                   'private static void sha(', 'private static void uuid(', 'private static void stackId(',
                   'private static void path(', 'private static String[] cols(', 'private static List<JSONObject> objects(',
                   'private static MessageDigest digest(', 'private static String hex(', 'private static byte[] hash(',
-                  'private static void transfer(', 'private static String utf8(', 'static void remove(', 'private static IOException invalid(']
+                  'static String validateSuggestion(', 'private static void transfer(', 'private static String utf8(', 'static void remove(', 'private static IOException invalid(']
     selected = [member(source, s) for s in signatures]
     # Package visibility only for the two calls made by the host driver. Bodies stay byte-identical.
     selected = [s.replace('private static void validate(', 'static void validate(', 1)
                 .replace('private static void upgradeOlder(', 'static void upgradeOlder(', 1) for s in selected]
     (package / 'LibraryArchive.java').write_text(header + 'final class LibraryArchive {\n' + constants + '\n'.join(selected) + '\n}\n')
+    # LinkArchive (archive format 4 links) mixes Android SQLite capture with pure validation; extract only the pure members.
+    links = sources['LinkArchive']
+    link_const = links[links.index('    static final int LINK_LIMIT'):links.index('    private LinkArchive()')]
+    link_members = [member(links, s) for s in ['static Set<String> validate(', 'private static boolean bool(', 'private static String string(', 'private static IOException invalid(']]
+    (package / 'LinkArchive.java').write_text(header + 'final class LinkArchive {\n' + link_const + '\n'.join(link_members) + '\n}\n')
     (package / 'LibraryRepository.java').write_text(header + 'final class LibraryRepository {\n' + member(sources['LibraryRepository'], 'static String cleanName(') + '\n}\n')
     (package / 'SuggestionRules.java').write_text(header + 'final class SuggestionRules {\n' + member(sources['SuggestionRules'], 'static final class Result') + '\n}\n')
     digest=member(sources['SuggestionStore'], 'private static final class Digest').replace('private static final class Digest','static final class Digest',1)

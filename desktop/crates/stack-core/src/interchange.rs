@@ -973,7 +973,7 @@ impl Library {
             }
             // Restored links are always `unreachable`: their locators belong to another device or time.
             tx.execute(
-                "INSERT INTO link_records VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,'unreachable',?12,?13,?14,?15)",
+                "INSERT INTO link_records(row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,title_user_edited,added_at,text,preview) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,'unreachable',?12,?13,?14,?15)",
                 params![
                     link.row_id,
                     link.row["owner"].as_str(),
@@ -1112,7 +1112,7 @@ impl Library {
     /// exported. The local row id is the archive id, so `previews/<id>.pdf` matches `links/<id>.pdf`.
     fn link_rows_for_export(&self) -> Result<Vec<(Value, bool)>> {
         let mut statement = self.db.prepare(
-            "SELECT row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,title_user_edited,added_at,text,preview FROM link_records WHERE state<>'trashed' ORDER BY added_at,row_id",
+            "SELECT row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,title_user_edited,added_at,text,preview AND NOT preview_pending FROM link_records WHERE state<>'trashed' ORDER BY added_at,row_id",
         )?;
         let rows = statement
             .query_map([], |r| {
@@ -1128,7 +1128,7 @@ impl Library {
                         "hash": r.get::<_, String>(7)?,
                         "shared": r.get::<_, i64>(8)?,
                         "protected": r.get::<_, i64>(9)?,
-                        "locators": r.get::<_, String>(10)?,
+                        "locators": crate::link_sync::exportable_locators(r.get::<_, String>(10)?),
                         "state": r.get::<_, String>(11)?,
                         "title_user_edited": r.get::<_, i64>(12)?,
                         "added_at": r.get::<_, i64>(13)?,

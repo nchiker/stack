@@ -22,11 +22,12 @@ impl Stack {
             if let Some(error) = &self.sync.error {
                 body = body.push(self.body(error.clone()));
             }
+            // Linked-document conflicts are not reviewable here, but a plain note is shown for them.
             if self
                 .sync
                 .status
                 .as_ref()
-                .is_some_and(|s| s["conflicts"].as_object().is_some_and(|c| !c.is_empty()))
+                .is_some_and(crate::sync_ui::shows_conflicts)
             {
                 body = body.push(self.sync_conflict_view());
             }

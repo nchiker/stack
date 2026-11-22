@@ -43,6 +43,9 @@ pub struct Library {
     pub(crate) db: Connection,
     pub(crate) probe: Probe,
     pub(crate) _lock: Arc<File>,
+    /// Cached "this device has written its link enable operation" (0 unknown, 1 no, 2 yes). Derived from the
+    /// sync history, never stored; cleared whenever the sync state is replaced or reset.
+    pub(crate) links_enabled: std::sync::atomic::AtomicU8,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -143,9 +146,11 @@ impl Library {
             db,
             probe: Box::new(|_| Ok(())),
             _lock: lock,
+            links_enabled: std::sync::atomic::AtomicU8::new(0),
         };
         library.recover_operations()?;
         library.recover_text()?;
+        library.recover_link_previews()?;
         let first = meta_opt(&library.db, "library_id")?.is_none();
         if first {
             let mut graph = library.manifest()?.into_json();

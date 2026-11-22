@@ -27,13 +27,28 @@ public final class SyncActivity extends LibraryActivity {
         work(()->{try{if(result.baseline!=null)new SyncExchange(this,app().library,()->{if(!setupForeground||!app().access.allowed())throw new java.io.IOException("Connection paused. Open Stack to continue.");}).mergeConnected(result.baseline);SyncJob.schedule(this);return true;}finally{result.close();}},ok->{keepSyncAwake(false);SyncJob.kick(app(),this::refreshSync);refreshSync();});
     }
     private void review(){work(()->new SyncStore(this,app().library).status(),state->{
-        JSONObject conflicts=state.optJSONObject("conflicts");if(conflicts==null||conflicts.length()==0){refreshSync();return;}
+        JSONObject conflicts=state.optJSONObject("conflicts");
+        if(conflicts==null||conflicts.length()==0){JSONArray links=state.optJSONArray("link_conflicts");if(links!=null&&links.length()>0)reviewLink(links.optJSONObject(0));else refreshSync();return;}
         String key=SyncProtocol.keys(conflicts).get(0);for(String field:SyncProtocol.keys(conflicts))if(field.startsWith("documents/")&&field.endsWith("/title")){key=field;break;}final String selectedKey=key;JSONArray choices=conflicts.optJSONArray(key);if(choices==null)return;
         StringBuilder comparison=new StringBuilder("This was changed on both devices. Choose the version to keep.\n\n");
         String local=state.optString("replica");List<String> labels=new ArrayList<>();
         for(int i=0;i<choices.length();i++){JSONObject choice=choices.optJSONObject(i);String device=local.equals(choice.optJSONObject("id").optString("replica"))?"phone":"desktop";labels.add("Keep "+device+" version");comparison.append(device.equals("phone")?"Phone:\n":"Desktop:\n").append(readable(choice.opt("value"),state)).append("\n\n");}
         new AlertDialog.Builder(this).setTitle("Choose which change to keep").setMessage(comparison.toString()).setNegativeButton(labels.get(0),(d,w)->resolve(selectedKey,choices,0)).setPositiveButton(labels.size()>1?labels.get(1):labels.get(0),(d,w)->resolve(selectedKey,choices,Math.min(1,choices.length()-1))).setNeutralButton("Decide later",null).show();
     });}
+    /** P2: one open link tie (once per link). One choice keeps every cell of the link. */
+    private void reviewLink(JSONObject link){
+        if(link==null)return;
+        String id=link.optString("link");String title=link.optString("title");if(title.isEmpty())title=link.optString("link_id","Link");
+        JSONArray choices=link.optJSONArray("choices");if(choices==null||choices.length()<2)return;
+        StringBuilder comparison=new StringBuilder("This link was changed on both devices in the same way. Choose the version to keep for all of its details.\n\n");
+        for(int i=0;i<choices.length();i++){JSONObject choice=choices.optJSONObject(i);boolean phone="phone".equals(choice.optString("side"));
+            comparison.append(phone?"Phone:\n":"Desktop:\n").append("Title: ").append(choice.optString("title")).append("\n")
+                .append(choice.optBoolean("gone")?"Removed on this side":"Changed "+new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm",java.util.Locale.getDefault()).format(new java.util.Date(choice.optLong("modified")))).append("\n\n");}
+        new AlertDialog.Builder(this).setTitle(title).setMessage(comparison.toString())
+            .setNegativeButton("Keep phone version",(d,w)->resolveLink(id,"phone")).setPositiveButton("Keep desktop version",(d,w)->resolveLink(id,"desktop"))
+            .setNeutralButton("Decide later",null).show();
+    }
+    private void resolveLink(String id,String side){work(()->new SyncStore(this,app().library).resolveLink(id,side),ok->{SyncJob.changed(app());review();});}
     private void resolve(String key,JSONArray choices,int selected){JSONArray expected=new JSONArray();for(int i=0;i<choices.length();i++)expected.put(choices.optJSONObject(i).optJSONObject("id"));work(()->new SyncStore(this,app().library).resolve(key,expected,choices.optJSONObject(selected).opt("value")),ok->{SyncJob.changed(app());review();});}
     static String readable(Object value,JSONObject status){
         if(value==null||value==JSONObject.NULL)return "Removed";

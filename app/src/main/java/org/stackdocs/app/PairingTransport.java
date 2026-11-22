@@ -245,11 +245,32 @@ final class PairingTransport {
     }
 
     // Computers running Stack 0.1.0 reject unknown hello fields and close the
-    // connection. After such a refusal, use the plain hello for a while.
-    private static volatile long plainHelloUntil;
+    // connection. After such a refusal, the next lower hello level is used for 15 minutes
+    // (HelloGate ladder: frontier+features, frontier, plain).
+    /** D4b ships last: until both sides can apply link records nothing may announce `links`. */
+    private static final boolean ANNOUNCE_LINKS=false;
+    static boolean announcesLinks(){return ANNOUNCE_LINKS;}
+    /** An extra listener (tests); called after the peer hello is validated, before the equal-frontier decision. P1's own enable step always runs first. */
+    volatile HelloGate.Listener helloListener;
+    /** True when this session's hello step wrote the phone's links.enable operation: the frontier advertised in the hello is then stale. */
+    private volatile boolean enabledLinksInHello;
+    /**
+     * P1: the peer announced links (hello gate, section 5): write this phone's metadata-only enable operation once. It is never
+     * deferred and carries a marker cell, so it is valid with no links at all. With ANNOUNCE_LINKS=false nothing announces, so on
+     * a real session this does nothing; tests call it with a fake announcing peer.
+     */
+    void onPeerHello(HelloGate.Peer peer)throws Exception {onPeerHello(peer,ANNOUNCE_LINKS);}
+    /** L3: both sides must announce: the phone only enables links for a peer when it announces them too (`weAnnounce`; tests pass true). */
+    void onPeerHello(HelloGate.Peer peer,boolean weAnnounce)throws Exception {
+        if(!weAnnounce||peer==null||!peer.announcesLinks)return;
+        if(new SyncStore(context,store.repository).enableLinks())enabledLinksInHello=true;
+    }
+    private volatile HelloGate.Peer lastPeerHello;
+    /** The last accepted peer hello (null before one); package-private for P1. */
+    HelloGate.Peer lastPeerHello(){return lastPeerHello;}
     private static final class HelloRefused extends IOException {HelloRefused(IOException cause){super("Computer refused the hello",cause);}}
 
-    private JSONObject hello(JSONObject policy,SessionControl control)throws Exception {
+    private JSONObject hello(JSONObject policy,SessionControl control,int level)throws Exception {
         // Only group identity and frontier are needed; a full status also scans every document.
         SyncStore current=new SyncStore(context,store.repository,control::check);
         // Local edits must be recorded before the frontier is advertised.
@@ -259,8 +280,7 @@ final class PairingTransport {
             ||!state.members.contains(local)||!state.members.contains(policy.getString("peer_replica")))
             throw new IOException("Network transport requires the frozen two-member group");
         JSONObject hello=new JSONObject().put("version",1).put("group",policy.getString("group")).put("replica",local);
-        if(Clock.now()>=plainHelloUntil)hello.put("frontier",SyncProtocol.json(state.frontier));
-        return hello;
+        return HelloGate.apply(hello,level,ANNOUNCE_LINKS,SyncProtocol.json(state.frontier),ANNOUNCE_LINKS&&LinkSync.enabled(state,local));
     }
 
     SSLContext tls(JSONObject policy)throws Exception {
@@ -292,14 +312,18 @@ final class PairingTransport {
         return syncNow(host,port,new SessionControl()).put("status",store.status());
     }
     JSONObject syncNow(String host,int port,SessionControl control)throws Exception {
-        try{return session(host,port,control);}
-        catch(HelloRefused refused){plainHelloUntil=Clock.now()+15*60*1000L;return session(host,port,control);}
+        // One Sync walks down every level until a hello is accepted; the plain level has no lower one.
+        int level=HelloGate.startLevel(ANNOUNCE_LINKS,Clock.now());
+        while(true) {
+            try{return session(host,port,control,level);}
+            catch(HelloRefused refused){level++;HelloGate.refused(level,Clock.now());control.check();}
+        }
     }
-    private JSONObject session(String host,int port,SessionControl control)throws Exception {
+    private JSONObject session(String host,int port,SessionControl control,int level)throws Exception {
         if(Looper.myLooper()==Looper.getMainLooper())throw new IOException("Run Sync now on the foreground IO executor");
         control.check();
         if(host==null||host.isEmpty()||port<1||port>65535)throw new IOException("Choose a valid peer address");
-        JSONObject policy=policy(),local=hello(policy,control);
+        JSONObject policy=policy(),local=hello(policy,control,level);
         SSLContext tls=tls(policy);
         try(Socket raw=new Socket()) {
             control.attach(raw);
@@ -317,13 +341,18 @@ final class PairingTransport {
                 DataInputStream in=new DataInputStream(new BufferedInputStream(socket.getInputStream(),65536));
                 DataOutputStream out=new DataOutputStream(new BufferedOutputStream(socket.getOutputStream(),65536));
                 sendControl(out,'H',local);JSONObject remote;
-                try{remote=readControl(in,'H');}catch(IOException refused){if(local.has("frontier")&&!control.canceled())throw new HelloRefused(refused);throw refused;}
-                SyncProtocol.exact(remote,remote.has("frontier")?"version,group,replica,frontier":"version,group,replica");
+                try{remote=readControl(in,'H');}catch(IOException refused){if(HelloGate.hasLowerLevel(level)&&!control.canceled())throw new HelloRefused(refused);throw refused;}
+                HelloGate.Peer peerHello=HelloGate.parse(remote);
                 if(remote.getInt("version")!=1||!policy.getString("group").equals(remote.getString("group"))
                     ||!policy.getString("peer_replica").equals(remote.getString("replica")))throw new IOException("Peer group or replica mismatch");
                 // Equal frontiers: each side already holds every operation the
                 // other has, so the computer ends the session here as well.
-                if(local.has("frontier")&&remote.has("frontier")) {
+                lastPeerHello=peerHello;
+                enabledLinksInHello=false;onPeerHello(peerHello);
+                HelloGate.Listener listener=helloListener;if(listener!=null)listener.peerHello(peerHello);
+                // An operation written above moved our frontier past the one in the hello: never end this session as "equal".
+                if(!enabledLinksInHello&&local.has("frontier")&&remote.has("frontier")
+                    &&HelloGate.mayEndEqual(local.has("features"),local.optBoolean("enabled"),peerHello)) {
                     java.util.TreeMap<String,Long> ours=SyncProtocol.frontier(local.getJSONObject("frontier")),theirs=SyncProtocol.frontier(remote.getJSONObject("frontier"));
                     ours.values().removeIf(sequence->sequence==0);theirs.values().removeIf(sequence->sequence==0);
                     if(ours.equals(theirs)) {
