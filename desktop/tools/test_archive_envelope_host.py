@@ -5,8 +5,13 @@ Compiles app/.../BackupEnvelope.java byte-for-byte plus tools/java/EnvelopeHost.
  (a) Java decrypts desktop-encrypted.stackbackup (recovery slot, TEST_KEY): STACKBK magic, format 4, link count,
      and `archive_interop check` accepts the decrypted inner archive;
  (b) Java encrypts desktop-plain-v4.stackbackup key-only; `archive_interop check` accepts the result;
- (c) a flipped key, a truncated copy and a flipped body byte are refused by Java.
-Only the public synthetic TEST_KEY is used. It travels on stdin only, never in argv, files or output.
+ (c) a flipped key, a truncated copy and a flipped body byte are refused by Java;
+ (d) no-link files: Java decrypts desktop-nolinks-encrypted.stackbackup (format 4, an empty links array) and `check` accepts it;
+ (e) passphrase slot: Java writes a file with BOTH slots (recovery key + TEST_PASSPHRASE, which is not NFC). Java opens it with the
+     key and with the passphrase in its NFD and NFC forms; Rust (`check --test-passphrase`, and stack-cli --key-stdin /
+     --passphrase-stdin with both forms) opens it too; a wrong passphrase, a passphrase against a key-only desktop file and a
+     flipped body byte are refused.
+Only the public synthetic TEST_KEY and TEST_PASSPHRASE are used. They travel on stdin only, never in argv, files or output.
 Usage: test_archive_envelope_host.py [--selftest]
 """
 import glob
@@ -19,10 +24,14 @@ import struct
 import subprocess
 import sys
 import tempfile
+import unicodedata
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 TEST_KEY = bytes(range(1, 33)).hex()  # public synthetic key, never a real one
+TEST_PASSPHRASE = 'Cafe\u0301 Stack u\u0308ber 7'  # public synthetic; not NFC on purpose
+TEST_PASSPHRASE_NFC = unicodedata.normalize('NFC', TEST_PASSPHRASE)
+PASSPHRASES = (TEST_PASSPHRASE, TEST_PASSPHRASE_NFC)
 ENVELOPE = ROOT / 'app/src/main/java/org/stackdocs/app/BackupEnvelope.java'
 HOST = Path(__file__).with_name('java') / 'EnvelopeHost.java'
 GEN_BIN = ROOT / 'desktop/target/debug/examples/archive_interop'
@@ -42,7 +51,7 @@ def leaks(data, key=TEST_KEY):
     """True when `data` (bytes or str) holds the key in hex form, in either case or grouped by dashes/spaces."""
     text = data.decode('latin-1') if isinstance(data, bytes) else data
     squeezed = ''.join(c for c in text.lower() if c not in ' -\n\t')
-    return key in squeezed
+    return key in squeezed or any(form in text for form in PASSPHRASES)
 
 
 def scan_tree(root):
@@ -51,13 +60,13 @@ def scan_tree(root):
 
 
 def no_key_in_argv(argv):
-    if any(TEST_KEY in a.lower().replace('-', '') for a in map(str, argv)):
-        raise AssertionError('key in argv')
+    if any(TEST_KEY in a.lower().replace('-', '') or any(form in a for form in PASSPHRASES) for a in map(str, argv)):
+        raise AssertionError('key or passphrase in argv')
 
 
 def run(argv, key=None, env=None, cwd=None):
     no_key_in_argv(argv)
-    p = subprocess.run([str(a) for a in argv], input=(key + '\n').encode() if key is not None else None,
+    p = subprocess.run([str(a) for a in argv], input=(key + '\n').encode('utf-8') if key is not None else None,
                        capture_output=True, env=env, cwd=cwd, timeout=600)
     out = p.stdout + p.stderr
     if leaks(out):
@@ -117,6 +126,8 @@ def main():
     try:
         rc, out = run(['cargo', 'build', '--offline', '-p', 'stack-cli', '--example', 'archive_interop'], cwd=ROOT / 'desktop', env={**os.environ, **env})
         assert rc == 0, out[-500:]
+        rc, out = run(['cargo', 'build', '--offline', '-p', 'stack-cli'], cwd=ROOT / 'desktop', env={**os.environ, **env})
+        assert rc == 0, out[-500:]
         gen = scratch / 'gen'
         rc, out = run([GEN_BIN, 'make', gen], env={**env, 'STACK_PDFIUM_LIBRARY': find_pdfium()})
         assert rc == 0, out[-500:]
@@ -175,6 +186,77 @@ def main():
             refused[name] = out.strip()
         report['c_refused'] = refused
 
+        # (d) a library with zero links: the encrypted file holds format 4 with an empty links array
+        nolinks = json.loads((gen / 'expected-nolinks.json').read_text())
+        assert nolinks['links'] == []
+        for name, version in (('desktop-nolinks-encrypted.stackbackup', 4),):
+            inner0 = scratch / 'inner-nolinks.stackbackup'
+            rc, out = host('decrypt', gen / name, inner0)
+            assert rc == 0, 'Java refused the no-link envelope: ' + out
+            manifest0 = parse_inner(inner0.read_bytes())
+            assert manifest0['version'] == version and manifest0['links'] == [], (manifest0['version'], manifest0['links'])
+            rc, out = run([GEN_BIN, 'check', inner0, gen / 'expected-nolinks.json'], env={**env, 'STACK_PDFIUM_LIBRARY': find_pdfium()})
+            assert rc == 0, 'decrypted no-link inner archive differs from expected: ' + out
+        plain3 = parse_inner((gen / 'desktop-nolinks-plain.stackbackup').read_bytes())
+        assert plain3['version'] == 3 and 'links' not in plain3, 'the plain no-link file must be format 3 without links'
+        report['d_nolinks'] = {'encrypted_format': 4, 'encrypted_links': 0, 'plain_format': plain3['version']}
+
+        # (e) passphrase slot: Java writes both slots, Java and Rust read it every way
+        both = scratch / 'java-both-slots.stackbackup'
+        rc, out = host('encrypt-both', plain, both, key=TEST_KEY + '\n' + TEST_PASSPHRASE)
+        assert rc == 0, out
+        assert both.read_bytes()[:8] == b'STACKEN\x01'
+        header = both.read_bytes()
+        assert header[8] == 1 and header[29] == 2, 'KDF 1 and two slots expected'
+        assert sorted([header[30], header[30 + 61]]) == [1, 2], 'slot types 1 (passphrase) and 2 (recovery)'
+        opened = {}
+        for label, secret in (('java_key', None), ('java_passphrase_nfd', TEST_PASSPHRASE), ('java_passphrase_nfc', TEST_PASSPHRASE_NFC)):
+            target = scratch / (label + '.out')
+            rc, out = host('decrypt', both, target) if secret is None else host('decrypt-passphrase', both, target, key=secret)
+            assert rc == 0, label + ': ' + out
+            assert target.read_bytes() == plain.read_bytes(), label + ' differs from the plain archive'
+            opened[label] = 'opened'
+        rc, out = run([GEN_BIN, 'check', both, gen / 'expected.json'], env={**env, 'STACK_PDFIUM_LIBRARY': find_pdfium()})
+        assert rc == 0, 'Rust refused the two-slot archive by key: ' + out
+        phone_json = scratch / 'phone.json'
+        phone_json.write_text(json.dumps({'documents': expected['documents']['titles'], 'links': [
+            {k: l[k] for k in ('owner', 'link_id', 'title', 'has_preview', 'preview_sha256')} for l in expected['links']]}))
+        rc, out = run([GEN_BIN, 'check', both, '--phone-json', phone_json, '--test-passphrase'], env={**env, 'STACK_PDFIUM_LIBRARY': find_pdfium()})
+        assert rc == 0, 'Rust refused the two-slot archive by passphrase: ' + out
+        opened['rust_generator_key'] = opened['rust_generator_passphrase'] = 'opened'
+        home = scratch / 'home'
+        home.mkdir()
+        cli_env = {**env, 'HOME': str(home), 'XDG_DATA_HOME': str(home), 'XDG_CONFIG_HOME': str(home), 'XDG_CACHE_HOME': str(home),
+                   'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/nonexistent', 'STACK_PDFIUM_LIBRARY': find_pdfium()}
+        cli = ROOT / 'desktop/target/debug/stack-cli'
+        for n, (label, flag, secret) in enumerate((('cli_key', '--key-stdin', TEST_KEY), ('cli_passphrase_nfd', '--passphrase-stdin', TEST_PASSPHRASE),
+                                                  ('cli_passphrase_nfc', '--passphrase-stdin', TEST_PASSPHRASE_NFC))):
+            lib = scratch / f'cli-lib-{n}'
+            lib.mkdir()
+            rc, out = run([cli, 'archive', lib, 'restore', both, flag], key=secret, env=cli_env)
+            assert rc == 0, label + ': ' + out[-300:]
+            opened[label] = 'opened'
+        report['e_two_slots'] = opened
+
+        refused_e = {}
+        rc, out = host('decrypt-passphrase', both, scratch / 'e1', key=TEST_PASSPHRASE + '!')
+        assert rc != 0 and not (scratch / 'e1').exists(), 'wrong passphrase accepted by Java'
+        refused_e['java_wrong_passphrase'] = out.strip()
+        rc, out = host('decrypt-passphrase', enc, scratch / 'e2', key=TEST_PASSPHRASE)
+        assert rc != 0 and not (scratch / 'e2').exists(), 'a passphrase opened a key-only desktop file'
+        refused_e['java_passphrase_on_key_only_file'] = out.strip()
+        lib = scratch / 'cli-lib-wrong'
+        lib.mkdir()
+        rc, out = run([cli, 'archive', lib, 'review', both, '--passphrase-stdin'], key=TEST_PASSPHRASE + '!', env=cli_env)
+        assert rc != 0 and 'Wrong passphrase or recovery key, or damaged.' in out, out[-300:]
+        refused_e['cli_wrong_passphrase'] = out.strip().splitlines()[-1]
+        raw = both.read_bytes()
+        (scratch / 'e3.bin').write_bytes(raw[:300] + bytes([raw[300] ^ 1]) + raw[301:])
+        rc, out = host('decrypt-passphrase', scratch / 'e3.bin', scratch / 'e3.out', key=TEST_PASSPHRASE)
+        assert rc != 0 and not (scratch / 'e3.out').exists(), 'flipped body byte accepted with the passphrase'
+        refused_e['java_flipped_body_byte'] = out.strip()
+        report['e_refused'] = refused_e
+
         leaked = scan_tree(scratch)
         assert not leaked, 'key text found in ' + ', '.join(leaked)
         print(json.dumps(report, indent=2))
@@ -197,6 +279,28 @@ class GuardTests(unittest.TestCase):
         self.assertTrue(leaks('-'.join(TEST_KEY[i:i + 8] for i in range(0, 64, 8))))
         self.assertFalse(leaks(flip_key(TEST_KEY)))
         self.assertNotEqual(flip_key(TEST_KEY), TEST_KEY)
+
+    def test_passphrase_detection_and_argv_guard(self):
+        self.assertNotEqual(TEST_PASSPHRASE, TEST_PASSPHRASE_NFC)
+        self.assertFalse(TEST_PASSPHRASE.isascii())
+        for form in PASSPHRASES:
+            self.assertTrue(leaks('x ' + form + ' y'))
+            with self.assertRaises(AssertionError):
+                no_key_in_argv(['java', form])
+        self.assertFalse(leaks('Cafe Stack uber 7'))
+
+    def test_host_modes_read_secrets_from_stdin_only(self):
+        source = HOST.read_text()
+        for mode in ('encrypt-both', 'decrypt-passphrase'):
+            self.assertIn(mode, source)
+        self.assertNotIn('args[3]', source)
+        self.assertNotIn('args[4]', source)
+        self.assertIn('StandardCharsets.UTF_8', source)
+
+    def test_header_offsets_of_a_two_slot_envelope(self):
+        # magic(8) kdf(1) iterations(4) salt(16) slot_count(1) = 30 bytes, then 61-byte slots (type 1, nonce 12, 48 wrapped).
+        self.assertEqual(8 + 1 + 4 + 16, 29)
+        self.assertEqual(1 + 12 + 32 + 16, 61)
 
     def test_argv_guard(self):
         with self.assertRaises(AssertionError):
