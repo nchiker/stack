@@ -2,6 +2,6 @@
 Type=Application
 Name=Run Stack checks
 Comment=Run every automatic Stack check and show a PASS/FAIL summary
-Exec=sh -c "exec cosmic-term -- sh \\"\\$(dirname \\"\\$1\\")/desktop/tools/run_checks_window.sh\\"" sh %k
+Exec=sh -c "script=\\"\\$(dirname \\"\\$1\\")/desktop/tools/run_checks_window.sh\\"; if command -v cosmic-term >/dev/null; then exec cosmic-term -- sh \\"\\$script\\"; else exec x-terminal-emulator -e sh \\"\\$script\\"; fi" sh %k
 Terminal=false
 Categories=Development;

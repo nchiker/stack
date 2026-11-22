@@ -109,12 +109,7 @@ pub fn execute(library: &mut stack_core::library::Library, request: Request) -> 
                 library,
                 stream,
                 &control,
-                &mut |library, peer| {
-                    library
-                        .sync_links_on_hello(peer.announces_links())
-                        .map(|_| ())
-                        .map_err(Into::into)
-                },
+                &mut stack_transport::enable_links_on_hello,
             )?;
             stack_transport::pairing::mark_complete(library.root())?;
             stack_transport::pairing::record_sync(library.root())?;

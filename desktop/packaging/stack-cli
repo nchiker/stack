@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+. /app/lib/stack/env.sh
+exec /app/lib/stack/bin/stack-cli "$@"

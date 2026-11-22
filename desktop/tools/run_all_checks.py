@@ -132,12 +132,15 @@ def phone_suite(adb, name, option):
 
 
 FLATPAK_TEST_ID = 'org.stackdocs.desktop.test'  # the TEST Flatpak only; never the real org.stackdocs.desktop
-FLATPAK_CLI = '/app/lib/stack/bin/stack-cli'
+FLATPAK_CLI = '/app/bin/stack-cli'  # the wrapper: same environment as the app (library path, PDFium)
+# Exit codes of `stack-cli key ...`
+EXIT_NO_STORE = 3
+EXIT_LOCKED = 4
 
 
 def flatpak_run(*args, key=None, timeout=60):
-    """One `flatpak run` of stack-cli in the test Flatpak. `key` (the public test key) goes on stdin only."""
-    argv = ['flatpak', 'run', '--user', '--env=STACK_PDFIUM_LIBRARY=/app/lib/stack/runtime/pdfium/lib/libpdfium.so', f'--command={FLATPAK_CLI}', FLATPAK_TEST_ID, *map(str, args)]
+    """One `flatpak run` of the stack-cli wrapper in the test Flatpak. `key` (the public test key) goes on stdin only."""
+    argv = ['flatpak', 'run', '--user', f'--command={FLATPAK_CLI}', FLATPAK_TEST_ID, *map(str, args)]
     try:
         p = subprocess.run(argv, input=(key + '\n').encode() if key else None, capture_output=True, timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -185,8 +188,8 @@ def flatpak_key_store(cargo_env):
             rc, out = flatpak_run('key', 'save', '--key-stdin', key=interop.TEST_KEY_HEX)
             log.append(out)
         if rc != 0:
-            if 'No key store is available' in out or rc == 124:
-                report('SKIP', name, 'no secret store in this session (needs a logged-in desktop session): ' + last_line(out))
+            if rc in (EXIT_NO_STORE, EXIT_LOCKED, 124):
+                report('SKIP', name, 'no usable secret store in this session (needs an unlocked, logged-in desktop session): ' + last_line(out))
             else:
                 report('FAIL', name, 'key save: ' + last_line(out))
             return

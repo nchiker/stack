@@ -29,6 +29,8 @@ modules:
       - cargo build --offline --locked --release -p stack-desktop -p stack-cli -p stack-transport
       - install -Dm755 -t /app/lib/stack/bin target/release/stack-desktop target/release/stack-cli target/release/stack-transport
       - install -Dm755 packaging/stack /app/bin/stack
+      - install -Dm755 packaging/stack-cli /app/bin/stack-cli
+      - install -Dm644 packaging/stack-env /app/lib/stack/env.sh
       - install -Dm644 packaging/org.stackdocs.desktop.desktop /app/share/applications/org.stackdocs.desktop.desktop
       - install -Dm644 packaging/org.stackdocs.desktop.metainfo.xml /app/share/metainfo/org.stackdocs.desktop.metainfo.xml
       - install -Dm644 assets/org.stackdocs.desktop.svg /app/share/icons/hicolor/scalable/apps/org.stackdocs.desktop.svg

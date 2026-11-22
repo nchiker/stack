@@ -211,7 +211,7 @@ Full design and implementation notes: `STACK_LINK_SLICE6_DESIGN.md`. Wire detail
 - **Setup.** Nothing to install or run: both apps announce links in the sync handshake and the next Sync does the rest.
   An older desktop still syncs documents. An older desktop build cannot open a library the new desktop has upgraded (schema 6).
 - **Status.** Both sides are built, tested and announce `links` (`ANNOUNCE_LINKS=true`, step D4b is live),
-  so link cells now travel once a side enables. Real-LAN test (T3) and the Flatpak launch test (6b) are still to do.
+  so link cells now travel once a side enables. Real-LAN test (T3) passed 2026-11-22 (50 links, first sync 42-49 s). The Flatpak launch test (6b) is still to do.
 
 ## Work by project
 

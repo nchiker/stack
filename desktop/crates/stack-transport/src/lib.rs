@@ -232,6 +232,17 @@ pub fn equal_frontier_may_skip(
 /// session is skipped on equal frontiers.
 pub type HelloHook<'a> = &'a mut dyn FnMut(&mut Library, &PeerHello) -> Result<()>;
 
+/// The real hello hook, used by every default entry point and by the app: a peer that announced `links` makes this
+/// side enable once (section 5, after the hello reply and before the first bundle). A failed enable is logged
+/// (fixed text, no paths or secrets) and the session carries on: the hello already went out with the pre-enable
+/// state (`enabled=false`), so the M1 rule cannot have skipped wrongly, and the next session retries the enable.
+pub fn enable_links_on_hello(library: &mut Library, peer: &PeerHello) -> Result<()> {
+    if library.sync_links_on_hello(peer.announces_links()).is_err() {
+        eprintln!("Link sync could not be switched on this time; carrying on without it");
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Level {
     FrontierFeatures,
@@ -859,7 +870,7 @@ pub fn sync_now_library(
     address: SocketAddr,
     control: &SessionControl,
 ) -> Result<Value> {
-    sync_now_library_with(library, address, control, &mut |_, _| Ok(()))
+    sync_now_library_with(library, address, control, &mut enable_links_on_hello)
 }
 
 /// As `sync_now_library`, calling `on_hello` once the hello is accepted.
@@ -976,7 +987,7 @@ pub fn serve_accepted_library(
     tcp: TcpStream,
     control: &SessionControl,
 ) -> Result<Value> {
-    serve_accepted_library_with(library, tcp, control, &mut |_, _| Ok(()))
+    serve_accepted_library_with(library, tcp, control, &mut enable_links_on_hello)
 }
 
 /// As `serve_accepted_library`; `on_hello` runs after the hello reply is sent
@@ -1239,7 +1250,19 @@ mod tests {
         send_frame(&mut tls, b'B', b"corrupt exchange", MAX_BUNDLE).unwrap();
         drop(tls);
         assert!(server.join().unwrap().is_err());
-        assert_eq!(Library::open(&b).unwrap().sync_status().unwrap(), before);
+        // The hello announced links, so b wrote its own enable operation after the hello reply and before the
+        // bundle (design section 5, M-a: it cannot wait for the bundle). That is the ONLY change: the corrupt
+        // bundle applied nothing, and a's operations, receipts and gaps are as before.
+        let mut after = Library::open(&b).unwrap().sync_status().unwrap();
+        assert_eq!(after["links_enabled"], true);
+        assert_eq!(
+            after["operations"],
+            before["operations"].as_u64().unwrap() + 1
+        );
+        for key in ["links_enabled", "operations", "frontier"] {
+            after[key] = before[key].clone();
+        }
+        assert_eq!(after, before);
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         drop(listener);

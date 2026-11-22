@@ -2039,3 +2039,20 @@ fn sigkill_during_an_import_leaves_the_same_final_rows_after_the_next_import() {
         assert_eq!(rows(&a).len(), 1, "{point}");
     }
 }
+
+#[test]
+fn an_unwritable_blob_folder_falls_back_to_the_marker_alone_and_the_session_goes_on() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut a = library_with(dir.path(), "a", vec![archive_link(1, "no room", 0)]);
+    let mut phone = join(&mut a, dir.path());
+    // The blob folder cannot be made (a plain file sits where it should be).
+    let blobs = a.root().join("sync_blobs");
+    let _ = fs::remove_dir_all(&blobs);
+    fs::write(&blobs, b"in the way").unwrap();
+    assert!(a.sync_links_on_hello(true).unwrap());
+    assert!(a.sync_links_enabled().unwrap());
+    let header = phone.receive(&a);
+    assert_eq!(link_keys(&header), vec![wire::marker_key(&phone.peer)]);
+    assert!(projection(&a).is_empty());
+    assert!(!a.sync_links_on_hello(true).unwrap(), "enabled once");
+}

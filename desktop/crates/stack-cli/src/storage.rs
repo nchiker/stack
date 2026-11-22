@@ -306,25 +306,70 @@ const NO_STORE: &str =
 const BAD_KEY: &str = "That is not a Stack backup key";
 const KEY_EXISTS: &str =
     "A backup key is already saved on this computer; add --replace to replace it";
+const LOCKED: &str =
+    "The key store is locked; unlock it (for example by signing in again) and retry";
+const NOTHING_SAVED: &str = "No backup key was saved on this computer.";
+
+/// Exit codes of `stack-cli key ...` (anything else that fails exits 1).
+pub const EXIT_USAGE: i32 = 2;
+pub const EXIT_NO_STORE: i32 = 3;
+pub const EXIT_LOCKED: i32 = 4;
+pub const EXIT_KEY_EXISTS: i32 = 5;
+
+/// A failure with its own exit code.
+#[derive(Debug)]
+struct CliError {
+    code: i32,
+    text: String,
+}
+impl std::fmt::Display for CliError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.text)
+    }
+}
+impl std::error::Error for CliError {}
+fn coded(code: i32, text: impl Into<String>) -> Box<dyn std::error::Error> {
+    Box::new(CliError {
+        code,
+        text: text.into(),
+    })
+}
+/// The process exit code for a failure: 1 unless it carries its own.
+pub fn exit_code(error: &(dyn std::error::Error + 'static)) -> i32 {
+    error.downcast_ref::<CliError>().map_or(1, |e| e.code)
+}
 fn store_error(error: stack_core::keystore::StoreError) -> Box<dyn std::error::Error> {
     use stack_core::keystore::StoreError;
     match error {
-        StoreError::Unavailable => NO_STORE.into(),
-        other => other.into(),
+        StoreError::Unavailable => coded(EXIT_NO_STORE, NO_STORE),
+        StoreError::Locked => coded(EXIT_LOCKED, LOCKED),
+        StoreError::Failed(text) => text.into(),
     }
+}
+fn usage_error() -> Box<dyn std::error::Error> {
+    coded(EXIT_USAGE, usage())
 }
 
 /// `key save --key-stdin [--replace]`, `key status`, `key remove`: manage the backup key saved on this computer
 /// (the same store the desktop app uses). The key comes only from standard input and is never printed; `status`
 /// shows only whether a key is saved and its short fingerprint. The desktop app replaces a saved key only after the
-/// new key has opened a backup; a command with no backup to prove it needs `--replace` to overwrite.
+/// new key has opened a backup; a command with no backup to prove it needs `--replace` to overwrite (saving the
+/// very same key again is fine). A locked store is reported, never unlocked with a prompt, except for `--replace`.
 fn key_command(
     store: &dyn stack_core::keystore::SecretStore,
     args: &[OsString],
     read_stdin: impl FnOnce() -> Result<String>,
 ) -> Result<String> {
-    use stack_core::keystore::{KeyStatus, fingerprint, key_status, parse_key_text};
+    use stack_core::keystore::{
+        KeyStatus, StoreError, fingerprint, key_status_typed, parse_key_text,
+    };
     let word = |a: &OsString| a.to_str().map(str::to_owned);
+    let not_locked = || -> Result<()> {
+        if store.is_locked().map_err(store_error)? {
+            return Err(store_error(StoreError::Locked));
+        }
+        Ok(())
+    };
     match args.iter().map(word).collect::<Option<Vec<_>>>().as_deref() {
         Some([action, flag]) | Some([action, flag, _])
             if action == "save" && flag == "--key-stdin" =>
@@ -332,48 +377,56 @@ fn key_command(
             let replace = match args {
                 [_, _] => false,
                 [_, _, r] if r == "--replace" => true,
-                _ => return Err(usage().into()),
+                _ => return Err(usage_error()),
+            };
+            // Without --replace the store is looked at first, so a locked store or a different saved key is
+            // reported before the user has typed anything more than needed.
+            let existing = if replace {
+                None
+            } else {
+                not_locked()?;
+                store.get().map_err(store_error)?
             };
             let text = zeroize::Zeroizing::new(read_stdin()?);
             let hex = parse_key_text(&text).ok_or(BAD_KEY)?;
-            if !replace && store.get().map_err(store_error)?.is_some() {
-                return Err(KEY_EXISTS.into());
+            let line = |what: &str| format!("{what} Fingerprint {}", fingerprint(&hex));
+            match existing {
+                Some(saved) if *saved == *hex => {
+                    return Ok(line("Backup key already saved on this computer."));
+                }
+                Some(_) => return Err(coded(EXIT_KEY_EXISTS, KEY_EXISTS)),
+                None => {}
             }
             store.set(&hex).map_err(store_error)?;
-            Ok(format!(
-                "Backup key saved on this computer. Fingerprint {}",
-                fingerprint(&hex)
-            ))
+            Ok(line("Backup key saved on this computer."))
         }
-        Some([action]) if action == "status" => match key_status(store) {
+        Some([action]) if action == "status" => match key_status_typed(store) {
             Ok(KeyStatus::Saved { fingerprint }) => {
                 Ok(format!("saved: yes\nfingerprint: {fingerprint}"))
             }
             Ok(KeyStatus::NotSet) => Ok("saved: no".into()),
             Ok(KeyStatus::Locked) => Ok("saved: unknown (the key store is locked)".into()),
-            Err(message) if message == stack_core::keystore::StoreError::UNAVAILABLE_TEXT => {
-                Err(NO_STORE.into())
-            }
-            Err(message) => Err(message.into()),
+            Err(error) => Err(store_error(error)),
         },
         Some([action]) if action == "remove" => {
+            not_locked()?;
+            if store.get().map_err(store_error)?.is_none() {
+                return Ok(NOTHING_SAVED.into());
+            }
             store.remove().map_err(store_error)?;
             Ok("Saved backup key removed from this computer.".into())
         }
-        _ => Err(usage().into()),
+        _ => Err(usage_error()),
     }
 }
 /// The key the desktop app saved on this computer. The user asked for it, so a missing key store is an error here
 /// (the CLI never falls back to a plain file).
 fn saved_key() -> Result<stack_core::BackupKey> {
-    use stack_core::keystore::{StoreError, SystemStore, saved_backup_key};
+    use stack_core::keystore::{SystemStore, saved_backup_key};
     match saved_backup_key(&SystemStore) {
         Ok(Some(key)) => Ok(key),
         Ok(None) => Err("No backup key is saved on this computer".into()),
-        Err(StoreError::Unavailable) => Err(
-            "No key store is available on this computer, so the saved key cannot be used".into(),
-        ),
-        Err(error) => Err(error.into()),
+        Err(error) => Err(store_error(error)),
     }
 }
 /// Short review output: the counts and warnings, without the id mapping (`--full` prints that).
@@ -444,7 +497,8 @@ fn read_secret_file(path: &Path) -> Result<String> {
 }
 
 /// Reads one line from standard input a byte at a time (no buffered copy of the secret is left behind), with
-/// terminal echo off when it is a terminal.
+/// terminal echo off when it is a terminal. On a terminal Ctrl-C is read as a byte (signals are off while the
+/// secret is typed), so the terminal is always put back.
 fn read_secret_stdin(prompt: &str) -> Result<String> {
     use rustix::termios::{LocalModes, OptionalActions, isatty, tcgetattr, tcsetattr};
     use std::io::Write;
@@ -458,7 +512,9 @@ fn read_secret_stdin(prompt: &str) -> Result<String> {
     let _restore = if isatty(stdin) {
         let original = tcgetattr(stdin)?;
         let mut quiet = original.clone();
-        quiet.local_modes.remove(LocalModes::ECHO);
+        quiet
+            .local_modes
+            .remove(LocalModes::ECHO | LocalModes::ISIG);
         tcsetattr(stdin, OptionalActions::Flush, &quiet)?;
         eprint!("{prompt}");
         std::io::stderr().flush()?;
@@ -466,21 +522,40 @@ fn read_secret_stdin(prompt: &str) -> Result<String> {
     } else {
         None
     };
-    let mut bytes = zeroize::Zeroizing::new(Vec::new());
-    let mut one = [0u8; 1];
+    let result = read_secret_line(|one| Ok(rustix::io::read(stdin, one)?));
+    if _restore.is_some() {
+        eprintln!();
+    }
+    result
+}
+
+/// One line (up to a line feed or the end of input; a CR before the line feed is dropped) of at most 4096 bytes of
+/// UTF-8 text, from a one-byte-at-a-time reader. Every buffer holding secret bytes is zeroed on every path.
+fn read_secret_line(mut read: impl FnMut(&mut [u8; 1]) -> Result<usize>) -> Result<String> {
+    let mut bytes = zeroize::Zeroizing::new(Vec::with_capacity(4097));
+    let mut one = zeroize::Zeroizing::new([0u8; 1]);
     loop {
-        if rustix::io::read(stdin, &mut one)? == 0 || one[0] == b'\n' {
+        if read(&mut one)? == 0 || one[0] == b'\n' {
             break;
+        }
+        if one[0] == 3 {
+            return Err("Cancelled".into());
         }
         if bytes.len() >= 4096 {
             return Err("The key is too long".into());
         }
         bytes.push(one[0]);
     }
-    if _restore.is_some() {
-        eprintln!();
+    if bytes.last() == Some(&b'\r') {
+        bytes.pop();
     }
-    String::from_utf8(std::mem::take(&mut *bytes)).map_err(|_| "The key must be UTF-8 text".into())
+    match String::from_utf8(std::mem::take(&mut *bytes)) {
+        Ok(text) => Ok(text),
+        Err(invalid) => {
+            drop(zeroize::Zeroizing::new(invalid.into_bytes()));
+            Err("The key must be UTF-8 text".into())
+        }
+    }
 }
 fn visibility(value: &str) -> Result<bool> {
     match value {
@@ -686,6 +761,132 @@ mod tests {
         }
         let e = key_command(&store, &args(&["save", "--key-stdin"]), stdin(hex));
         assert_eq!(e.unwrap_err().to_string(), NO_STORE);
+    }
+
+    fn line_of(input: &[u8]) -> Result<String> {
+        let mut rest = input.iter();
+        read_secret_line(|one| match rest.next() {
+            Some(byte) => {
+                one[0] = *byte;
+                Ok(1)
+            }
+            None => Ok(0),
+        })
+    }
+
+    #[test]
+    fn reading_a_secret_line_handles_line_ends_limits_and_bad_text() {
+        assert_eq!(line_of(b"abc").unwrap(), "abc"); // end of input, no line feed
+        assert_eq!(line_of(b"abc\n").unwrap(), "abc");
+        assert_eq!(line_of(b"abc\r\n").unwrap(), "abc"); // CRLF
+        assert_eq!(line_of(b"one\ntwo\n").unwrap(), "one"); // only the first line
+        assert_eq!(line_of(b"").unwrap(), "");
+        assert_eq!(line_of(&vec![b'a'; 4096]).unwrap().len(), 4096);
+        let long = vec![b'a'; 4097];
+        assert_eq!(
+            line_of(&long).unwrap_err().to_string(),
+            "The key is too long"
+        );
+        let bad = line_of(b"ab\xff\xfe\n").unwrap_err().to_string();
+        assert_eq!(bad, "The key must be UTF-8 text");
+        assert_eq!(line_of(b"ab\x03cd\n").unwrap_err().to_string(), "Cancelled");
+        // A read failure passes through.
+        let failed = read_secret_line(|_| Err("read failed".into()));
+        assert_eq!(failed.unwrap_err().to_string(), "read failed");
+    }
+
+    #[test]
+    fn key_command_failures_have_their_own_exit_codes() {
+        use stack_core::keystore::{MemoryStore, SecretStore, StoreError};
+        use std::sync::atomic::Ordering::SeqCst;
+        let args = |v: &[&str]| v.iter().map(OsString::from).collect::<Vec<_>>();
+        let hex: String = (1u8..=32).map(|b| format!("{b:02x}")).collect();
+        let other = "ab".repeat(32);
+        let code = |r: Result<String>| exit_code(r.unwrap_err().as_ref());
+        let store = MemoryStore::default();
+        // Usage: 2, and the key is never read.
+        assert_eq!(
+            code(key_command(&store, &args(&["wat"]), || unreachable!())),
+            EXIT_USAGE
+        );
+        // A bad key and other failures: 1.
+        let bad = key_command(
+            &store,
+            &args(&["save", "--key-stdin"]),
+            || Ok("nope".into()),
+        );
+        assert_eq!(code(bad), 1);
+        // Remove with nothing saved is fine and says so.
+        assert_eq!(
+            key_command(&store, &args(&["remove"]), || unreachable!()).unwrap(),
+            NOTHING_SAVED
+        );
+        // Saving the same key twice succeeds; a different one is refused with 5.
+        let save = |s: &MemoryStore, k: &str, extra: &[&str]| {
+            let k = k.to_string();
+            let mut a = vec!["save", "--key-stdin"];
+            a.extend_from_slice(extra);
+            key_command(s, &args(&a), move || Ok(k))
+        };
+        save(&store, &hex, &[]).unwrap();
+        assert!(save(&store, &hex, &[]).unwrap().contains("already saved"));
+        assert_eq!(code(save(&store, &other, &[])), EXIT_KEY_EXISTS);
+        assert_eq!(&**store.get().unwrap().unwrap(), hex.as_str());
+        // A locked store: save (no --replace), remove and status never prompt; 4 for save and remove.
+        store.locked.store(true, SeqCst);
+        assert_eq!(code(save(&store, &other, &[])), EXIT_LOCKED);
+        assert_eq!(
+            code(key_command(&store, &args(&["remove"]), || unreachable!())),
+            EXIT_LOCKED
+        );
+        assert!(
+            key_command(&store, &args(&["status"]), || unreachable!())
+                .unwrap()
+                .contains("locked")
+        );
+        assert_eq!(store.unlocks.load(SeqCst), 0);
+        store.locked.store(false, SeqCst);
+        // No store: 3. A store that fails: its text passes through with 1.
+        store.unavailable.store(true, SeqCst);
+        for a in [vec!["status"], vec!["remove"]] {
+            assert_eq!(
+                code(key_command(&store, &args(&a), || unreachable!())),
+                EXIT_NO_STORE
+            );
+        }
+        assert_eq!(code(save(&store, &hex, &[])), EXIT_NO_STORE);
+        assert_eq!(code(save(&store, &hex, &["--replace"])), EXIT_NO_STORE);
+        store.unavailable.store(false, SeqCst);
+        *store.fail.lock().unwrap() = Some("denied by the store".into());
+        for a in [vec!["status"], vec!["remove"]] {
+            let e = key_command(&store, &args(&a), || unreachable!()).unwrap_err();
+            assert_eq!(e.to_string(), "denied by the store");
+            assert_eq!(exit_code(e.as_ref()), 1);
+        }
+        // A store that gave up waiting reports itself as unavailable (the store enforces its own time limits).
+        struct Silent;
+        impl SecretStore for Silent {
+            fn get(&self) -> std::result::Result<Option<zeroize::Zeroizing<String>>, StoreError> {
+                Err(StoreError::Unavailable)
+            }
+            fn set(&self, _: &str) -> std::result::Result<(), StoreError> {
+                Err(StoreError::Unavailable)
+            }
+            fn remove(&self) -> std::result::Result<(), StoreError> {
+                Err(StoreError::Unavailable)
+            }
+            fn is_locked(&self) -> std::result::Result<bool, StoreError> {
+                Err(StoreError::Unavailable)
+            }
+        }
+        assert_eq!(
+            code(key_command(&Silent, &args(&["status"]), || unreachable!())),
+            EXIT_NO_STORE
+        );
+        assert_eq!(
+            code(key_command(&Silent, &args(&["remove"]), || unreachable!())),
+            EXIT_NO_STORE
+        );
     }
 
     #[test]

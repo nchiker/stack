@@ -13,7 +13,7 @@ fn main() {
         .or_else(|| shutdown.err().map(Into::into));
     if let Some(error) = failure {
         eprintln!("{}", failure_line(error.as_ref()));
-        std::process::exit(1);
+        std::process::exit(storage::exit_code(error.as_ref()));
     }
 }
 

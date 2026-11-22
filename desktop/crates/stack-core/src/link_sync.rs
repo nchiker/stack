@@ -138,10 +138,13 @@ fn identity_of(row_owner: &str, row_link: &str) -> String {
 // ---------------------------------------------------------------------------
 
 pub(crate) fn derive_enabled(state: &State, replica: &str) -> bool {
-    state
-        .history
-        .values()
-        .any(|op| op.id.replica == replica && op.evidence["kind"] == "links.enable")
+    // As the phone's `LinkSync.enabled`: this replica's own `links.enable` operation that also carries its marker.
+    let marker = wire::marker_key(replica);
+    state.history.values().any(|op| {
+        op.id.replica == replica
+            && op.evidence["kind"] == "links.enable"
+            && op.changes.contains_key(&marker)
+    })
 }
 
 /// True when the incoming operations carry link data: the peer has enabled links, so this side must too.

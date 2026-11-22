@@ -83,17 +83,17 @@ fn paired_localhost_applies_and_acknowledges_then_replays_safely() {
     );
     // Adoption leaves both sides with the same operations, so the session ends
     // after hello and each records the other's advertised frontier as its receipt.
-    // D4b: both sides announce `links` (M1 rule). These entry points use the no-op hello hook, so neither side
-    // ever enables and the equal-frontier session is never skipped, but receipts are still recorded.
+    // D4b: both sides announce `links` (M1 rule) and the default entry points use the real hello hook, so this
+    // first session is not skipped (neither side was enabled when the hellos went out); both enable during it.
     let (client, server) = run_pair(a.clone(), b.clone(), port());
     assert_eq!(client["skipped"], serde_json::Value::Null);
     assert_eq!(server["skipped"], serde_json::Value::Null);
     let status = Library::open(&b).unwrap().sync_status().unwrap();
     assert_eq!(status["library"], group);
     assert_eq!(status["pending_gaps"], 0);
-    assert_eq!(status["acknowledged_by"][&a_id][&a_id], 1);
+    assert_eq!(status["acknowledged_by"][&a_id][&a_id], 2); // a's baseline plus its enable op
     let status = Library::open(&a).unwrap().sync_status().unwrap();
-    assert_eq!(status["acknowledged_by"][&b_id][&a_id], 1);
+    assert_eq!(status["acknowledged_by"][&b_id][&a_id], 2);
     // A new local operation on one side makes the next session exchange it.
     let mut library = Library::open(&a).unwrap();
     let revision = library.revision().unwrap();
@@ -115,8 +115,8 @@ fn paired_localhost_applies_and_acknowledges_then_replays_safely() {
     assert_eq!(client["received"]["applied"], 0);
     assert_eq!(client["status"]["pending_gaps"], 0);
     let (client, server) = run_pair(a, b, port());
-    assert_eq!(client["skipped"], serde_json::Value::Null);
-    assert_eq!(server["skipped"], serde_json::Value::Null);
+    assert_eq!(client["skipped"], true);
+    assert_eq!(server["skipped"], true);
 }
 
 #[test]
@@ -201,7 +201,7 @@ fn interrupted_connection_can_reconnect_without_advancing_receipts() {
     assert!(listener.join().unwrap().is_err());
     assert_eq!(Library::open(&b).unwrap().sync_status().unwrap(), before);
     let (_, server) = run_pair(a.clone(), b.clone(), port());
-    assert_eq!(server["skipped"], serde_json::Value::Null); // no-op hook: links never enabled, so no equal-frontier skip
+    assert_eq!(server["skipped"], serde_json::Value::Null); // first session: neither side had enabled when the hellos went out
     assert_eq!(
         Library::open(&b).unwrap().sync_status().unwrap()["library"],
         group
@@ -310,4 +310,65 @@ fn native_owner_cancels_waiting_and_blocked_handshake_without_changing_the_libra
         drop(stalled_client);
         server.join().unwrap();
     }
+}
+
+#[test]
+fn real_app_hook_enables_both_sides_then_equal_frontiers_skip() {
+    use stack_transport::{
+        SessionControl, enable_links_on_hello, serve_accepted_library_with, sync_now_library_with,
+    };
+    let temp = tempfile::Builder::new()
+        .prefix("stack-lan-hook-")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let a = temp.path().join("a");
+    let b = temp.path().join("b");
+    let (group, a_id) = initialized(&a);
+    let (_, b_id) = initialized(&b);
+    pair(&a, &b, &group, &a_id, &b_id);
+    Library::open(&a)
+        .unwrap()
+        .sync_start(std::slice::from_ref(&b_id))
+        .unwrap();
+    adopt_by_reviewed_file(
+        &a,
+        &b,
+        &group,
+        &a_id,
+        &b_id,
+        &temp.path().join("baseline.stackexchange"),
+    );
+    let session = || {
+        let address = port();
+        let root = b.clone();
+        let server = std::thread::spawn(move || {
+            let listener = TcpListener::bind(address).unwrap();
+            let (tcp, _) = listener.accept().unwrap();
+            let mut library = Library::open(&root).unwrap();
+            serve_accepted_library_with(
+                &mut library,
+                tcp,
+                &SessionControl::default(),
+                &mut enable_links_on_hello,
+            )
+        });
+        std::thread::sleep(Duration::from_millis(80));
+        let mut library = Library::open(&a).unwrap();
+        let client = sync_now_library_with(
+            &mut library,
+            address,
+            &SessionControl::default(),
+            &mut enable_links_on_hello,
+        )
+        .unwrap();
+        (client, server.join().unwrap().unwrap())
+    };
+    let (client, server) = session();
+    assert_eq!(client["skipped"], serde_json::Value::Null);
+    assert_eq!(server["skipped"], serde_json::Value::Null);
+    assert!(Library::open(&a).unwrap().sync_links_enabled().unwrap());
+    assert!(Library::open(&b).unwrap().sync_links_enabled().unwrap());
+    let (client, server) = session();
+    assert_eq!(client["skipped"], true);
+    assert_eq!(server["skipped"], true);
 }

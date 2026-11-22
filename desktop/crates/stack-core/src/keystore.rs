@@ -15,16 +15,20 @@ const QR_PREFIX: &str = "stackkey1:";
 pub enum StoreError {
     /// No secret store can be reached at all (no Secret Service / portal / D-Bus service).
     Unavailable,
-    /// A store was reached but the request failed (locked and not unlocked, denied, bad item, ...).
+    /// The store is locked and the caller did not want to be asked to unlock it.
+    Locked,
+    /// A store was reached but the request failed (denied, bad item, ...).
     Failed(String),
 }
 impl StoreError {
     pub const UNAVAILABLE_TEXT: &'static str = "The computer's secret store is not available.";
+    pub const LOCKED_TEXT: &'static str = "The computer's secret store is locked.";
 }
 impl std::fmt::Display for StoreError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             StoreError::Unavailable => f.write_str(Self::UNAVAILABLE_TEXT),
+            StoreError::Locked => f.write_str(Self::LOCKED_TEXT),
             StoreError::Failed(text) => f.write_str(text),
         }
     }
@@ -94,6 +98,11 @@ pub fn saved_backup_key(store: &dyn SecretStore) -> Result<Option<BackupKey>, St
 
 /// The status without prompting: a locked store is reported as `Locked`, not unlocked.
 pub fn key_status(store: &dyn SecretStore) -> Result<KeyStatus, String> {
+    key_status_typed(store).map_err(String::from)
+}
+
+/// Like [`key_status`], with the failure kept as a [`StoreError`] so callers can tell the causes apart.
+pub fn key_status_typed(store: &dyn SecretStore) -> Result<KeyStatus, StoreError> {
     if store.is_locked()? {
         return Ok(KeyStatus::Locked);
     }
@@ -170,9 +179,68 @@ const ATTRIBUTES: [(&str, &str); 2] = [
     ("purpose", "backup-recovery-key"),
 ];
 
-fn run<T: Send>(
+/// How long to wait for the secret store to answer (connecting, asking whether it is locked).
+const ANSWER_LIMIT: std::time::Duration = std::time::Duration::from_secs(15);
+/// How long to wait when the user may have to unlock the store (a prompt is on screen).
+const UNLOCK_LIMIT: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// Waits for `work` at most `limit`; a store that never answers becomes `Unavailable`, not a hang.
+async fn within<T>(
+    limit: std::time::Duration,
+    work: impl std::future::Future<Output = Result<T, StoreError>>,
+) -> Result<T, StoreError> {
+    tokio::time::timeout(limit, work)
+        .await
+        .unwrap_or(Err(StoreError::Unavailable))
+}
+
+/// Where a sandboxed (Flatpak) app keeps its keyring file: the app's own data folder, which is always writable and
+/// kept. The launcher points `XDG_DATA_HOME` at the shared library folder, so this must not follow it.
+fn sandbox_keyring_path() -> Option<std::path::PathBuf> {
+    if !oo7::ashpd::is_sandboxed() {
+        return None;
+    }
+    let id = std::env::var("FLATPAK_ID").ok().filter(|i| !i.is_empty())?;
+    let home = std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .filter(|p| p.is_absolute())?;
+    Some(
+        home.join(".var/app")
+            .join(id)
+            .join("data/keyrings/default.keyring"),
+    )
+}
+
+/// Opens the keyring. In a Flatpak, the file keyring is opened at an explicit place inside the app's own data
+/// folder (the key comes from the Secret portal), so the app and `stack-cli` always use the same file. Elsewhere
+/// this is the Secret Service.
+async fn open_keyring() -> Result<oo7::Keyring, StoreError> {
+    let Some(path) = sandbox_keyring_path() else {
+        return oo7::Keyring::new()
+            .await
+            .map_err(|_| StoreError::Unavailable);
+    };
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|_| {
+            StoreError::Failed("The computer's secret store could not be started.".into())
+        })?;
+    }
+    let secret = oo7::ashpd::desktop::secret::retrieve()
+        .await
+        .map_err(|_| StoreError::Unavailable)?;
+    let file = oo7::file::UnlockedKeyring::load(&path, oo7::Secret::from(secret))
+        .await
+        .map_err(|_| {
+            StoreError::Failed("The computer's secret store could not be opened.".into())
+        })?;
+    Ok(oo7::Keyring::File(std::sync::Arc::new(
+        tokio::sync::RwLock::new(Some(oo7::file::Keyring::Unlocked(file))),
+    )))
+}
+
+fn run<T: Send, E>(
     unlock: bool,
-    work: impl AsyncFnOnce(oo7::Keyring) -> oo7::Result<T> + Send,
+    work: impl AsyncFnOnce(oo7::Keyring) -> Result<T, E> + Send,
 ) -> Result<T, StoreError> {
     std::thread::scope(|scope| {
         scope
@@ -186,22 +254,25 @@ fn run<T: Send>(
                         )
                     })?;
                 runtime.block_on(async {
-                    let keyring = oo7::Keyring::new()
-                        .await
-                        .map_err(|_| StoreError::Unavailable)?;
-                    // A locked store asks the user to unlock it (only when the caller needs the key).
-                    if unlock {
-                        keyring.unlock().await.map_err(|_| {
+                    let keyring = within(ANSWER_LIMIT, open_keyring()).await?;
+                    // A locked store asks the user to unlock it (only when the caller needs the key); that
+                    // prompt, and the work that may trigger one, gets the longer limit.
+                    let limit = if unlock { UNLOCK_LIMIT } else { ANSWER_LIMIT };
+                    within(limit, async {
+                        if unlock {
+                            keyring.unlock().await.map_err(|_| {
+                                StoreError::Failed(
+                                    "The computer's secret store could not be unlocked.".into(),
+                                )
+                            })?;
+                        }
+                        work(keyring).await.map_err(|_| {
                             StoreError::Failed(
-                                "The computer's secret store could not be unlocked.".into(),
+                                "The computer's secret store refused the request.".into(),
                             )
-                        })?;
-                    }
-                    work(keyring).await.map_err(|_| {
-                        StoreError::Failed(
-                            "The computer's secret store refused the request.".into(),
-                        )
+                        })
                     })
+                    .await
                 })
             })
             .join()
@@ -231,6 +302,48 @@ fn select_key(secrets: &[Zeroizing<Vec<u8>>]) -> Result<Option<Zeroizing<String>
     }
 }
 
+/// What `SystemStore::set` needs from a keyring (a trait so the order of steps can be tested with a fake).
+trait Ring {
+    /// Creates the key item, replacing the one with the same attributes.
+    async fn create(&self, hex: &str) -> Result<(), ()>;
+    /// Removes every other entry with the same attributes (older duplicates), keeping the one holding `hex`.
+    async fn prune_others(&self, hex: &str) -> Result<(), ()>;
+}
+
+/// Saves the new key first and only then tidies up, so a failed save leaves the old key in place.
+async fn replace_key(ring: &impl Ring, hex: &str) -> Result<(), ()> {
+    ring.create(hex).await?;
+    ring.prune_others(hex).await
+}
+
+/// Which of the found secrets to remove: all but the first one that holds `hex`.
+fn others_to_remove(secrets: &[Zeroizing<Vec<u8>>], hex: &str) -> Vec<usize> {
+    let keep = secrets.iter().position(|s| s.as_slice() == hex.as_bytes());
+    (0..secrets.len()).filter(|i| Some(*i) != keep).collect()
+}
+
+struct KeyringRing<'a>(&'a oo7::Keyring);
+impl Ring for KeyringRing<'_> {
+    async fn create(&self, hex: &str) -> Result<(), ()> {
+        self.0
+            .create_item(LABEL, &ATTRIBUTES, oo7::Secret::text(hex), true)
+            .await
+            .map_err(|_| ())
+    }
+    async fn prune_others(&self, hex: &str) -> Result<(), ()> {
+        let items = self.0.search_items(&ATTRIBUTES).await.map_err(|_| ())?;
+        let mut secrets = Vec::new();
+        for item in &items {
+            let secret = item.secret().await.map_err(|_| ())?;
+            secrets.push(Zeroizing::new(secret.as_bytes().to_vec()));
+        }
+        for index in others_to_remove(&secrets, hex) {
+            items[index].delete().await.map_err(|_| ())?;
+        }
+        Ok(())
+    }
+}
+
 impl SecretStore for SystemStore {
     fn get(&self) -> Result<Option<Zeroizing<String>>, StoreError> {
         let secrets = run(true, async |keyring| {
@@ -238,19 +351,14 @@ impl SecretStore for SystemStore {
             for item in keyring.search_items(&ATTRIBUTES).await? {
                 secrets.push(Zeroizing::new(item.secret().await?.as_bytes().to_vec()));
             }
-            Ok(secrets)
+            Ok::<_, oo7::Error>(secrets)
         })?;
         select_key(&secrets)
     }
     fn set(&self, hex: &str) -> Result<(), StoreError> {
         let hex = Zeroizing::new(hex.to_string());
         run(true, async move |keyring| {
-            // Replace every earlier entry, so exactly one is left.
-            keyring.delete(&ATTRIBUTES).await?;
-            keyring
-                .create_item(LABEL, &ATTRIBUTES, oo7::Secret::text(hex.as_str()), true)
-                .await
-                .map(|_| ())
+            replace_key(&KeyringRing(&keyring), &hex).await
         })
     }
     fn remove(&self) -> Result<(), StoreError> {
@@ -385,6 +493,96 @@ mod tests {
         assert_eq!(
             saved_backup_key(&store).err(),
             Some(StoreError::Failed("denied".into()))
+        );
+    }
+
+    #[test]
+    fn a_store_that_never_answers_gives_up_with_unavailable() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let started = std::time::Instant::now();
+        let result: Result<(), StoreError> = runtime.block_on(within(
+            std::time::Duration::from_millis(50),
+            std::future::pending(),
+        ));
+        assert_eq!(result, Err(StoreError::Unavailable));
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
+        // An answer in time passes through, including its own error.
+        let fast = runtime.block_on(within(std::time::Duration::from_secs(5), async {
+            Err::<(), _>(StoreError::Locked)
+        }));
+        assert_eq!(fast, Err(StoreError::Locked));
+        assert!(ANSWER_LIMIT < UNLOCK_LIMIT);
+    }
+
+    /// A fake keyring holding one old key; creating can be made to fail.
+    struct FakeRing {
+        items: Mutex<Vec<String>>,
+        fail_create: bool,
+        calls: Mutex<Vec<&'static str>>,
+    }
+    impl Ring for FakeRing {
+        async fn create(&self, hex: &str) -> Result<(), ()> {
+            self.calls.lock().unwrap().push("create");
+            if self.fail_create {
+                return Err(());
+            }
+            *self.items.lock().unwrap() = vec![hex.to_string()];
+            Ok(())
+        }
+        async fn prune_others(&self, _hex: &str) -> Result<(), ()> {
+            self.calls.lock().unwrap().push("prune");
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn a_failed_create_leaves_the_old_key_and_removes_nothing() {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        let old = "ab".repeat(32);
+        let ring = FakeRing {
+            items: Mutex::new(vec![old.clone()]),
+            fail_create: true,
+            calls: Mutex::new(Vec::new()),
+        };
+        assert!(runtime.block_on(replace_key(&ring, KEY)).is_err());
+        assert_eq!(*ring.items.lock().unwrap(), vec![old]);
+        assert_eq!(*ring.calls.lock().unwrap(), vec!["create"]);
+        let ring = FakeRing {
+            items: Mutex::new(Vec::new()),
+            fail_create: false,
+            calls: Mutex::new(Vec::new()),
+        };
+        runtime.block_on(replace_key(&ring, KEY)).unwrap();
+        assert_eq!(*ring.calls.lock().unwrap(), vec!["create", "prune"]);
+    }
+
+    #[test]
+    fn only_other_entries_are_pruned_and_the_new_key_is_kept() {
+        let item = |t: &str| Zeroizing::new(t.as_bytes().to_vec());
+        let old = "ab".repeat(32);
+        assert_eq!(others_to_remove(&[item(&old), item(KEY)], KEY), vec![0]);
+        assert_eq!(others_to_remove(&[item(KEY), item(KEY)], KEY), vec![1]);
+        assert_eq!(others_to_remove(&[item(KEY)], KEY), Vec::<usize>::new());
+        assert_eq!(others_to_remove(&[item(&old)], KEY), vec![0]);
+    }
+
+    #[test]
+    fn a_locked_store_reports_locked_text_without_key_material() {
+        assert_eq!(StoreError::Locked.to_string(), StoreError::LOCKED_TEXT);
+        let store = MemoryStore::default();
+        store
+            .locked
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(key_status_typed(&store), Ok(KeyStatus::Locked));
+        *store.fail.lock().unwrap() = Some("down".into());
+        assert_eq!(
+            key_status_typed(&store),
+            Err(StoreError::Failed("down".into()))
         );
     }
 }
