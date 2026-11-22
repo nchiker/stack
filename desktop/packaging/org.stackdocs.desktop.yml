@@ -15,6 +15,7 @@ finish-args:
   - --socket=wayland
   - --socket=fallback-x11
   - --device=dri
+  - --talk-name=org.freedesktop.secrets
   - --filesystem=xdg-data/org.stackdocs.desktop:create
   - --filesystem=xdg-config/org.stackdocs.desktop:create
   - --filesystem=xdg-config/cosmic:ro

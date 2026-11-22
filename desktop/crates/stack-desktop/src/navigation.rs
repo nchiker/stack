@@ -161,7 +161,12 @@ impl Stack {
                             .then_some(Message::Transfer(Action::Pick(Pick::ArchiveExport))),
                     ),
                 );
-            use stack_core::keystore::KeyStatus;
+            use stack_core::keystore::{KeyStatus, SecretStore};
+            // Which store holds the key (a plain word, set after the status was read).
+            let store_note = stack_core::keystore::SystemStore
+                .store_name()
+                .map(|n| format!(" Stored in: {n}."))
+                .unwrap_or_default();
             // One short row; the fingerprint is only in the tooltip. Pasting a key lives in the import panel.
             let key_row: Element<'_, Message> = match &self.transfers.key_status {
                 Some(Ok(KeyStatus::Saved { fingerprint })) => widget::row::with_capacity(2)
@@ -170,7 +175,9 @@ impl Stack {
                     .push(
                         widget::tooltip(
                             widget::text::body("Backup key: saved").width(iced::Length::Fill),
-                            widget::text::caption(format!("Fingerprint {fingerprint}")),
+                            widget::text::caption(format!(
+                                "Fingerprint {fingerprint}.{store_note}"
+                            )),
                             widget::tooltip::Position::Top,
                         )
                         .gap(4),

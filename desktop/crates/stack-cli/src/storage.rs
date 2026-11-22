@@ -301,8 +301,7 @@ pub fn run(args: &[OsString]) -> Result<()> {
         _ => Err(usage().into()),
     }
 }
-const NO_STORE: &str =
-    "No key store is available on this computer, so the saved key cannot be used";
+const NO_STORE: &str = "No secret store is available on this computer (neither the desktop portal nor the host Secret Service answered), so the saved key cannot be used";
 const BAD_KEY: &str = "That is not a Stack backup key";
 const KEY_EXISTS: &str =
     "A backup key is already saved on this computer; add --replace to replace it";
@@ -401,11 +400,21 @@ fn key_command(
             Ok(line("Backup key saved on this computer."))
         }
         Some([action]) if action == "status" => match key_status_typed(store) {
-            Ok(KeyStatus::Saved { fingerprint }) => {
-                Ok(format!("saved: yes\nfingerprint: {fingerprint}"))
+            Ok(status) => {
+                let name = store
+                    .store_name()
+                    .map(|n| format!("\nstore: {n}"))
+                    .unwrap_or_default();
+                Ok(match status {
+                    KeyStatus::Saved { fingerprint } => {
+                        format!("saved: yes\nfingerprint: {fingerprint}{name}")
+                    }
+                    KeyStatus::NotSet => format!("saved: no{name}"),
+                    KeyStatus::Locked => {
+                        format!("saved: unknown (the key store is locked){name}")
+                    }
+                })
             }
-            Ok(KeyStatus::NotSet) => Ok("saved: no".into()),
-            Ok(KeyStatus::Locked) => Ok("saved: unknown (the key store is locked)".into()),
             Err(error) => Err(store_error(error)),
         },
         Some([action]) if action == "remove" => {

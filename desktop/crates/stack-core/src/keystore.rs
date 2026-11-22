@@ -21,7 +21,7 @@ pub enum StoreError {
     Failed(String),
 }
 impl StoreError {
-    pub const UNAVAILABLE_TEXT: &'static str = "The computer's secret store is not available.";
+    pub const UNAVAILABLE_TEXT: &'static str = "No secret store is available on this computer (neither the desktop portal nor the host Secret Service answered).";
     pub const LOCKED_TEXT: &'static str = "The computer's secret store is locked.";
 }
 impl std::fmt::Display for StoreError {
@@ -50,6 +50,25 @@ pub trait SecretStore: Send + Sync {
     fn remove(&self) -> Result<(), StoreError>;
     /// True when the store is locked. Never asks the user to unlock it.
     fn is_locked(&self) -> Result<bool, StoreError>;
+    /// A plain word for the store that answered last (never the key), if one has answered.
+    fn store_name(&self) -> Option<&'static str> {
+        None
+    }
+}
+
+/// Which store answered: the app's own key file (its password from the Secret portal) or the host's Secret Service.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StoreKind {
+    PortalFile,
+    HostSecretService,
+}
+impl StoreKind {
+    pub fn name(self) -> &'static str {
+        match self {
+            StoreKind::PortalFile => "portal key file",
+            StoreKind::HostSecretService => "host Secret Service",
+        }
+    }
 }
 
 /// Reads a key from pasted or typed text: 64 hex characters, optionally with the `stackkey1:` prefix, and with
@@ -163,6 +182,9 @@ impl SecretStore for MemoryStore {
         Ok(())
     }
     fn is_locked(&self) -> Result<bool, StoreError> {
+        if self.unavailable.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(StoreError::Unavailable);
+        }
         match self.fail.lock().unwrap_or_else(|e| e.into_inner()).clone() {
             Some(message) => Err(StoreError::Failed(message)),
             None => Ok(self.locked.load(std::sync::atomic::Ordering::SeqCst)),
@@ -174,10 +196,21 @@ impl SecretStore for MemoryStore {
 /// runtime, so it is safe to call from anywhere (including inside another runtime); it blocks, so keep it off the UI thread.
 pub struct SystemStore;
 const LABEL: &str = "Stack backup recovery key";
-const ATTRIBUTES: [(&str, &str); 2] = [
-    ("application", "org.stackdocs.desktop"),
-    ("purpose", "backup-recovery-key"),
-];
+const APPLICATION: &str = "org.stackdocs.desktop";
+
+/// The item attributes. In a Flatpak the application is the Flatpak id (the shared host Secret Service must not
+/// mix up two installs, for example a test build); for the real app that id is the plain name used everywhere else.
+fn attributes() -> [(String, String); 2] {
+    let id = oo7::ashpd::is_sandboxed()
+        .then(|| std::env::var("FLATPAK_ID").ok())
+        .flatten()
+        .filter(|i| !i.is_empty())
+        .unwrap_or_else(|| APPLICATION.to_string());
+    [
+        ("application".to_string(), id),
+        ("purpose".to_string(), "backup-recovery-key".to_string()),
+    ]
+}
 
 /// How long to wait for the secret store to answer (connecting, asking whether it is locked).
 const ANSWER_LIMIT: std::time::Duration = std::time::Duration::from_secs(15);
@@ -245,15 +278,42 @@ fn copy_old_keyring(old: &std::path::Path, new: &std::path::Path) {
     }
 }
 
-/// Opens the keyring. In a Flatpak, the file keyring is opened at an explicit place inside the app's own data
-/// folder (the key comes from the Secret portal), so the app and `stack-cli` always use the same file. Elsewhere
-/// this is the Secret Service.
-async fn open_keyring() -> Result<oo7::Keyring, StoreError> {
-    let Some(path) = sandbox_keyring_path() else {
-        return oo7::Keyring::new()
-            .await
-            .map_err(|_| StoreError::Unavailable);
+/// How long the Secret portal gets to answer before the host Secret Service is tried (some desktops, for example
+/// COSMIC, have no Secret portal backend, and the call would otherwise hang).
+const PORTAL_LIMIT: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// The store that answered last: 0 none, 1 portal key file, 2 host Secret Service.
+static LAST_KIND: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+fn remember_kind(kind: StoreKind) {
+    let n = match kind {
+        StoreKind::PortalFile => 1,
+        StoreKind::HostSecretService => 2,
     };
+    LAST_KIND.store(n, std::sync::atomic::Ordering::SeqCst);
+}
+fn last_kind() -> Option<StoreKind> {
+    match LAST_KIND.load(std::sync::atomic::Ordering::SeqCst) {
+        1 => Some(StoreKind::PortalFile),
+        2 => Some(StoreKind::HostSecretService),
+        _ => None,
+    }
+}
+
+/// The host's Secret Service (org.freedesktop.secrets) over D-Bus, bypassing the portal: its default collection.
+async fn open_host_keyring() -> Result<oo7::Keyring, StoreError> {
+    let service = oo7::dbus::Service::new()
+        .await
+        .map_err(|_| StoreError::Unavailable)?;
+    let collection = service
+        .default_collection()
+        .await
+        .map_err(|_| StoreError::Unavailable)?;
+    Ok(oo7::Keyring::DBus(collection))
+}
+
+/// The app's own key file; its password comes from the Secret portal.
+async fn open_portal_keyring(path: std::path::PathBuf) -> Result<oo7::Keyring, StoreError> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|_| {
             StoreError::Failed("The computer's secret store could not be started.".into())
@@ -275,7 +335,34 @@ async fn open_keyring() -> Result<oo7::Keyring, StoreError> {
     )))
 }
 
+/// Opens one keyring. `None` is the plain desktop case (the Secret Service as `oo7` finds it). In a Flatpak the
+/// two stores are opened separately: the host Secret Service, and the app's own key file (the Secret portal, which
+/// gets only `PORTAL_LIMIT` to answer because some desktops, for example COSMIC, have no portal backend).
+async fn open_keyring(kind: Option<StoreKind>) -> Result<oo7::Keyring, StoreError> {
+    let (keyring, kind) = match kind {
+        None => (
+            oo7::Keyring::new()
+                .await
+                .map_err(|_| StoreError::Unavailable)?,
+            StoreKind::HostSecretService,
+        ),
+        Some(StoreKind::HostSecretService) => {
+            (open_host_keyring().await?, StoreKind::HostSecretService)
+        }
+        Some(StoreKind::PortalFile) => {
+            let path = sandbox_keyring_path().ok_or(StoreError::Unavailable)?;
+            (
+                within(PORTAL_LIMIT, open_portal_keyring(path)).await?,
+                StoreKind::PortalFile,
+            )
+        }
+    };
+    remember_kind(kind);
+    Ok(keyring)
+}
+
 fn run<T: Send, E>(
+    kind: Option<StoreKind>,
     unlock: bool,
     work: impl AsyncFnOnce(oo7::Keyring) -> Result<T, E> + Send,
 ) -> Result<T, StoreError> {
@@ -291,7 +378,7 @@ fn run<T: Send, E>(
                         )
                     })?;
                 runtime.block_on(async {
-                    let keyring = within(ANSWER_LIMIT, open_keyring()).await?;
+                    let keyring = within(ANSWER_LIMIT, open_keyring(kind)).await?;
                     // A locked store asks the user to unlock it (only when the caller needs the key); that
                     // prompt, and the work that may trigger one, gets the longer limit.
                     let limit = if unlock { UNLOCK_LIMIT } else { ANSWER_LIMIT };
@@ -363,12 +450,12 @@ struct KeyringRing<'a>(&'a oo7::Keyring);
 impl Ring for KeyringRing<'_> {
     async fn create(&self, hex: &str) -> Result<(), ()> {
         self.0
-            .create_item(LABEL, &ATTRIBUTES, oo7::Secret::text(hex), true)
+            .create_item(LABEL, &attributes(), oo7::Secret::text(hex), true)
             .await
             .map_err(|_| ())
     }
     async fn prune_others(&self, hex: &str) -> Result<(), ()> {
-        let items = self.0.search_items(&ATTRIBUTES).await.map_err(|_| ())?;
+        let items = self.0.search_items(&attributes()).await.map_err(|_| ())?;
         let mut secrets = Vec::new();
         for item in &items {
             let secret = item.secret().await.map_err(|_| ())?;
@@ -381,11 +468,14 @@ impl Ring for KeyringRing<'_> {
     }
 }
 
-impl SecretStore for SystemStore {
+/// One store: `None` is the plain desktop Secret Service, otherwise the given store inside a Flatpak.
+struct Single(Option<StoreKind>);
+
+impl SecretStore for Single {
     fn get(&self) -> Result<Option<Zeroizing<String>>, StoreError> {
-        let secrets = run(true, async |keyring| {
+        let secrets = run(self.0, true, async |keyring| {
             let mut secrets = Vec::new();
-            for item in keyring.search_items(&ATTRIBUTES).await? {
+            for item in keyring.search_items(&attributes()).await? {
                 secrets.push(Zeroizing::new(item.secret().await?.as_bytes().to_vec()));
             }
             Ok::<_, oo7::Error>(secrets)
@@ -394,15 +484,100 @@ impl SecretStore for SystemStore {
     }
     fn set(&self, hex: &str) -> Result<(), StoreError> {
         let hex = Zeroizing::new(hex.to_string());
-        run(true, async move |keyring| {
+        run(self.0, true, async move |keyring| {
             replace_key(&KeyringRing(&keyring), &hex).await
         })
     }
     fn remove(&self) -> Result<(), StoreError> {
-        run(true, async |keyring| keyring.delete(&ATTRIBUTES).await)
+        run(self.0, true, async |keyring| {
+            keyring.delete(&attributes()).await
+        })
     }
     fn is_locked(&self) -> Result<bool, StoreError> {
-        run(false, async |keyring| keyring.is_locked().await)
+        run(self.0, false, async |keyring| keyring.is_locked().await)
+    }
+}
+
+/// In a Flatpak: the host Secret Service first (it answers on every desktop that has one, which the portal does
+/// not), the app's own portal key file second. A key saved by Stack 0.5.0 or earlier lives in the portal file, so it
+/// is still found there (the portal is only asked when that file exists, or when the host store is unavailable).
+struct Chain<H, P> {
+    host: H,
+    portal: P,
+    portal_has_data: fn() -> bool,
+}
+impl<H: SecretStore, P: SecretStore> SecretStore for Chain<H, P> {
+    fn get(&self) -> Result<Option<Zeroizing<String>>, StoreError> {
+        let host_answered = match self.host.get() {
+            Ok(Some(key)) => return Ok(Some(key)),
+            Ok(None) => true,
+            Err(StoreError::Unavailable) => false,
+            Err(other) => return Err(other),
+        };
+        if host_answered && !(self.portal_has_data)() {
+            return Ok(None);
+        }
+        self.portal.get()
+    }
+    fn set(&self, hex: &str) -> Result<(), StoreError> {
+        match self.host.set(hex) {
+            Err(StoreError::Unavailable) => self.portal.set(hex),
+            other => other,
+        }
+    }
+    fn remove(&self) -> Result<(), StoreError> {
+        let host = self.host.remove();
+        if matches!(host, Ok(()) | Err(StoreError::Unavailable)) {
+            let host_answered = host.is_ok();
+            if !host_answered || (self.portal_has_data)() {
+                match self.portal.remove() {
+                    Err(StoreError::Unavailable) if host_answered => return Ok(()),
+                    other => return other,
+                }
+            }
+        }
+        host
+    }
+    fn is_locked(&self) -> Result<bool, StoreError> {
+        match self.host.is_locked() {
+            Err(StoreError::Unavailable) => self.portal.is_locked(),
+            other => other,
+        }
+    }
+}
+
+fn portal_file_exists() -> bool {
+    sandbox_keyring_path().is_some_and(|p| p.exists())
+        || old_sandbox_keyring_path().is_some_and(|p| p.is_file())
+}
+
+fn with_system<T>(f: impl FnOnce(&dyn SecretStore) -> T) -> T {
+    if sandbox_keyring_path().is_some() {
+        f(&Chain {
+            host: Single(Some(StoreKind::HostSecretService)),
+            portal: Single(Some(StoreKind::PortalFile)),
+            portal_has_data: portal_file_exists,
+        })
+    } else {
+        f(&Single(None))
+    }
+}
+
+impl SecretStore for SystemStore {
+    fn get(&self) -> Result<Option<Zeroizing<String>>, StoreError> {
+        with_system(|s| s.get())
+    }
+    fn set(&self, hex: &str) -> Result<(), StoreError> {
+        with_system(|s| s.set(hex))
+    }
+    fn remove(&self) -> Result<(), StoreError> {
+        with_system(|s| s.remove())
+    }
+    fn is_locked(&self) -> Result<bool, StoreError> {
+        with_system(|s| s.is_locked())
+    }
+    fn store_name(&self) -> Option<&'static str> {
+        last_kind().map(StoreKind::name)
     }
 }
 
@@ -574,6 +749,106 @@ mod tests {
         }));
         assert_eq!(fast, Err(StoreError::Locked));
         assert!(ANSWER_LIMIT < UNLOCK_LIMIT);
+        assert!(PORTAL_LIMIT < ANSWER_LIMIT);
+    }
+
+    type Fake = Chain<std::sync::Arc<MemoryStore>, std::sync::Arc<MemoryStore>>;
+    impl SecretStore for std::sync::Arc<MemoryStore> {
+        fn get(&self) -> Result<Option<Zeroizing<String>>, StoreError> {
+            (**self).get()
+        }
+        fn set(&self, hex: &str) -> Result<(), StoreError> {
+            (**self).set(hex)
+        }
+        fn remove(&self) -> Result<(), StoreError> {
+            (**self).remove()
+        }
+        fn is_locked(&self) -> Result<bool, StoreError> {
+            (**self).is_locked()
+        }
+    }
+    fn chain(portal_data: bool) -> Fake {
+        fn yes() -> bool {
+            true
+        }
+        fn no() -> bool {
+            false
+        }
+        Chain {
+            host: Default::default(),
+            portal: Default::default(),
+            portal_has_data: if portal_data { yes } else { no },
+        }
+    }
+    fn down(s: &std::sync::Arc<MemoryStore>) {
+        s.unavailable
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[test]
+    fn the_host_store_is_used_and_found_again_by_status() {
+        let c = chain(false);
+        save_key(&c, KEY).unwrap();
+        assert_eq!(c.host.get().unwrap().unwrap().as_str(), KEY);
+        assert!(c.portal.get().unwrap().is_none());
+        assert_eq!(
+            key_status(&c).unwrap(),
+            KeyStatus::Saved {
+                fingerprint: fingerprint(KEY)
+            }
+        );
+        c.remove().unwrap();
+        assert_eq!(key_status(&c).unwrap(), KeyStatus::NotSet);
+    }
+
+    #[test]
+    fn a_missing_host_store_falls_back_to_the_portal_file_and_both_missing_is_no_store() {
+        let c = chain(false);
+        down(&c.host);
+        save_key(&c, KEY).unwrap();
+        assert_eq!(c.portal.get().unwrap().unwrap().as_str(), KEY);
+        assert_eq!(c.get().unwrap().unwrap().as_str(), KEY);
+        c.remove().unwrap();
+        assert!(c.get().unwrap().is_none());
+        down(&c.portal);
+        assert_eq!(c.get(), Err(StoreError::Unavailable));
+        assert_eq!(c.set(KEY), Err(StoreError::Unavailable));
+        assert_eq!(c.remove(), Err(StoreError::Unavailable));
+        assert_eq!(c.is_locked(), Err(StoreError::Unavailable));
+        assert!(
+            StoreError::Unavailable
+                .to_string()
+                .starts_with("No secret store is available")
+        );
+    }
+
+    #[test]
+    fn a_key_in_the_old_portal_file_is_still_found_and_removed() {
+        let c = chain(true);
+        c.portal.set(KEY).unwrap();
+        assert_eq!(c.get().unwrap().unwrap().as_str(), KEY);
+        c.remove().unwrap();
+        assert!(c.portal.get().unwrap().is_none());
+        // Without such a file the portal is not even asked.
+        let c = chain(false);
+        down(&c.portal);
+        assert_eq!(c.get(), Ok(None));
+        assert_eq!(c.remove(), Ok(()));
+    }
+
+    #[test]
+    fn a_broken_host_store_is_reported_not_hidden_by_the_portal() {
+        let c = chain(true);
+        *c.host.fail.lock().unwrap() = Some("denied".into());
+        c.portal.set(KEY).unwrap();
+        assert_eq!(c.get(), Err(StoreError::Failed("denied".into())));
+        assert_eq!(c.set(KEY), Err(StoreError::Failed("denied".into())));
+    }
+
+    #[test]
+    fn store_names_are_plain_words() {
+        assert_eq!(StoreKind::PortalFile.name(), "portal key file");
+        assert_eq!(StoreKind::HostSecretService.name(), "host Secret Service");
     }
 
     /// A fake keyring holding one old key; creating can be made to fail.
