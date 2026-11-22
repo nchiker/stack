@@ -25,8 +25,8 @@ import java.util.function.Consumer;
 /**
  * Slice 6, work item P1 (docs/STACK_LINK_SLICE6_DESIGN.md sections 2 to 4, 7, 9): the phone side of link sync. Isolated libraries and
  * synthetic links only. The "desktop" is a fake peer: a bare causal state (no database) that authors link operations by the
- * production SyncGraph writer and is delivered through the production SyncExchange. Nothing announces on a real session
- * (PairingTransport.ANNOUNCE_LINKS is false), so the announcing peer is simulated with `PairingTransport.onPeerHello`.
+ * production SyncGraph writer and is delivered through the production SyncExchange. The announcing peer is simulated with
+ * `PairingTransport.onPeerHello` (PairingTransport.ANNOUNCE_LINKS is true, D4b, so a real session announces too).
  * Run with `-e linkSync true`. Written and compiled without a device; it has not been run (see the P1 notes in the design doc).
  */
 final class LinkSyncChecks {
@@ -274,8 +274,8 @@ final class LinkSyncChecks {
             int ops = p.ownOps();
             transport.onPeerHello(new HelloGate.Peer(true, false, null), true);
             require(p.ownOps() == ops && !LinkSync.enabled(p.state(), p.replica()), "a peer that does not announce links creates nothing");
-            transport.onPeerHello(new HelloGate.Peer(true, true, false));      // L3: the phone itself does not announce (ANNOUNCE_LINKS is false), so a real session never enables
-            require(p.ownOps() == ops && !LinkSync.enabled(p.state(), p.replica()) && !PairingTransport.announcesLinks(), "the phone enables only when it announces links too");
+            transport.onPeerHello(new HelloGate.Peer(true, true, false), false);      // L3: a phone that does not announce never enables
+            require(p.ownOps() == ops && !LinkSync.enabled(p.state(), p.replica()) && PairingTransport.announcesLinks(), "the phone enables only when it announces links too");
             transport.onPeerHello(new HelloGate.Peer(true, true, false), true);      // the fake announcing peer; no links at all: the marker alone keeps the operation valid
             SyncProtocol.Operation enable = p.lastOwn();
             require(p.ownOps() == ops + 1 && enable.changes.length() == 1 && enable.changes.has(SyncGraph.linkMarkerKey(p.replica())), "a zero-link enable is a marker-only operation");

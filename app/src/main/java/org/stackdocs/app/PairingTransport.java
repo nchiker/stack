@@ -247,8 +247,8 @@ final class PairingTransport {
     // Computers running Stack 0.1.0 reject unknown hello fields and close the
     // connection. After such a refusal, the next lower hello level is used for 15 minutes
     // (HelloGate ladder: frontier+features, frontier, plain).
-    /** D4b ships last: until both sides can apply link records nothing may announce `links`. */
-    private static final boolean ANNOUNCE_LINKS=false;
+    /** D4b (live): both sides can apply, keep, resolve and purge link records, so the hello announces `links` with the real enabled state. */
+    private static final boolean ANNOUNCE_LINKS=true;
     static boolean announcesLinks(){return ANNOUNCE_LINKS;}
     /** An extra listener (tests); called after the peer hello is validated, before the equal-frontier decision. P1's own enable step always runs first. */
     volatile HelloGate.Listener helloListener;
@@ -256,8 +256,8 @@ final class PairingTransport {
     private volatile boolean enabledLinksInHello;
     /**
      * P1: the peer announced links (hello gate, section 5): write this phone's metadata-only enable operation once. It is never
-     * deferred and carries a marker cell, so it is valid with no links at all. With ANNOUNCE_LINKS=false nothing announces, so on
-     * a real session this does nothing; tests call it with a fake announcing peer.
+     * deferred and carries a marker cell, so it is valid with no links at all. A real session runs this when the desktop
+     * announces links; tests also call it with a fake announcing peer.
      */
     void onPeerHello(HelloGate.Peer peer)throws Exception {onPeerHello(peer,ANNOUNCE_LINKS);}
     /** L3: both sides must announce: the phone only enables links for a peer when it announces them too (`weAnnounce`; tests pass true). */

@@ -297,7 +297,7 @@ impl Library {
     }
 
     /// The hello hook (after the hello reply, before the first bundle): a peer that announced links makes this
-    /// side enable once. Returns whether an operation was written. Nothing here announces anything.
+    /// side enable once. Returns whether an operation was written. The hello itself is built in `stack-transport`.
     pub fn sync_links_on_hello(&mut self, peer_announces_links: bool) -> Result<bool> {
         if peer_announces_links {
             self.sync_enable_links()

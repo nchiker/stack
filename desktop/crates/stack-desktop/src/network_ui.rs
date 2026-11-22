@@ -104,7 +104,7 @@ pub fn execute(library: &mut stack_core::library::Library, request: Request) -> 
     let notice = match request {
         Request::Accepted { stream, control } => {
             // After the hello reply and before the first bundle: a phone that announces links makes this side
-            // enable once (the phone does not announce yet, so today this never fires).
+            // enable once (the phone announces links, D4b).
             let result = stack_transport::serve_accepted_library_with(
                 library,
                 stream,

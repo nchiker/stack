@@ -109,11 +109,10 @@ state, receipt and bundle publication boundaries. File replay never regresses a
 verified acknowledgment. Paired TLS/native controls reuse the same apply path and
 remain distinct from unperformed Android runtime exchange.
 
-## Link records (slice 6; implemented, not yet announced)
+## Link records (slice 6; implemented and announced)
 
-Status: both sides can read, write, resolve and purge link cells, but no device announces `links` yet
-(`ANNOUNCE_LINKS=false` in Rust `stack-transport` and Java `PairingTransport`; the switch ships last), so no link cell
-is created today. Wire version stays 1, graph model stays 2, archive format stays 4. The kernel is unchanged. Design:
+Status: both sides can read, write, resolve and purge link cells, and both devices now announce `links`
+(`ANNOUNCE_LINKS=true` in Rust `stack-transport` and Java `PairingTransport`; D4b), with `enabled` derived from history. Wire version stays 1, graph model stays 2, archive format stays 4. The kernel is unchanged. Design:
 `../STACK_LINK_SLICE6_DESIGN.md`.
 
 Hello: optional `"features":["links"]` and optional `"enabled":true|false`, after `frontier`. Absent means the peer does

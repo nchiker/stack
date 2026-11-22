@@ -139,8 +139,8 @@ struct Hello {
     /// unknown hello fields. Equal frontiers end the session after the hello.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     frontier: Option<BTreeMap<String, u64>>,
-    /// Optional feature list, e.g. `["links"]`. Never sent while
-    /// `ANNOUNCE_LINKS` is false (D4b flips it, shipping last); always accepted.
+    /// Optional feature list, e.g. `["links"]`. Sent when
+    /// `ANNOUNCE_LINKS` is true (D4b, live); always accepted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     features: Option<Vec<String>>,
     /// Sent with `features` by a device that announces `links`.
@@ -148,10 +148,9 @@ struct Hello {
     enabled: Option<bool>,
 }
 
-/// D4b switch (slice 6, section 5): this build never announces `features`.
-/// Flip only when links can be applied, kept, resolved and purged (D5, P1, P2,
-/// D6 all shipped). The send path below is complete but dormant.
-const ANNOUNCE_LINKS: bool = false;
+/// D4b switch (slice 6, section 5): this build announces `features: ["links"]` and the real `enabled`.
+/// Flipped last, once links can be applied, kept, resolved and purged (D5, P1, P2, D6 all shipped).
+const ANNOUNCE_LINKS: bool = true;
 /// How long a refused ladder level is remembered for one peer.
 const REFUSAL_MEMORY: Duration = Duration::from_secs(15 * 60);
 
@@ -589,9 +588,12 @@ fn check_group(library: &Library, policy: &Policy) -> Result<Hello> {
         group: policy.group.clone(),
         replica,
         frontier: Some(serde_json::from_value(status["frontier"].clone())?),
-        // D5 supplies the real enabled flag when D4b turns announcing on.
         features: ANNOUNCE_LINKS.then(|| vec!["links".to_owned()]),
-        enabled: ANNOUNCE_LINKS.then_some(false),
+        enabled: if ANNOUNCE_LINKS {
+            Some(library.sync_links_enabled()?)
+        } else {
+            None
+        },
     })
 }
 
@@ -1201,11 +1203,13 @@ mod tests {
         let before = Library::open(&b).unwrap().sync_status().unwrap();
         let (policy, cert, key, roots) = credentials(&a).unwrap();
         let mut local = check_group(&Library::open(&a).unwrap(), &policy).unwrap();
-        assert!(local.features.is_none() && local.enabled.is_none());
+        // D4b is live: the local hello announces links with the real (here still disabled) state.
+        assert_eq!(local.features.as_deref(), Some(&["links".to_owned()][..]));
+        assert_eq!(local.enabled, Some(false));
         assert!(
-            !String::from_utf8(serde_json::to_vec(&local).unwrap())
+            String::from_utf8(serde_json::to_vec(&local).unwrap())
                 .unwrap()
-                .contains("features")
+                .contains("\"features\":[\"links\"],\"enabled\":false")
         );
         local.frontier = None;
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -1420,7 +1424,7 @@ mod tests {
         hello(&mut pipe, &local_hello(true, true), &test_policy(), false).unwrap();
         let sent = sent_body(&pipe);
         assert!(sent.get("features").is_none() && sent.get("enabled").is_none());
-        const { assert!(!ANNOUNCE_LINKS) }; // D4b ships last
+        const { assert!(ANNOUNCE_LINKS) }; // D4b is live
     }
 
     #[test]

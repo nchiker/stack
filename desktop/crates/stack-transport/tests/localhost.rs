@@ -83,9 +83,11 @@ fn paired_localhost_applies_and_acknowledges_then_replays_safely() {
     );
     // Adoption leaves both sides with the same operations, so the session ends
     // after hello and each records the other's advertised frontier as its receipt.
+    // D4b: both sides announce `links` (M1 rule). These entry points use the no-op hello hook, so neither side
+    // ever enables and the equal-frontier session is never skipped, but receipts are still recorded.
     let (client, server) = run_pair(a.clone(), b.clone(), port());
-    assert_eq!(client["skipped"], true);
-    assert_eq!(server["skipped"], true);
+    assert_eq!(client["skipped"], serde_json::Value::Null);
+    assert_eq!(server["skipped"], serde_json::Value::Null);
     let status = Library::open(&b).unwrap().sync_status().unwrap();
     assert_eq!(status["library"], group);
     assert_eq!(status["pending_gaps"], 0);
@@ -113,8 +115,8 @@ fn paired_localhost_applies_and_acknowledges_then_replays_safely() {
     assert_eq!(client["received"]["applied"], 0);
     assert_eq!(client["status"]["pending_gaps"], 0);
     let (client, server) = run_pair(a, b, port());
-    assert_eq!(client["skipped"], true);
-    assert_eq!(server["skipped"], true);
+    assert_eq!(client["skipped"], serde_json::Value::Null);
+    assert_eq!(server["skipped"], serde_json::Value::Null);
 }
 
 #[test]
@@ -199,7 +201,7 @@ fn interrupted_connection_can_reconnect_without_advancing_receipts() {
     assert!(listener.join().unwrap().is_err());
     assert_eq!(Library::open(&b).unwrap().sync_status().unwrap(), before);
     let (_, server) = run_pair(a.clone(), b.clone(), port());
-    assert_eq!(server["skipped"], true);
+    assert_eq!(server["skipped"], serde_json::Value::Null); // no-op hook: links never enabled, so no equal-frontier skip
     assert_eq!(
         Library::open(&b).unwrap().sync_status().unwrap()["library"],
         group

@@ -192,7 +192,7 @@ Slice 3 handoff (archive format 4 and encrypted exports): `docs/STACK_LINK_SLICE
 
 `stat`/`refresh` calls (`LinkChecker`: owner identity checked first, 5 s limit, own thread pool, one call per owner, compare-and-set write; only a well-formed `exists:false` makes `missing`), provider `removed` (`{ok:true, changed:bool}`; unknown id is a no-op; `moved`/`unshared`/`delete` answer `unknown_method`), states `live|unreachable|missing|trashed` with `state_since` (missing for 30 days becomes trashed; trashed for 30 days is deleted), Recently deleted for links, "Check linked documents", detail-screen messages and an "Update saved copy" button when the hash changed. Checks: `LinkLifecycleChecks`.
 
-## Slice 6, sync of link records (built, not yet announced)
+## Slice 6, sync of link records (built and announced)
 
 Full design and implementation notes: `STACK_LINK_SLICE6_DESIGN.md`. Wire details: `desktop/INTEROP_SYNC_PROTOCOL_V1.md`.
 
@@ -210,8 +210,8 @@ Full design and implementation notes: `STACK_LINK_SLICE6_DESIGN.md`. Wire detail
   acknowledges; titles, Filen paths and possibly old text stay in sync history.
 - **Setup.** Nothing to install or run: both apps announce links in the sync handshake and the next Sync does the rest.
   An older desktop still syncs documents. An older desktop build cannot open a library the new desktop has upgraded (schema 6).
-- **Status.** Both sides are built and tested, but nothing announces `links` yet (`ANNOUNCE_LINKS=false`, step D4b ships last),
-  so no link cells exist on the wire today. Real-LAN test (T3) and the Flatpak launch test (6b) are still to do.
+- **Status.** Both sides are built, tested and announce `links` (`ANNOUNCE_LINKS=true`, step D4b is live),
+  so link cells now travel once a side enables. Real-LAN test (T3) and the Flatpak launch test (6b) are still to do.
 
 ## Work by project
 

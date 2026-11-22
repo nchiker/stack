@@ -53,7 +53,7 @@ public final class HelloGateHost {
             check(!h.has("features") && !h.has("enabled"), "announce=false level " + level + " sends nothing");
             check(h.has("frontier") == (level != HelloGate.PLAIN), "announce=false level " + level + " frontier");
         }
-        check(!PairingTransportAnnounces.value(), "PairingTransport.ANNOUNCE_LINKS is false");
+        check(PairingTransportAnnounces.value(), "PairingTransport.ANNOUNCE_LINKS is true");
         JSONObject f = HelloGate.apply(base(), HelloGate.FRONTIER_FEATURES, true, fr, true);
         check(f.has("frontier") && f.getJSONArray("features").length() == 1 && "links".equals(f.getJSONArray("features").getString(0)) && f.getBoolean("enabled"), "announce level shape");
         check(!HelloGate.apply(base(), HelloGate.FRONTIER, true, fr, true).has("features"), "frontier level has no features");
