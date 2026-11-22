@@ -18,3 +18,4 @@ rustix = { workspace = true, features = ["termios", "stdio"] }
 
 [dev-dependencies]
 tempfile.workspace = true
+sha2.workspace = true

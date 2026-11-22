@@ -3,14 +3,23 @@ use stack_core::{RenderSize, Rotation};
 use stack_render::{Renderer, fixtures};
 use std::path::PathBuf;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     let result = run();
     let text_shutdown = stack_render::shutdown_text_worker();
     let shutdown = stack_render::shutdown_pdf_worker();
-    result?;
-    text_shutdown?;
-    shutdown?;
-    Ok(())
+    let failure = result
+        .err()
+        .or_else(|| text_shutdown.err().map(Into::into))
+        .or_else(|| shutdown.err().map(Into::into));
+    if let Some(error) = failure {
+        eprintln!("{}", failure_line(error.as_ref()));
+        std::process::exit(1);
+    }
+}
+
+/// The one line printed for a failure: the human message (Display), never the Debug form.
+fn failure_line(error: &dyn std::error::Error) -> String {
+    format!("Error: {error}")
 }
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -64,4 +73,23 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         _ => return Err("Usage: stack-cli fixtures NEW_DIRECTORY | render-smoke FIXTURE_DIRECTORY NEW_OUTPUT_DIRECTORY".into()),
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use stack_archive::crypto::EnvelopeError;
+
+    #[test]
+    fn failures_print_the_human_message_not_the_debug_form() {
+        let error = stack_core::library::Error::Archive(stack_archive::Error::Envelope(
+            EnvelopeError::WrongKey,
+        ));
+        assert_eq!(
+            failure_line(&error),
+            "Error: Wrong passphrase or recovery key, or damaged."
+        );
+        let text: Box<dyn std::error::Error> = "Use show or hide".into();
+        assert_eq!(failure_line(text.as_ref()), "Error: Use show or hide");
+    }
 }

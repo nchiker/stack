@@ -146,6 +146,16 @@ pub struct Ui {
     pub store: Option<Arc<dyn stack_core::keystore::SecretStore>>,
 }
 impl Ui {
+    /// `private_store`: smoke runs and demos use an in-memory key store and never touch the computer's real one.
+    pub fn new(private_store: bool) -> Self {
+        Self {
+            store: private_store.then(|| {
+                Arc::new(stack_core::keystore::MemoryStore::default())
+                    as Arc<dyn stack_core::keystore::SecretStore>
+            }),
+            ..Default::default()
+        }
+    }
     pub fn secret_store(&self) -> Arc<dyn stack_core::keystore::SecretStore> {
         self.store
             .clone()
@@ -375,9 +385,10 @@ impl Stack {
             Action::RemoveKey if !self.transfers.busy() => {
                 let store = self.transfers.secret_store();
                 return cosmic::task::future(async move {
-                    let result = tokio::task::spawn_blocking(move || store.remove())
-                        .await
-                        .unwrap_or_else(|_| Err("Removing the key failed.".into()));
+                    let result =
+                        tokio::task::spawn_blocking(move || store.remove().map_err(String::from))
+                            .await
+                            .unwrap_or_else(|_| Err("Removing the key failed.".into()));
                     Message::Transfer(Action::KeyRemoved(result))
                 });
             }
@@ -482,6 +493,7 @@ impl Stack {
                         let result = tokio::task::spawn_blocking(move || {
                             stack_core::keystore::saved_backup_key(store.as_ref())
                                 .map(|key| key.map(Arc::new))
+                                .map_err(String::from)
                         })
                         .await
                         .unwrap_or_else(|_| Err("The saved key could not be read.".into()));
@@ -490,7 +502,10 @@ impl Stack {
                 }
                 self.begin_transfer(Kind::Archive(files[0].clone(), None))
             }
-            Pick::ArchiveExport => self.begin_transfer(Kind::ExportArchive(files[0].clone())),
+            Pick::ArchiveExport => self.begin_transfer(Kind::ExportArchive(
+                files[0].clone(),
+                crate::operations::KeySource(self.transfers.secret_store()),
+            )),
             Pick::Pdf { token, .. } => self.begin_transfer(Kind::ExportPdf {
                 token,
                 destination: files[0].clone(),
@@ -617,12 +632,14 @@ impl Stack {
                 if active.control.check().is_err() {
                     return self.discard_transfer();
                 }
-                active.phase =
-                    if matches!(active.kind, Kind::ExportArchive(_) | Kind::ExportPdf { .. }) {
-                        Phase::Writing
-                    } else {
-                        Phase::Reading
-                    };
+                active.phase = if matches!(
+                    active.kind,
+                    Kind::ExportArchive(..) | Kind::ExportPdf { .. }
+                ) {
+                    Phase::Writing
+                } else {
+                    Phase::Reading
+                };
                 let request = TransferRequest::Run {
                     id,
                     control: active.control.clone(),
@@ -736,13 +753,34 @@ impl Stack {
                 destination,
                 cleanup_needed,
                 pdf,
+                encrypted,
+                no_key_store,
+                links,
             }) => {
                 let Some(active) = self.transfers.active.as_mut().filter(|a| a.id == id) else {
                     return app::Task::none();
                 };
                 active.published = true;
+                let archive_note = match (pdf.is_some(), encrypted, links) {
+                    (true, ..) => String::new(),
+                    (false, encrypted, links) => format!(
+                        " {} {}.",
+                        if encrypted {
+                            "Encrypted with the saved backup key;"
+                        } else if no_key_store {
+                            "Not encrypted (no key store on this computer);"
+                        } else {
+                            "Not encrypted (no backup key is saved);"
+                        },
+                        match links {
+                            0 => "no linked documents".to_string(),
+                            1 => "1 linked document included".to_string(),
+                            n => format!("{n} linked documents included"),
+                        }
+                    ),
+                };
                 self.transfers.status = Some(format!(
-                    "{} published to {}{} {}",
+                    "{} published to {}{}{}{}",
                     if pdf.is_some() { "PDF" } else { "Archive" },
                     destination.display(),
                     if cleanup_needed {
@@ -750,7 +788,9 @@ impl Stack {
                     } else {
                         "."
                     },
-                    pdf.map(|mode| mode.text_status()).unwrap_or("")
+                    archive_note,
+                    pdf.map(|mode| format!(" {}", mode.text_status()))
+                        .unwrap_or_default()
                 ));
                 self.transfers.retry = None;
                 self.discard_transfer()
@@ -781,7 +821,10 @@ impl Stack {
                 if matches!(active.kind, Kind::Source(_)) {
                     return self.next_import();
                 }
-                if matches!(active.kind, Kind::ExportArchive(_) | Kind::ExportPdf { .. }) {
+                if matches!(
+                    active.kind,
+                    Kind::ExportArchive(..) | Kind::ExportPdf { .. }
+                ) {
                     return app::Task::none();
                 }
                 if active.committed.is_some() && matches!(active.kind, Kind::Archive(..)) {

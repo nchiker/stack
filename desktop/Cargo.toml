@@ -38,7 +38,7 @@ iced-winit = { package = "iced_winit", git = "https://github.com/pop-os/libcosmi
 tokio = { version = "=1.53.3", features = ["rt", "time", "sync"] }
 rusqlite = { version = "=0.40.2", features = ["bundled"] }
 uuid = { version = "=1.28.0", features = ["v4", "v5"] }
-rustix = { version = "=1.1.5", features = ["fs"] }
+rustix = { version = "=1.1.5", features = ["fs", "rand"] }
 tempfile = "=3.27.0"
 qrcodegen = "=1.8.0"
 

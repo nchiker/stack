@@ -284,9 +284,35 @@ pub struct SnapshotWork {
     directory: PathBuf,
     root: PathBuf,
     lease: Arc<StageLease>,
+    /// Link rows in archive column order, each with whether `links/<id>.pdf` exists. Empty unless this is an
+    /// export snapshot of a library that has linked documents.
+    links: Vec<(Value, bool)>,
+}
+/// Pins one stored file into the snapshot directory: a hard link when possible, otherwise a private copy.
+fn pin_file(source: &Path, target: &Path, length: u64, control: &Control) -> Result<()> {
+    stack_archive::read_regular(source)?;
+    private_dir(target.parent().expect("pinned parent"))?;
+    if fs::hard_link(source, target).is_err() {
+        stack_archive::reserve_space(target.parent().expect("parent"), length)?;
+        let mut input = stack_archive::read_regular(source)?;
+        let mut output = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(target)?;
+        stack_archive::transfer(&mut input, &mut output, length, control)?;
+        output.sync_all()?;
+        fs::set_permissions(target, fs::Permissions::from_mode(0o400))?;
+    }
+    Ok(())
 }
 impl SnapshotWork {
     pub fn pin(self, control: &Control) -> Result<FrozenSnapshot> {
+        self.pin_for(false, control)
+    }
+    /// Pins the snapshot. `encrypted` is true when it will be wrapped in the envelope, which only holds format 4
+    /// (an empty `links` array when there are no linked documents, like the phone).
+    pub fn pin_for(self, encrypted: bool, control: &Control) -> Result<FrozenSnapshot> {
         let directory = self.directory.clone();
         private_dir(&directory.join("originals"))?;
         for entry in self.manifest.rows("files") {
@@ -296,28 +322,12 @@ impl SnapshotWork {
             stack_archive::read_directory(&self.root.join("originals").join(doc))?;
             let source = self.root.join(path);
             let target = directory.join(path);
-            stack_archive::read_regular(&source)?;
-            private_dir(target.parent().expect("original parent"))?;
-            if fs::hard_link(&source, &target).is_err() {
-                stack_archive::reserve_space(
-                    target.parent().expect("parent"),
-                    entry["length"].as_u64().expect("length"),
-                )?;
-                let mut input = stack_archive::read_regular(&source)?;
-                let mut output = OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .mode(0o600)
-                    .open(&target)?;
-                stack_archive::transfer(
-                    &mut input,
-                    &mut output,
-                    entry["length"].as_u64().expect("length"),
-                    control,
-                )?;
-                output.sync_all()?;
-                fs::set_permissions(&target, fs::Permissions::from_mode(0o400))?;
-            }
+            pin_file(
+                &source,
+                &target,
+                entry["length"].as_u64().expect("length"),
+                control,
+            )?;
             if stack_archive::file_hash(
                 &target,
                 entry["length"].as_u64().expect("length"),
@@ -327,8 +337,54 @@ impl SnapshotWork {
                 return Err(Error::Invalid("A saved original is missing or changed"));
             }
         }
+        let manifest = if self.links.is_empty() && !encrypted {
+            self.manifest
+        } else {
+            // Format 4: the link rows plus one pinned, hashed preview per link that has one. The whole graph is
+            // validated again, so what is written always passes the reader's checks.
+            let mut graph = self.manifest.into_json();
+            let mut rows = Vec::new();
+            let mut files = graph["files"].as_array().cloned().unwrap_or_default();
+            if self.links.iter().any(|(_, preview)| *preview) {
+                private_dir(&directory.join("previews"))?;
+            }
+            for (row, preview) in &self.links {
+                control.check()?;
+                if *preview {
+                    let id = row["id"].as_str().expect("link id");
+                    let source = self.root.join(preview_file(id));
+                    // A preview file that is gone is skipped, as the phone does; the link row stays without one.
+                    let opened = stack_archive::read_directory(&self.root.join("links"))
+                        .and_then(|_| stack_archive::read_regular(&source));
+                    let file = match opened {
+                        Ok(file) => file,
+                        Err(stack_archive::Error::Io(e))
+                            if e.kind() == std::io::ErrorKind::NotFound =>
+                        {
+                            rows.push(row.clone());
+                            continue;
+                        }
+                        Err(e) => return Err(e.into()),
+                    };
+                    let length = file.metadata()?.len();
+                    if length == 0 || length > stack_archive::links::MAX_PREVIEW {
+                        return Err(Error::Invalid("A saved link preview has an invalid size"));
+                    }
+                    let path = stack_archive::links::preview_path(id);
+                    let target = directory.join(&path);
+                    pin_file(&source, &target, length, control)?;
+                    let sha256 = stack_archive::file_hash(&target, length, control)?;
+                    files.push(json!({"path":path,"length":length,"sha256":sha256}));
+                }
+                rows.push(row.clone());
+            }
+            graph["version"] = json!(4);
+            graph["files"] = Value::Array(files);
+            graph["links"] = Value::Array(rows);
+            Manifest::from_value(graph)?
+        };
         Ok(FrozenSnapshot {
-            manifest: self.manifest,
+            manifest,
             directory,
             _lease: self.lease.clone(),
         })
@@ -477,6 +533,39 @@ impl FrozenSnapshot {
         let file = self.directory.join(path);
         stack_archive::read_regular(&file)?;
         Ok(file)
+    }
+    /// How many linked documents this snapshot carries (0 for format 3).
+    pub fn link_count(&self) -> usize {
+        self.manifest
+            .json()
+            .get("links")
+            .and_then(Value::as_array)
+            .map_or(0, Vec::len)
+    }
+    /// Writes the archive inside the encrypted envelope, with one recovery slot made from `key` (a recovery key,
+    /// not a passphrase). Random bytes come from the operating system. The key is not kept.
+    pub fn write_encrypted(
+        &self,
+        output: &mut impl Write,
+        key: &BackupKey,
+        control: &Control,
+    ) -> Result<()> {
+        if self.manifest.source_version() != 4 {
+            return Err(Error::Invalid(
+                "Encrypted exports need the format 4 archive",
+            ));
+        }
+        if !key.recovery {
+            return Err(Error::Invalid(
+                "Exports are encrypted with the recovery key",
+            ));
+        }
+        let key = stack_archive::crypto::RecoveryKey::parse(&key.text)?;
+        let mut writer = stack_archive::crypto::encrypt_with_recovery_key(&mut *output, &key)?;
+        drop(key);
+        stack_archive::write(&self.manifest, &self.directory, &mut writer, control)?;
+        writer.finish()?;
+        Ok(())
     }
     pub fn write(&self, output: &mut impl Write, control: &Control) -> Result<()> {
         Ok(stack_archive::write(
@@ -954,7 +1043,13 @@ impl Library {
 
     pub fn prepare_snapshot(&self, control: &Control) -> Result<SnapshotWork> {
         self.ensure_sync_exportable()?;
-        self.prepare_snapshot_for(None, control)
+        self.prepare_snapshot_for(None, false, control)
+    }
+    /// The snapshot an archive export writes: like [`Library::prepare_snapshot`], plus the linked documents
+    /// (format 4) when the library has any. Everything is read here, on the repository, in one consistent view.
+    pub fn prepare_export_snapshot(&self, control: &Control) -> Result<SnapshotWork> {
+        self.ensure_sync_exportable()?;
+        self.prepare_snapshot_for(None, true, control)
     }
     pub fn prepare_document_snapshot(
         &self,
@@ -962,11 +1057,12 @@ impl Library {
         control: &Control,
     ) -> Result<SnapshotWork> {
         self.checked_token(token)?;
-        self.prepare_snapshot_for(Some(&token.id), control)
+        self.prepare_snapshot_for(Some(&token.id), false, control)
     }
     fn prepare_snapshot_for(
         &self,
         document: Option<&str>,
+        with_links: bool,
         control: &Control,
     ) -> Result<SnapshotWork> {
         control.check()?;
@@ -999,12 +1095,55 @@ impl Library {
             let id = doc["id"].as_str().expect("ID");
             graph["decision_evidence"][id] = json!(validation::current_evidence(&graph, id));
         }
+        let links = if with_links {
+            self.link_rows_for_export()?
+        } else {
+            Vec::new()
+        };
         Ok(SnapshotWork {
             manifest: Manifest::from_value(graph)?,
             directory,
             root: self.root.clone(),
             lease,
+            links,
         })
+    }
+    /// Link rows with exactly the archive columns (`LinkArchive.FIELDS`); the local lifecycle columns are not
+    /// exported. The local row id is the archive id, so `previews/<id>.pdf` matches `links/<id>.pdf`.
+    fn link_rows_for_export(&self) -> Result<Vec<(Value, bool)>> {
+        let mut statement = self.db.prepare(
+            "SELECT row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,title_user_edited,added_at,text,preview FROM link_records WHERE state<>'trashed' ORDER BY added_at,row_id",
+        )?;
+        let rows = statement
+            .query_map([], |r| {
+                Ok((
+                    json!({
+                        "id": r.get::<_, String>(0)?,
+                        "owner": r.get::<_, String>(1)?,
+                        "link_id": r.get::<_, String>(2)?,
+                        "kind": r.get::<_, String>(3)?,
+                        "title": r.get::<_, String>(4)?,
+                        "mime": r.get::<_, String>(5)?,
+                        "modified": r.get::<_, i64>(6)?,
+                        "hash": r.get::<_, String>(7)?,
+                        "shared": r.get::<_, i64>(8)?,
+                        "protected": r.get::<_, i64>(9)?,
+                        "locators": r.get::<_, String>(10)?,
+                        "state": r.get::<_, String>(11)?,
+                        "title_user_edited": r.get::<_, i64>(12)?,
+                        "added_at": r.get::<_, i64>(13)?,
+                        "text": r.get::<_, String>(14)?,
+                    }),
+                    r.get::<_, i64>(15)? != 0,
+                ))
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        if rows.len() > stack_archive::links::LINK_LIMIT {
+            return Err(Error::Invalid(
+                "Too many linked documents to export (the limit is 1000)",
+            ));
+        }
+        Ok(rows)
     }
     pub fn snapshot(&mut self, control: &Control) -> Result<FrozenSnapshot> {
         self.prepare_snapshot(control)?.pin(control)
@@ -1019,12 +1158,30 @@ impl Library {
             _lock: self._lock.clone(),
         })
     }
-    pub fn export_archive(&mut self, destination: &Path, control: &Control) -> Result<()> {
-        let snapshot = self.snapshot(control)?;
+    /// Exports the whole library (format 4 when it has linked documents, otherwise format 3). With a key the file
+    /// is wrapped in the encrypted envelope; without one it is plain.
+    pub fn export_archive_with_key(
+        &mut self,
+        destination: &Path,
+        key: Option<&BackupKey>,
+        control: &Control,
+    ) -> Result<()> {
+        let snapshot = self
+            .prepare_export_snapshot(control)?
+            .pin_for(key.is_some(), control)?;
         let output = self.prepare_output()?;
-        output.publish_with_probe(destination, control, &mut self.probe, |file, control| {
-            snapshot.write(file, control)
-        })
+        output.publish_with_probe(
+            destination,
+            control,
+            &mut self.probe,
+            |file, control| match key {
+                Some(key) => snapshot.write_encrypted(file, key, control),
+                None => snapshot.write(file, control),
+            },
+        )
+    }
+    pub fn export_archive(&mut self, destination: &Path, control: &Control) -> Result<()> {
+        self.export_archive_with_key(destination, None, control)
     }
 
     /// Raw image/PDF ingestion uses the same staged graph/atomic publication path.

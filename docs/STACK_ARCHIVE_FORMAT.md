@@ -307,7 +307,7 @@ The manifest and file table are inside the encryption.
   an unfinished or failed restore removes them. The receipt carries `links_added`, `links_skipped`, `encrypted`. Linked documents show in All
   documents and search (title and saved text, labelled "Linked document"), open to a read-only view (saved preview page 1, saved text), with no
   Open and no editing in the UI; the stored columns keep the locators, hash and flags so a desktop editor could use them later. The desktop does
-  not write link records into its own exports (its archives stay format 3) and does not sync them (slice 6). The key is typed or pasted into a
+  not sync link records (slice 6); its exports are described under "Desktop writer" below. The key is typed or pasted into a
   password field (desktop) or read from a file or stdin without echo (`stack-cli archive ROOT restore FILE --saved-key|--key-file PATH|--key-stdin|
   --passphrase-file PATH|--passphrase-stdin`; never a command-line value), held zeroed-on-drop, and never printed, logged or stored.
   Saved key (2026-11-21): the desktop keeps the recovery key itself, like the phone. Backup & restore shows one short row: "Backup key: saved" with a
@@ -326,6 +326,25 @@ The manifest and file table are inside the encryption.
   **Setting up a new computer:** in Key Vault click "Copy Stack key"; in Stack choose Import backup, pick the backup, and click "Paste key from Key Vault"
   (it opens the backup for review and saves the key on this computer). The fingerprint (menu tooltip) should match the one Key Vault or the phone shows. After that
   encrypted backups open without asking. The Backup & restore menu shows the key status and a Remove button.
+
+- Desktop writer (2026-11-22): the desktop export writes what the phone writes. `Library::prepare_export_snapshot` reads the `link_records` rows in the same
+  repository call as the document graph (so rows and graph are one view); `SnapshotWork::pin_for(encrypted, ...)` then hard-links (or copies) each
+  `links/<row id>.pdf` into the private snapshot as `previews/<row id>.pdf`, hashes the pinned copy and adds its `files` row, sets `version` 4 and the
+  `links` array, and validates the whole graph again (`Manifest::from_value`, the reader's own checks). Link rows carry exactly the `LinkArchive.FIELDS`
+  columns, with the local row id as the archive id; lifecycle-local data is never exported (the desktop has none besides `preview`, and `state` is
+  written as stored: `unreachable` after a restore). More than 1000 links fails the export with a plain message. Without linked documents and without
+  encryption the file stays format 3 exactly as before. Sync, per-document and PDF snapshots never carry links.
+  No key store (2026-11-22): when the secret store cannot be reached at all (`keystore::StoreError::Unavailable`: no Secret Service, portal or D-Bus service), the desktop export proceeds plain and the saved message says "Not encrypted (no key store on this computer)". A reachable store that fails (locked and not unlocked, denied, a bad entry) still stops the export and writes nothing; no key saved on a reachable store is plain with "no backup key is saved". `stack-cli archive ROOT export FILE --saved-key` never falls back to plain: an unreachable store is an error there.
+  Encryption: `FrozenSnapshot::write_encrypted` wraps the same stream with `crypto::encrypt_with_recovery_key`: one recovery slot (`slot_count` 1),
+  a fresh 16-byte salt and data key from the operating system (`getrandom`, through rustix's `rand` feature; no new crate), 600,000 iterations (unused by
+  a recovery slot but part of the header), slot key derived from the recovery key and zeroed. An encrypted file always holds format 4 (an empty `links`
+  array when there are none, as on the phone), because the reader refuses anything else inside an envelope. A random-source failure aborts the export.
+  Policy: the desktop export encrypts with the saved backup key when one is saved and writes a plain file when none is; a saved key that cannot be read
+  stops the export (nothing is written) rather than silently writing plain. Export never accepts a passphrase and never asks for a key. The saved message
+  says "Encrypted with the saved backup key" or "Not encrypted (no backup key is saved)" and how many linked documents were included.
+  CLI: `stack-cli archive ROOT export NEW_FILE [--saved-key]` (no key on the command line; without the flag the file is plain).
+  Tests: `stack-core/tests/export_links.rs` (round trips plain and encrypted, exact columns, wrong or missing key refused, format 3 without links,
+  random salt), `stack-desktop` controller test for the saved message.
 
 ### Shared test vector (envelope v1)
 Inputs: salt = bytes 100..115; passphrase `correct horse`, 600,000 iterations; recovery key = bytes 200..231 (slot key =

@@ -10,16 +10,42 @@ use zeroize::Zeroizing;
 /// Prefix of the QR payload the phone and Key Vault show for the key.
 const QR_PREFIX: &str = "stackkey1:";
 
+/// Why the secret store failed. Fixed generic texts only: never key material or system error text.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum StoreError {
+    /// No secret store can be reached at all (no Secret Service / portal / D-Bus service).
+    Unavailable,
+    /// A store was reached but the request failed (locked and not unlocked, denied, bad item, ...).
+    Failed(String),
+}
+impl StoreError {
+    pub const UNAVAILABLE_TEXT: &'static str = "The computer's secret store is not available.";
+}
+impl std::fmt::Display for StoreError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StoreError::Unavailable => f.write_str(Self::UNAVAILABLE_TEXT),
+            StoreError::Failed(text) => f.write_str(text),
+        }
+    }
+}
+impl std::error::Error for StoreError {}
+impl From<StoreError> for String {
+    fn from(error: StoreError) -> String {
+        error.to_string()
+    }
+}
+
 /// Where the saved key lives. Implementations hold at most one key. Errors are short generic texts.
 pub trait SecretStore: Send + Sync {
     /// The saved key as 64 lowercase hex characters, if any.
-    fn get(&self) -> Result<Option<Zeroizing<String>>, String>;
+    fn get(&self) -> Result<Option<Zeroizing<String>>, StoreError>;
     /// Saves (replaces) the key; `hex` is 64 lowercase hex characters.
-    fn set(&self, hex: &str) -> Result<(), String>;
+    fn set(&self, hex: &str) -> Result<(), StoreError>;
     /// Removes the saved key; removing nothing is fine.
-    fn remove(&self) -> Result<(), String>;
+    fn remove(&self) -> Result<(), StoreError>;
     /// True when the store is locked. Never asks the user to unlock it.
-    fn is_locked(&self) -> Result<bool, String>;
+    fn is_locked(&self) -> Result<bool, StoreError>;
 }
 
 /// Reads a key from pasted or typed text: 64 hex characters, optionally with the `stackkey1:` prefix, and with
@@ -62,7 +88,7 @@ pub fn save_key(store: &dyn SecretStore, text: &str) -> Result<String, String> {
 }
 
 /// The saved key ready for opening a backup, if one is saved.
-pub fn saved_backup_key(store: &dyn SecretStore) -> Result<Option<BackupKey>, String> {
+pub fn saved_backup_key(store: &dyn SecretStore) -> Result<Option<BackupKey>, StoreError> {
     Ok(store.get()?.map(|hex| BackupKey::recovery(hex.to_string())))
 }
 
@@ -85,25 +111,30 @@ pub struct MemoryStore {
     key: Mutex<Option<Zeroizing<String>>>,
     /// When set, every call fails with this text (to test an unavailable secret store).
     pub fail: Mutex<Option<String>>,
+    /// When set, every call reports that no secret store can be reached (`StoreError::Unavailable`).
+    pub unavailable: std::sync::atomic::AtomicBool,
     /// Pretends the store is locked: `is_locked` says so, and any read or write counts as an unlock.
     pub locked: std::sync::atomic::AtomicBool,
     /// How many times a read or write would have had to unlock the store.
     pub unlocks: std::sync::atomic::AtomicUsize,
 }
 impl MemoryStore {
-    fn check(&self) -> Result<(), String> {
+    fn check(&self) -> Result<(), StoreError> {
         use std::sync::atomic::Ordering::SeqCst;
+        if self.unavailable.load(SeqCst) {
+            return Err(StoreError::Unavailable);
+        }
         if self.locked.load(SeqCst) {
             self.unlocks.fetch_add(1, SeqCst);
         }
         match self.fail.lock().unwrap_or_else(|e| e.into_inner()).clone() {
-            Some(message) => Err(message),
+            Some(message) => Err(StoreError::Failed(message)),
             None => Ok(()),
         }
     }
 }
 impl SecretStore for MemoryStore {
-    fn get(&self) -> Result<Option<Zeroizing<String>>, String> {
+    fn get(&self) -> Result<Option<Zeroizing<String>>, StoreError> {
         self.check()?;
         Ok(self
             .key
@@ -112,19 +143,19 @@ impl SecretStore for MemoryStore {
             .as_ref()
             .map(|k| Zeroizing::new(k.to_string())))
     }
-    fn set(&self, hex: &str) -> Result<(), String> {
+    fn set(&self, hex: &str) -> Result<(), StoreError> {
         self.check()?;
         *self.key.lock().unwrap_or_else(|e| e.into_inner()) = Some(Zeroizing::new(hex.to_string()));
         Ok(())
     }
-    fn remove(&self) -> Result<(), String> {
+    fn remove(&self) -> Result<(), StoreError> {
         self.check()?;
         *self.key.lock().unwrap_or_else(|e| e.into_inner()) = None;
         Ok(())
     }
-    fn is_locked(&self) -> Result<bool, String> {
+    fn is_locked(&self) -> Result<bool, StoreError> {
         match self.fail.lock().unwrap_or_else(|e| e.into_inner()).clone() {
-            Some(message) => Err(message),
+            Some(message) => Err(StoreError::Failed(message)),
             None => Ok(self.locked.load(std::sync::atomic::Ordering::SeqCst)),
         }
     }
@@ -142,50 +173,66 @@ const ATTRIBUTES: [(&str, &str); 2] = [
 fn run<T: Send>(
     unlock: bool,
     work: impl AsyncFnOnce(oo7::Keyring) -> oo7::Result<T> + Send,
-) -> Result<T, String> {
+) -> Result<T, StoreError> {
     std::thread::scope(|scope| {
         scope
             .spawn(|| {
                 let runtime = tokio::runtime::Builder::new_current_thread()
                     .enable_all()
                     .build()
-                    .map_err(|_| "The computer's secret store could not be started.".to_string())?;
+                    .map_err(|_| {
+                        StoreError::Failed(
+                            "The computer's secret store could not be started.".into(),
+                        )
+                    })?;
                 runtime.block_on(async {
                     let keyring = oo7::Keyring::new()
                         .await
-                        .map_err(|_| "The computer's secret store is not available.".to_string())?;
+                        .map_err(|_| StoreError::Unavailable)?;
                     // A locked store asks the user to unlock it (only when the caller needs the key).
                     if unlock {
                         keyring.unlock().await.map_err(|_| {
-                            "The computer's secret store could not be unlocked.".to_string()
+                            StoreError::Failed(
+                                "The computer's secret store could not be unlocked.".into(),
+                            )
                         })?;
                     }
-                    work(keyring)
-                        .await
-                        .map_err(|_| "The computer's secret store refused the request.".to_string())
+                    work(keyring).await.map_err(|_| {
+                        StoreError::Failed(
+                            "The computer's secret store refused the request.".into(),
+                        )
+                    })
                 })
             })
             .join()
-            .unwrap_or_else(|_| Err("The computer's secret store failed.".to_string()))
+            .unwrap_or_else(|_| {
+                Err(StoreError::Failed(
+                    "The computer's secret store failed.".into(),
+                ))
+            })
     })
 }
 
 /// The one saved key among the secrets found: none is `None`; exactly one valid key is `Some`; several items or an
 /// item that is not a valid key is an error (a generic text, never key bytes).
-fn select_key(secrets: &[Zeroizing<Vec<u8>>]) -> Result<Option<Zeroizing<String>>, String> {
+fn select_key(secrets: &[Zeroizing<Vec<u8>>]) -> Result<Option<Zeroizing<String>>, StoreError> {
     match secrets {
         [] => Ok(None),
         [one] => std::str::from_utf8(one)
             .ok()
             .and_then(parse_key_text)
             .map(Some)
-            .ok_or_else(|| "The saved item in the secret store is not a Stack key.".to_string()),
-        _ => Err("The secret store holds more than one Stack key entry.".to_string()),
+            .ok_or_else(|| {
+                StoreError::Failed("The saved item in the secret store is not a Stack key.".into())
+            }),
+        _ => Err(StoreError::Failed(
+            "The secret store holds more than one Stack key entry.".into(),
+        )),
     }
 }
 
 impl SecretStore for SystemStore {
-    fn get(&self) -> Result<Option<Zeroizing<String>>, String> {
+    fn get(&self) -> Result<Option<Zeroizing<String>>, StoreError> {
         let secrets = run(true, async |keyring| {
             let mut secrets = Vec::new();
             for item in keyring.search_items(&ATTRIBUTES).await? {
@@ -195,7 +242,7 @@ impl SecretStore for SystemStore {
         })?;
         select_key(&secrets)
     }
-    fn set(&self, hex: &str) -> Result<(), String> {
+    fn set(&self, hex: &str) -> Result<(), StoreError> {
         let hex = Zeroizing::new(hex.to_string());
         run(true, async move |keyring| {
             // Replace every earlier entry, so exactly one is left.
@@ -206,10 +253,10 @@ impl SecretStore for SystemStore {
                 .map(|_| ())
         })
     }
-    fn remove(&self) -> Result<(), String> {
+    fn remove(&self) -> Result<(), StoreError> {
         run(true, async |keyring| keyring.delete(&ATTRIBUTES).await)
     }
-    fn is_locked(&self) -> Result<bool, String> {
+    fn is_locked(&self) -> Result<bool, StoreError> {
         run(false, async |keyring| keyring.is_locked().await)
     }
 }
@@ -270,7 +317,9 @@ mod tests {
             select_key(&[Zeroizing::new(vec![0xff, 0xfe])]),
         ] {
             let message = bad.unwrap_err();
-            assert!(!message.contains(KEY) && !message.contains("not a key"));
+            assert!(
+                !message.to_string().contains(KEY) && !message.to_string().contains("not a key")
+            );
         }
     }
 
@@ -317,5 +366,25 @@ mod tests {
         assert_eq!(key_status(&store).unwrap(), KeyStatus::NotSet);
         *store.fail.lock().unwrap() = Some("down".into());
         assert_eq!(key_status(&store), Err("down".into()));
+    }
+
+    #[test]
+    fn an_unreachable_store_is_told_apart_from_a_failing_one() {
+        let store = MemoryStore::default();
+        store
+            .unavailable
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(
+            saved_backup_key(&store).err(),
+            Some(StoreError::Unavailable)
+        );
+        store
+            .unavailable
+            .store(false, std::sync::atomic::Ordering::SeqCst);
+        *store.fail.lock().unwrap() = Some("denied".into());
+        assert_eq!(
+            saved_backup_key(&store).err(),
+            Some(StoreError::Failed("denied".into()))
+        );
     }
 }

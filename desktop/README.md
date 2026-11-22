@@ -50,7 +50,8 @@ has a single writer.
 ```sh
 stack-cli library ROOT status|manifest|search TEXT|rename ID TITLE|notes ID TEXT|delete ID
 stack-cli library ROOT stack-create NAME ARGB show|hide|stack-rename ID NAME|stack-delete ID
-stack-cli archive ROOT review|restore|export FILE.stackbackup
+stack-cli archive ROOT review FILE.stackbackup [--full]   # short summary; --full adds the id mapping
+stack-cli archive ROOT restore|export FILE.stackbackup
 stack-cli sync ROOT status
 ```
 

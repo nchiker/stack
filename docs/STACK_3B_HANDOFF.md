@@ -76,7 +76,7 @@ Done
 Left / not done
 - Real phone-made backup (2026-11-21, `Stack-2026-11-21-182252.stackbackup`, 218 MB from test phone, key-only envelope) was reviewed with the CLI (format 4, encrypted, 164 documents, 2 links, 0 skipped) and then, after the key-storage and guided-import work, imported end to end in the desktop test app by the user with the key copied from Key Vault ("it worked"). Real key store (`oo7`) checked by hand (user, 2026-11-22): the desktop test build (not the Flatpak) opened a backup using the key from the real key path. Not yet checked: the Flatpak's own store (Secret portal), which needs a Flatpak build. (The Backup & restore menu looked fine in the real sidebar and the Key Vault clipboard test passed, per the user.)
 - The CLI needs `STACK_PDFIUM_LIBRARY` for any backup with link previews (the packaged app ships PDFium). `review` prints the full id mapping JSON (very long); consider a short form.
-- The desktop export (and any export) still writes format 3 without link records, so a desktop round trip drops linked documents. Sync of link records is slice 6.
+- (2026-11-22) The desktop export now writes format 4 with linked documents and encrypts with the saved key (see the archive doc, "Desktop writer"). Not yet checked by hand on a real keyring or against the phone reading a desktop-made file. Sync of link records is slice 6. With no key store on the computer at all the desktop export is plain (message says so); a reachable store that errors still stops the export.
 - Linked view shows page 1 of the preview only, and the first 20,000 characters of text. No stacks, tags, notes or delete for linked documents yet.
 - Link rows are not removed or aged by any lifecycle on the desktop (no checks; they stay `unreachable`).
 - Typed key text passes through iced widget strings that cannot be zeroed; the copy kept by the app is zeroed after use.
@@ -87,7 +87,19 @@ Left / not done
 - Key Vault (separate repo `~/Projects/APK-Keys`, nchiker/keyvault-tool, commit 22425ff): compact menu-bar window and a "Copy Stack key" button (clipboard with a sensitive hint, overwritten after 60 s, cleared on close/signals), reviewed read-only by Opus (fixes applied, 22 tests). Clipboard hand test passed (user, 2026-11-21: "all good"). Still unchecked by hand: menus and tooltips, and the QR button after its worker code changed. Two minor nits: green status text is faint on the grey panel; the "Key copied" message is orange like a warning.
 - Two other ignored desktop tests (`ordinary_desktop_import_reads_text_offline_and_preserves_typed_draft`, `application_pdf_import_reorder_subset_and_output_use_saved_snapshot`) already fail without an OCR runtime; PDFium tests must be run one at a time (`PdfiumLibraryBindingsAlreadyInitialized` otherwise). New crates from the `oo7` work (oo7 0.6.0, ashpd 0.13.13, cbc, hkdf, md-5, num*, serde_bytes, zeroize_derive) were fetched with the user's approval; oo7 0.7.3 needs a newer tokio than the pinned 1.53.3.
 
+Update (2026-11-22): desktop export and interop test bed
+- Desktop export writes format 4 with linked documents, encrypted with the saved key when there is one (commit ca26f16; Opus read-only review: no critical/high,
+  findings fixed). No key saved: plain, message says so. No key store at all: plain, message says so. Key store reachable but erroring: export refused, nothing written.
+  Trashed links and missing preview files are skipped. `stack-cli archive ROOT export FILE --saved-key` encrypts; it never falls back to plain. CLI errors now print the
+  human message (1e9e2e1).
+- Interop test bed (782eec8; dev-only, synthetic public test key, never the real key or keyring): `desktop/crates/stack-cli/examples/archive_interop.rs` (make/check/reexport),
+  `desktop/tools/test_android_archive_interop.py` (+ `_test.py`; `--desktop-only` needs no phone; phone steps locked to test phone 0A121JEC203530 and the TEST build),
+  `desktop/tools/test_archive_envelope_host.py` + `java/EnvelopeHost.java` (Java vs Rust envelope on this computer), phone side `InteropChecks.java`.
+  Run on the test phone 2026-11-22: desktop->phone (plain and encrypted), phone->desktop, and the full loop all passed; nothing left on the phone. Not covered: the real window,
+  the Flatpak and its Secret portal, the real keyring export path, Key Vault menus/QR (hand checks), and the phone re-reading into its original library (read phase needs a fresh one).
+  Needs PDFium for desktop steps (`STACK_PDFIUM_LIBRARY`, set by the harness only on those subprocesses).
+
 Next
-1. User hand checks listed above (Key Vault menus/tooltips and QR button, Flatpak; the real keyring passed 2026-11-22) before any release; fix what they show.
-2. Decide with the user: desktop export of linked documents (format 4, encrypted; needs an OS random source) vs leaving it to slice 6; link count in CLI Status JSON.
+1. User hand checks (Key Vault menus/tooltips and QR button; the desktop export button with a real saved key; Flatpak) before any release; fix what they show.
+2. Sync of link records is slice 6.
 3. A desktop release (Flatpak build and publish) only on the user's explicit go-ahead. Rule for all work: setup must live in the app, never in scripts or dev-machine paths (see `CLAUDE.md`).

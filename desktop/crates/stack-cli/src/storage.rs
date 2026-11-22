@@ -245,8 +245,15 @@ pub fn run(args: &[OsString]) -> Result<()> {
             report(&library.edit_stacks(library.revision()?, StackEdit::Order(ids), &control)?)
         }
         ("archive", "validate" | "review" | "restore", [input, options @ ..]) => {
+            // `--full` (review/validate only) prints the whole id mapping instead of the short summary.
+            let full = options.iter().any(|o| o == "--full");
+            if full && action == "restore" {
+                return Err(usage().into());
+            }
+            let options: Vec<OsString> =
+                options.iter().filter(|o| *o != "--full").cloned().collect();
             // An encrypted backup needs its key: from a file or from stdin (no echo on a terminal), never an argument.
-            let key = backup_key(options)?;
+            let key = backup_key(&options)?;
             let staged = library.stage_archive_with_key(
                 &mut stack_archive::read_regular(Path::new(input))?,
                 key.as_ref(),
@@ -256,17 +263,64 @@ pub fn run(args: &[OsString]) -> Result<()> {
             let plan = library.review_archive(&staged)?;
             if action == "restore" {
                 report(&library.commit_archive(&plan, &control)?)
-            } else {
+            } else if full {
                 report(plan.review())
+            } else {
+                report(&review_summary(plan.review()))
             }
         }
-        ("archive", "export", [output]) => {
-            library.export_archive(Path::new(output), &control)?;
-            println!("Archive published.");
+        ("archive", "export", [output, options @ ..]) => {
+            // The only option is `--saved-key`: encrypt with the key the desktop app saved on this computer.
+            // Without it the file is plain. A key is never accepted as an argument.
+            let key = match options {
+                [] => None,
+                [flag] if flag == "--saved-key" => Some(saved_key()?),
+                _ => return Err(usage().into()),
+            };
+            let links = library.link_count()?;
+            library.export_archive_with_key(Path::new(output), key.as_ref(), &control)?;
+            println!(
+                "Archive published ({}, {links} linked documents).",
+                if key.is_some() {
+                    "encrypted"
+                } else {
+                    "not encrypted"
+                }
+            );
             Ok(())
         }
         _ => Err(usage().into()),
     }
+}
+/// The key the desktop app saved on this computer. The user asked for it, so a missing key store is an error here
+/// (the CLI never falls back to a plain file).
+fn saved_key() -> Result<stack_core::BackupKey> {
+    use stack_core::keystore::{StoreError, SystemStore, saved_backup_key};
+    match saved_backup_key(&SystemStore) {
+        Ok(Some(key)) => Ok(key),
+        Ok(None) => Err("No backup key is saved on this computer".into()),
+        Err(StoreError::Unavailable) => Err(
+            "No key store is available on this computer, so the saved key cannot be used".into(),
+        ),
+        Err(error) => Err(error.into()),
+    }
+}
+/// Short review output: the counts and warnings, without the id mapping (`--full` prints that).
+fn review_summary(receipt: &stack_core::RestoreReceipt) -> serde_json::Value {
+    let mut warnings = Vec::new();
+    if !receipt.encrypted {
+        warnings.push("Not encrypted, so it cannot be checked for tampering");
+    }
+    serde_json::json!({
+        "format": receipt.source_version,
+        "encrypted": receipt.encrypted,
+        "documents": receipt.documents_added,
+        "links_imported": receipt.links_added,
+        "links_skipped": receipt.links_skipped,
+        "existing_documents_skipped": receipt.document_collisions,
+        "matching_stacks": receipt.merged_stacks,
+        "warnings": warnings,
+    })
 }
 /// `--saved-key` (the key saved on this computer by the desktop app, from the OS secret store), `--key-file PATH`, `--key-stdin`, `--passphrase-file PATH`, `--passphrase-stdin`. The secret is read into a
 /// buffer that is zeroed on drop; it is never printed, logged or accepted as a command-line value.
@@ -275,9 +329,7 @@ fn backup_key(options: &[OsString]) -> Result<Option<stack_core::BackupKey>> {
     let (recovery, source) = match options {
         [] => return Ok(None),
         [flag] if flag == "--saved-key" => {
-            return stack_core::keystore::saved_backup_key(&stack_core::keystore::SystemStore)?
-                .ok_or_else(|| "No backup key is saved on this computer".into())
-                .map(Some);
+            return saved_key().map(Some);
         }
         [flag] if flag == "--key-stdin" => (true, None),
         [flag] if flag == "--passphrase-stdin" => (false, None),
@@ -367,7 +419,7 @@ fn visibility(value: &str) -> Result<bool> {
     }
 }
 fn usage() -> &'static str {
-    "Usage: stack-cli library ROOT status|reindex|manifest|journal|search QUERY [STACK]|import FILE TITLE|rename ID TITLE|notes ID TEXT|file ID [STACK...]|detail ID JSON_FILE|remove-detail ID FIELD|delete ID|page-order ID PAGE...|stack-create NAME COLOR show/hide|stack-rename ID NAME|stack-visibility ID show/hide|stack-delete ID|stack-order ID...; stack-cli archive ROOT validate|review|restore FILE [--saved-key|--key-file PATH|--key-stdin|--passphrase-file PATH|--passphrase-stdin]|export NEW_FILE; stack-cli m1-fixtures M0_FIXTURES NEW_DIRECTORY"
+    "Usage: stack-cli library ROOT status|reindex|manifest|journal|search QUERY [STACK]|import FILE TITLE|rename ID TITLE|notes ID TEXT|file ID [STACK...]|detail ID JSON_FILE|remove-detail ID FIELD|delete ID|page-order ID PAGE...|stack-create NAME COLOR show/hide|stack-rename ID NAME|stack-visibility ID show/hide|stack-delete ID|stack-order ID...; stack-cli archive ROOT validate|review|restore FILE [--saved-key|--key-file PATH|--key-stdin|--passphrase-file PATH|--passphrase-stdin] (validate|review print a short summary; add --full for the whole id mapping)|export NEW_FILE [--saved-key]; stack-cli m1-fixtures M0_FIXTURES NEW_DIRECTORY"
 }
 
 /// External SIGKILL harness hook, restricted to explicit synthetic /tmp roots.
@@ -479,5 +531,24 @@ mod tests {
         );
         fs::write(&file, "\n").unwrap();
         assert!(backup_key(&args(&["--key-file", file.to_str().unwrap()])).is_err());
+    }
+
+    #[test]
+    fn review_summary_is_short_and_has_no_mapping() {
+        let receipt: stack_core::RestoreReceipt = serde_json::from_value(serde_json::json!({
+            "operation": "op", "documents_added": 3, "document_collisions": 1, "merged_stacks": 2,
+            "source_version": 4, "source_hash": "h", "links_added": 5, "links_skipped": 6,
+            "mappings": {"documents": {"a": "b"}, "pages": {}, "stacks": {}, "tags": {}, "scans": {}}
+        }))
+        .unwrap();
+        let v = review_summary(&receipt);
+        assert_eq!(v["format"], 4);
+        assert_eq!(v["encrypted"], false);
+        assert_eq!(v["documents"], 3);
+        assert_eq!(v["links_imported"], 5);
+        assert_eq!(v["links_skipped"], 6);
+        assert_eq!(v["existing_documents_skipped"], 1);
+        assert_eq!(v["warnings"].as_array().unwrap().len(), 1);
+        assert!(v.get("mappings").is_none());
     }
 }

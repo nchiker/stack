@@ -136,6 +136,7 @@ fn encrypted_format4_restores_links_read_only_and_unreachable() {
     assert!(receipt.summary().contains("2 linked documents imported"));
     assert!(!receipt.summary().contains("not encrypted"));
     assert_eq!(library.link_count().unwrap(), 2);
+    assert_eq!(library.status().unwrap().links, 2);
 
     let hits = library.search("zebra", None, Sort::Newest, 100).unwrap();
     assert_eq!(hits.len(), 1);

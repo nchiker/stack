@@ -18,12 +18,22 @@ pub enum Kind {
     Source(PathBuf),
     /// A backup file and, for an encrypted one, its key. The key is zeroed when the last clone drops.
     Archive(PathBuf, Option<Arc<stack_core::BackupKey>>),
-    ExportArchive(PathBuf),
+    /// The destination and where to look for the saved backup key (read on the transfer worker, never on the UI thread).
+    ExportArchive(PathBuf, KeySource),
     ExportPdf {
         token: stack_core::library::DocumentToken,
         destination: PathBuf,
     },
 }
+/// The secret store an export asks for the saved backup key.
+#[derive(Clone)]
+pub struct KeySource(pub Arc<dyn stack_core::keystore::SecretStore>);
+impl std::fmt::Debug for KeySource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("KeySource")
+    }
+}
+
 #[derive(Clone)]
 pub enum RepoRequest {
     Prepare {
@@ -73,13 +83,18 @@ pub enum TransferOutcome {
         destination: PathBuf,
         cleanup_needed: bool,
         pdf: Option<stack_render::pdf::Mode>,
+        /// Archive exports only: whether the file is encrypted, and how many linked documents it carries.
+        encrypted: bool,
+        /// True when the file is plain because no secret store could be reached on this computer.
+        no_key_store: bool,
+        links: usize,
     },
     Discarded(String),
 }
 
 pub enum Work {
     Input(ImportWork, Kind),
-    Export(SnapshotWork, OutputWork, PathBuf),
+    Export(SnapshotWork, OutputWork, PathBuf, KeySource),
     Pdf(SnapshotWork, OutputWork, PathBuf, String),
 }
 #[derive(Default)]
@@ -105,10 +120,11 @@ pub fn repository(
             control.check()?;
             let work = match kind.clone() {
                 Kind::Source(_) | Kind::Archive(..) => Work::Input(library.prepare_import()?, kind),
-                Kind::ExportArchive(destination) => Work::Export(
-                    library.prepare_snapshot(&control)?,
+                Kind::ExportArchive(destination, keys) => Work::Export(
+                    library.prepare_export_snapshot(&control)?,
                     library.prepare_output()?,
                     destination,
+                    keys,
                 ),
                 Kind::ExportPdf { token, destination } => Work::Pdf(
                     library.prepare_document_snapshot(&token, &control)?,
@@ -277,7 +293,7 @@ pub fn start(store: Store) -> Worker<TransferRequest, TransferOutcome> {
                                         false,
                                     )
                                 }
-                                Kind::ExportArchive(_) | Kind::ExportPdf { .. } => {
+                                Kind::ExportArchive(..) | Kind::ExportPdf { .. } => {
                                     return Err(Error::Stale);
                                 }
                             };
@@ -287,11 +303,34 @@ pub fn start(store: Store) -> Worker<TransferRequest, TransferOutcome> {
                             slot.staged = Some(Arc::new(staged));
                             Ok(TransferOutcome::Staged { id, archive })
                         }
-                        Work::Export(work, output, destination) => {
-                            let snapshot = work.pin(&control)?;
+                        Work::Export(work, output, destination, keys) => {
+                            // A saved key means an encrypted file; none means plain. A store that cannot be
+                            // reached at all (no key store on this computer) also means plain. Any other
+                            // failure on a reachable store stops the export, so a file is never left plain
+                            // by accident.
+                            let mut no_key_store = false;
+                            let key = match stack_core::keystore::saved_backup_key(keys.0.as_ref())
+                            {
+                                Ok(key) => key,
+                                Err(stack_core::keystore::StoreError::Unavailable) => {
+                                    no_key_store = true;
+                                    None
+                                }
+                                Err(_) => {
+                                    return Err(Error::Invalid(
+                                        "The saved backup key could not be read; nothing was exported",
+                                    ));
+                                }
+                            };
+                            let encrypted = key.is_some();
+                            let snapshot = work.pin_for(encrypted, &control)?;
+                            let links = snapshot.link_count();
                             let cleanup_needed =
                                 match output.publish(&destination, &control, |file, control| {
-                                    snapshot.write(file, control)
+                                    match &key {
+                                        Some(key) => snapshot.write_encrypted(file, key, control),
+                                        None => snapshot.write(file, control),
+                                    }
                                 }) {
                                     Ok(()) => false,
                                     Err(Error::PublishedExport(_)) => true,
@@ -302,6 +341,9 @@ pub fn start(store: Store) -> Worker<TransferRequest, TransferOutcome> {
                                 destination,
                                 cleanup_needed,
                                 pdf: None,
+                                encrypted,
+                                no_key_store,
+                                links,
                             })
                         }
                         Work::Pdf(work, output, destination, document) => {
@@ -328,6 +370,9 @@ pub fn start(store: Store) -> Worker<TransferRequest, TransferOutcome> {
                                 destination,
                                 cleanup_needed,
                                 pdf: Some(plan.mode),
+                                encrypted: false,
+                                no_key_store: false,
+                                links: 0,
                             })
                         }
                     }

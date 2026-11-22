@@ -62,6 +62,7 @@ pub struct Status {
     pub pages: usize,
     pub stacks: usize,
     pub originals: usize,
+    pub links: usize,
     pub journal_events: i64,
     pub tombstones: i64,
 }
@@ -245,6 +246,7 @@ impl Library {
             pages: manifest.rows("pages").len(),
             stacks: manifest.rows("stacks").len(),
             originals: manifest.rows("files").len(),
+            links: self.link_count()?,
             journal_events: self
                 .db
                 .query_row("SELECT count(*) FROM journal", [], |r| r.get(0))?,

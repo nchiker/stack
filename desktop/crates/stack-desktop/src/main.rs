@@ -409,6 +409,7 @@ impl cosmic::Application for Stack {
             nav.insert().text("Receipts");
         }
         nav.activate_position(0);
+        let private_store = flags.smoke.is_some() || flags.demo.is_some();
         let operation_store: operations::Store = Arc::default();
         let transfer_worker = Some(operations::start(operation_store.clone()));
         let repository = flags.library.clone().map(|root| {
@@ -436,7 +437,7 @@ impl cosmic::Application for Stack {
             scenario_step: 0,
             repository,
             transfer_worker,
-            transfers: Default::default(),
+            transfers: transfers_ui::Ui::new(private_store),
             sync: Default::default(),
             renderer: Some(renderer),
             thumbnail_worker: Some(thumbnails::start()),

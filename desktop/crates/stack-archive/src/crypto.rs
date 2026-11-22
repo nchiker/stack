@@ -432,6 +432,51 @@ pub fn encrypt_to<W: Write>(
     })
 }
 
+/// Fills `buffer` from the operating system's random source (the `getrandom` call). Fails rather than falling back.
+pub fn os_random(buffer: &mut [u8]) -> io::Result<()> {
+    let mut filled = 0;
+    while filled < buffer.len() {
+        match rustix::rand::getrandom(&mut buffer[filled..], rustix::rand::GetRandomFlags::empty())
+        {
+            Ok(0) => {
+                return Err(io::Error::other(
+                    "The system random source returned nothing.",
+                ));
+            }
+            Ok(n) => filled += n,
+            Err(rustix::io::Errno::INTR) => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(())
+}
+
+/// Starts a key-only envelope (one recovery slot, `slot_count` 1) with a fresh random salt and data key from the
+/// operating system. The slot key is derived here and zeroed on return.
+pub fn encrypt_with_recovery_key<W: Write>(out: W, key: &RecoveryKey) -> Result<EncryptWriter<W>> {
+    let mut failure: Option<io::Error> = None;
+    let mut random = |buffer: &mut [u8]| {
+        if failure.is_none()
+            && let Err(error) = os_random(buffer)
+        {
+            buffer.fill(0);
+            failure = Some(error);
+        }
+    };
+    let mut salt = [0u8; SALT];
+    random(&mut salt);
+    let slot_key = recovery_slot_key(key, &salt);
+    let slots = [Slot {
+        slot_type: SLOT_RECOVERY,
+        key: &slot_key,
+    }];
+    let writer = encrypt_to(out, &salt, MIN_ITERATIONS, &slots, &mut random);
+    match failure {
+        Some(error) => Err(error.into()),
+        None => writer,
+    }
+}
+
 /// Holds back one chunk so the final one can carry the last flag. Call [`EncryptWriter::finish`].
 pub struct EncryptWriter<W: Write> {
     out: W,

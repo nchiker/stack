@@ -21,7 +21,7 @@ import java.util.function.Consumer;
 
 /** Slice 2c (Stack side): preview drawing, display text, the owner launcher, render markers. Synthetic data only. */
 final class LinkUiChecks {
-    private static byte[] pdf(int pages, int width, int height, String label) throws IOException {
+    static byte[] pdf(int pages, int width, int height, String label) throws IOException {
         PdfDocument document = new PdfDocument();
         for (int i = 0; i < pages; i++) {
             PdfDocument.Page page = document.startPage(new PdfDocument.PageInfo.Builder(width, height, i + 1).create());

@@ -1015,7 +1015,9 @@ impl Driver {
         };
         let mut core = Core::default();
         core.set_main_window_id(Some(iced::window::Id::RESERVED));
-        let (app, task) = Stack::init(core, flags);
+        let (mut app, task) = Stack::init(core, flags);
+        // Tests never reach the computer's real secret store; a test that needs a key sets its own.
+        app.transfers.store = Some(Arc::new(MemoryStore::default()));
         let mut driver = Self {
             app,
             tasks: SelectAll::new(),
@@ -1372,6 +1374,77 @@ fn click_workspace(app: &Stack, label: &str, size: iced::Size) -> Vec<Message> {
         .unwrap();
     }
     messages
+}
+
+/// Export uses the saved backup key when there is one and says plainly whether the file is encrypted.
+#[test]
+fn archive_export_is_encrypted_with_the_saved_key_and_says_so() {
+    let _serial = CONTROLLERS.lock().unwrap();
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let directory = tempfile::tempdir().unwrap();
+            let fixtures = directory.path().join("fixtures");
+            stack_render::fixtures::create(&fixtures).unwrap();
+            let store = Arc::new(MemoryStore::default());
+            let mut driver = Driver::new(directory.path().join("library"));
+            driver.settle().await;
+            driver.app.transfers.store = Some(store.clone());
+            driver
+                .pick(Pick::Documents, vec![fixtures.join("corners.png")])
+                .await;
+            let plain = directory.path().join("plain.stackbackup");
+            driver.pick(Pick::ArchiveExport, vec![plain.clone()]).await;
+            let status = driver.app.transfers.status.clone().unwrap();
+            assert!(status.starts_with("Archive published"), "{status}");
+            assert!(status.contains("Not encrypted"), "{status}");
+            assert!(status.contains("no linked documents"), "{status}");
+            assert_eq!(&std::fs::read(&plain).unwrap()[..8], stack_archive::MAGIC);
+
+            store.set(&"ab".repeat(32)).unwrap();
+            let sealed = directory.path().join("sealed.stackbackup");
+            driver.pick(Pick::ArchiveExport, vec![sealed.clone()]).await;
+            let status = driver.app.transfers.status.clone().unwrap();
+            assert!(
+                status.contains("Encrypted with the saved backup key"),
+                "{status}"
+            );
+            assert!(!status.contains(&"ab".repeat(32)));
+            assert_eq!(
+                &std::fs::read(&sealed).unwrap()[..8],
+                stack_archive::crypto::ENVELOPE_MAGIC
+            );
+
+            // A store that is reachable but fails stops the export instead of writing a plain file.
+            *store.fail.lock().unwrap() = Some("denied".into());
+            let refused = directory.path().join("refused.stackbackup");
+            driver
+                .pick(Pick::ArchiveExport, vec![refused.clone()])
+                .await;
+            assert!(!refused.exists());
+            let status = driver.app.transfers.status.clone().unwrap_or_default();
+            assert!(!status.contains("published"), "{status}");
+
+            // No key store on this computer at all: the export proceeds plain and says why.
+            *store.fail.lock().unwrap() = None;
+            store
+                .unavailable
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+            let unkeyed = directory.path().join("unkeyed.stackbackup");
+            driver
+                .pick(Pick::ArchiveExport, vec![unkeyed.clone()])
+                .await;
+            let status = driver.app.transfers.status.clone().unwrap();
+            assert!(status.starts_with("Archive published"), "{status}");
+            assert!(
+                status.contains("Not encrypted (no key store on this computer)"),
+                "{status}"
+            );
+            assert!(status.contains("no linked documents"), "{status}");
+            assert_eq!(&std::fs::read(&unkeyed).unwrap()[..8], stack_archive::MAGIC);
+        });
 }
 
 #[test]

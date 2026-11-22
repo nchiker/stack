@@ -123,6 +123,7 @@ public final class ScannerChecks extends Instrumentation {
                 if(!disposableCanonical||!getTargetContext().getPackageName().equals("org.stackdocs.app"))throw new SecurityException("Explicit disposable Pixel 4a authorization required");
                 DisposableSmokeChecks.run(this,syncArguments.getString("disposableSmoke"),this::mark);
             }
+            else if(syncArguments.containsKey("interopPhase")) InteropChecks.run(getTargetContext(),syncArguments,this::mark);
             else if (syncArguments.containsKey("nearbyPhase")) mark("nearby "+syncArguments.getString("nearbyPhase")+": "+NearbyPairingChecks.run(this,syncArguments));
             else if ("true".equals(syncArguments.getString("resetUi"))) LibraryResetChecks.runUi(this,this::mark);
             else if ("true".equals(syncArguments.getString("libraryReset"))) LibraryResetChecks.run(this,this::mark);
