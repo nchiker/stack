@@ -183,6 +183,8 @@ final class SyncStore {
                 }
                 if(linkWork)LinkSync.clearDirty(db);
             }
+            // P2: a link that a local write made decidable is resolved here (the rows are applied by the next install).
+            if(LinkSync.enabled(state,replica)&&LinkSync.resolveDecided(state,replica)>0)changed=true;
             String text=null;
             if(changed) {
                 text=state.saved().toString();value.put("state",text);
@@ -191,12 +193,26 @@ final class SyncStore {
             db.setTransactionSuccessful();
             if(text!=null)remember(text,state);
         } finally {db.endTransaction();}
+        if(linkWork)purgeLinkBlobs();
+    }
+    /**
+     * D6: deletes retained link blobs nothing references any more. Always called AFTER the transaction that changed references or
+     * acknowledgements has committed; a failure or a crash leaves only blobs that are already unreferenced; the next pass removes them.
+     */
+    void purgeLinkBlobs() {
+        try {
+            SyncProtocol.State state=load();if(state==null)return;String replica=replica();
+            if(!LinkSync.enabled(state,replica))return;
+            linkSync().purge(state,replica,peerAcknowledgement(state,replica));
+        } catch(IOException|JSONException|RuntimeException ignored) { /* retried by the next pass */ }
     }
     LinkSync linkSync(){return new LinkSync(db,context.getFilesDir(),control);}
     /** What the single peer of the frozen two-member group has acknowledged of our operations; empty if it never did. */
     private TreeMap<String,Long> peerAcknowledgement(SyncProtocol.State state,String replica)throws IOException,JSONException {
-        TreeMap<String,Long> out=new TreeMap<>();
-        for(String member:state.members)if(!member.equals(replica))for(Map.Entry<String,Long> entry:receipt(member).entrySet())out.merge(entry.getKey(),entry.getValue(),Math::min);
+        TreeMap<String,Long> out=new TreeMap<>();java.util.List<TreeMap<String,Long>> receipts=new java.util.ArrayList<>();java.util.Set<String> replicas=new java.util.TreeSet<>();
+        for(String member:state.members)if(!member.equals(replica)){TreeMap<String,Long> r=receipt(member);receipts.add(r);replicas.addAll(r.keySet());}
+        // A member with no receipt counts as 0 for every replica, so nothing it may still need is purged.
+        for(String r:replicas){long low=Long.MAX_VALUE;for(TreeMap<String,Long> receipt:receipts)low=Math.min(low,receipt.getOrDefault(r,0L));out.put(r,low);}
         return out;
     }
     /**
@@ -249,6 +265,7 @@ final class SyncStore {
         }finally{db.endTransaction();}
         probe.reached("committed");
         repository.links.afterApply(applied,linkSync().blobs());
+        purgeLinkBlobs();
         repository.archiveChanged();
     }
     private boolean hasDrafts(){try(Cursor row=db.rawQuery("SELECT 1 FROM editor_drafts LIMIT 1",null)){return row.moveToFirst();}}
@@ -303,6 +320,8 @@ final class SyncStore {
         if(!SyncGraph.isLinkKey(link))throw SyncProtocol.invalid("unknown link");
         boolean phone;if("phone".equals(side))phone=true;else if("desktop".equals(side))phone=false;else throw SyncProtocol.invalid("unknown side");
         capture();SyncProtocol.State state=load();if(state==null)throw SyncProtocol.invalid("no baseline");
+        // The tie may have become decidable (a local write after the review was shown): resolve those first, then check this one.
+        LinkSync.resolveDecided(state,replica());
         if(!LinkSync.conflictedBases(state).contains(link))throw SyncProtocol.invalid("link conflict changed");
         LinkSync.resolveTie(state,replica(),link,phone);
         install(state,null);
@@ -312,6 +331,7 @@ final class SyncStore {
     void receipt(String peer,TreeMap<String,Long> acknowledged)throws JSONException {
         ContentValues row=new ContentValues();row.put("peer",peer);row.put("frontier",SyncProtocol.json(acknowledged).toString());db.insertWithOnConflict("sync_receipts",null,row,SQLiteDatabase.CONFLICT_REPLACE);
         if(LinkSync.deferralOutstanding(db))LinkSync.markDirty(db);   // only a blob deferred by the unacknowledged-bytes budget may fit now (M3)
+        purgeLinkBlobs();   // D6: the acknowledgement may have released blobs
     }
     void savePending(SyncProtocol.State state)throws IOException,JSONException {
         String text=state.saved().toString();ContentValues row=new ContentValues();row.put("state",text);db.update("sync_state",row,"singleton=1",null);remember(text,state);

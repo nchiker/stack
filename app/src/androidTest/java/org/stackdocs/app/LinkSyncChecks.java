@@ -47,6 +47,8 @@ final class LinkSyncChecks {
         reviewApply(test, mark);
         reviewPreviewFiles(test, mark);
         resolution(test, mark);
+        resolutionReview(test, mark);
+        purge(test, mark);
     }
 
     // ---- fixtures ----------------------------------------------------------------------------------------------------
@@ -69,8 +71,11 @@ final class LinkSyncChecks {
         void close() { repo.closeForReset(); }
         File pdf(String name, String body) throws IOException { File f = new File(staging, name); try (FileOutputStream o = new FileOutputStream(f)) { o.write(("%PDF-1.7\n" + body).getBytes(StandardCharsets.US_ASCII)); } return f; }
         String publish(String linkId, String title, String hash, String text, String previewBody, boolean isProtected) throws Exception {
+            return publishAt(linkId, title, hash, text, previewBody, isProtected, 1_800_000_000_000L);
+        }
+        String publishAt(String linkId, String title, String hash, String text, String previewBody, boolean isProtected, long modified) throws Exception {
             LinkRecord record = LinkRecord.parse(new JSONObject().put("contract", 1).put("owner", OWNER).put("link_id", linkId).put("kind", "doc").put("title", title)
-                .put("mime", MIME).put("modified", 1_800_000_000_000L).put("hash", hash).put("protected", isProtected)
+                .put("mime", MIME).put("modified", modified).put("hash", hash).put("protected", isProtected)
                 .put("locators", new JSONArray().put(new JSONObject().put("type", "filen").put("uuid", UUID.randomUUID().toString()).put("path", "/Health/" + title + ".sam"))
                     .put(new JSONObject().put("type", "saf").put("uri", "content://stub/" + linkId))).toString());
             return links.publish(record, text, previewBody == null ? null : pdf(UUID.randomUUID() + ".pdf", previewBody)).id;
@@ -97,9 +102,11 @@ final class LinkSyncChecks {
     /** The fake computer: a causal state that never opens a database. */
     static final class Desk {
         final String replica; final SyncProtocol.State state; long delivered; final Map<String, byte[]> blobs = new TreeMap<>();
-        Desk(Phone phone) throws Exception {
+        Desk(Phone phone) throws Exception { this(phone, true); }
+        /** learn=false: a computer that has seen none of the phone's operations, so its enable operation is concurrent with them (as the real one is: empty context). */
+        Desk(Phone phone, boolean learn) throws Exception {
             replica = phone.desktop; SyncProtocol.State p = phone.state();
-            state = new SyncProtocol.State(p.library, p.members); learn(phone);
+            state = new SyncProtocol.State(p.library, p.members); if (learn) learn(phone);
         }
         /** The computer receives everything the phone has written so far. */
         void learn(Phone phone) throws Exception { state.receive(new ArrayList<>(phone.state().history.values())); }
@@ -301,13 +308,13 @@ final class LinkSyncChecks {
             require(summary.getInt("applied") == 1, "the desktop's enable operation was applied");
             SyncProtocol.State state = p.state();
             SyncProtocol.Operation phoneEnable = null; for (SyncProtocol.Operation op : state.history.values()) if (op.replica.equals(p.replica()) && "links.enable".equals(evidence(op))) phoneEnable = op;
-            require(phoneEnable != null && p.ownOps() == before + 1 && state.concurrent(phoneEnable, deskEnable), "the phone's enable was written before receiving, so it is concurrent with the desktop's");
+            require(phoneEnable != null && p.ownOps() == before + 2 /* the enable and, since P2, one link.resolve for the conflicted link */ && state.concurrent(phoneEnable, deskEnable), "the phone's enable was written before receiving, so it is concurrent with the desktop's");
 
             // Desktop-only link: trashed, reason user (never live), revision 1, text and preview placed, projection holds the received cells.
             require("trashed".equals(p.text("SELECT state FROM link_records WHERE link_id=?", only)) && "user".equals(p.text("SELECT removed_reason FROM link_records WHERE link_id=?", only)) && p.count("SELECT revision FROM link_records WHERE link_id=?", only) == 1, "a desktop-only link arrives trashed with reason user");
             String onlyId = p.text("SELECT id FROM link_records WHERE link_id=?", only);
             require(p.links.text(onlyId).equals("desktop text") && p.links.preview(onlyId) != null && p.count("SELECT preview_pending FROM link_records WHERE id=?", onlyId) == 0 && p.text("SELECT preview_file FROM link_records WHERE id=?", onlyId).equals(onlyId + ".pdf"), "its text is searchable and its preview was placed after the commit");
-            require(p.links.list("desktop").isEmpty() && p.links.trashed().size() == 1, "it is in Recently deleted, not in the list");
+            require(p.links.list("only").isEmpty() && p.links.trashed().size() == 1, "it is in Recently deleted, not in the list");
             p.links.restore(onlyId);
             require("unreachable".equals(p.text("SELECT state FROM link_records WHERE id=?", onlyId)), "restore gives unreachable");
             require(p.count("SELECT count(*) FROM link_records WHERE link_id=?", dead) == 0, "an identity whose presence is gone is never inserted");
@@ -674,10 +681,218 @@ final class LinkSyncChecks {
 
             // One choice (desktop) resolves every cell of the link, then the rows are applied and nothing is left in review.
             p.store.resolveLink(key(tie), "desktop");
-            require(hash('2').equals(p.text("SELECT hash FROM link_records WHERE id=?", tieId)) && "Tie desktop".equals(p.text("SELECT title FROM link_records WHERE id=?", tieId)), "one desktop choice applies every cell of the tied link");
+            require(hash('2').equals(p.text("SELECT hash FROM link_records WHERE id=?", tieId)) && "Tie phone edited".equals(p.text("SELECT title FROM link_records WHERE id=?", tieId)), "a desktop choice takes the desktop's content but keeps the phone's causally newer title");
             require(LinkSync.conflictedKeys(p.state()).isEmpty() && p.store.status().optJSONArray("link_conflicts").length() == 0, "no link is left in review after the choice");
         } finally { p.close(); }
         mark.accept("Link sync P2: one rule per link (gone, later modified, same hash), one resolution operation, a modified tie reviewed once per link with one choice for all cells, a new local write over a tie");
+    }
+
+    // ---- D6: purge of retained link blobs ------------------------------------------------------------------------------
+
+    private static File blobFile(Phone p, String sha) { return new File(new File(p.context.getFilesDir(), "sync_blobs"), sha); }
+    /** The peer acknowledges everything this phone has: the receipt runs the purge pass. */
+    private static void ackAll(Phone p) throws Exception { p.store.receipt(p.desktop, new TreeMap<>(p.state().frontier)); }
+    /** The digest of the newest cell `cellKey` this replica wrote (null cells skipped). */
+    private static String cellSha(Phone p, String cellKey) throws Exception {
+        String sha = null;
+        for (SyncProtocol.Operation op : p.linkOps()) if (op.changes.has(cellKey) && !op.changes.isNull(cellKey)) sha = op.changes.getJSONObject(cellKey).getString("sha256");
+        return sha;
+    }
+
+    /** An export to a scratch stream: no exception and no link blob skipped (every blob an unacknowledged operation needs is still kept). */
+    private static void exportClean(Phone p, String step) throws Exception {
+        SyncExchange exchange = new SyncExchange(p.context, p.repo);
+        try { exchange.export(p.desktop, new ByteArrayOutputStream()); } catch (Exception failed) { throw new AssertionError("the export fails after the purge step: " + step + " (" + failed + ")"); }
+        require(exchange.skippedLinkBlobs == 0, "no link blob is missing from the export after the purge step: " + step);
+    }
+    private static String freshBlob(Phone p, String text) throws Exception {
+        byte[] bytes = (text + UUID.randomUUID()).getBytes(StandardCharsets.UTF_8); String sha = hex(bytes);
+        p.store.linkSync().keep(sha, bytes.length, new ByteArrayInputStream(bytes)); return sha;
+    }
+    private static JSONObject cell(String sha) throws Exception { return new JSONObject().put("sha256", sha).put("length", sha.length()); }
+
+    private static void purge(Instrumentation test, Consumer<String> mark) throws Exception {
+        Phone p = new Phone(test, "ls-purge");
+        try {
+            // Not enabled: nothing is purged (and nothing fails).
+            String early = freshBlob(p, "before links are enabled");
+            p.store.purgeLinkBlobs();
+            require(blobFile(p, early).isFile(), "with links not enabled the purge does nothing");
+            String gone = UUID.randomUUID().toString(), prot = UUID.randomUUID().toString(), sup = UUID.randomUUID().toString(), one = UUID.randomUUID().toString(), two = UUID.randomUUID().toString();
+            String goneId = p.publish(gone, "Gone link", hash('1'), "gone text", null, false);
+            p.publish(prot, "Protected link", hash('2'), "protected later text", null, false);
+            p.publish(sup, "Superseded link", hash('3'), "superseded text", "preview one", false);
+            String oneId = p.publish(one, "Share one", hash('4'), "shared text", null, false);
+            String twoId = p.publish(two, "Share two", hash('5'), "shared text", null, false);
+            p.store.enableLinks(); p.store.capture();
+            String goneSha = hex("gone text".getBytes(StandardCharsets.UTF_8)), protSha = hex("protected later text".getBytes(StandardCharsets.UTF_8)), sharedSha = hex("shared text".getBytes(StandardCharsets.UTF_8));
+            String oldPreview = cellSha(p, key(sup) + "/preview");
+            require(oldPreview != null && blobFile(p, goneSha).isFile() && blobFile(p, protSha).isFile() && blobFile(p, sharedSha).isFile() && blobFile(p, oldPreview).isFile(), "the blobs are kept after capture");
+
+            // A document original (a digest that was never a link digest) in the same directory.
+            byte[] original = "a document original".getBytes(StandardCharsets.UTF_8); String originalSha = hex(original);
+            p.store.linkSync().keep(originalSha, original.length, new ByteArrayInputStream(original));
+
+            // Link gone, link protected, preview superseded; one of two links sharing a digest is deleted.
+            p.links.delete(goneId);
+            p.publish(prot, "Protected link", hash('2'), "protected later text", null, true);
+            p.publish(sup, "Superseded link", hash('6'), "superseded text", "preview two", false);
+            p.links.delete(oneId);
+            p.store.capture();
+            require(blobFile(p, goneSha).isFile() && blobFile(p, protSha).isFile() && blobFile(p, oldPreview).isFile(), "before the acknowledgement every blob stays (unacknowledged operations may still be exported)");
+            p.store.purgeLinkBlobs();
+            require(blobFile(p, goneSha).isFile() && blobFile(p, protSha).isFile() && blobFile(p, oldPreview).isFile() && blobFile(p, early).isFile(), "with no receipt at all (own blobs) the purge does nothing");
+            exportClean(p, "before any acknowledgement");
+
+            ackAll(p);
+            require(!blobFile(p, goneSha).exists(), "a gone link's blob is purged after the acknowledgement");
+            require(!blobFile(p, protSha).exists(), "a protected link's old text blob is purged after the acknowledgement");
+            require(!blobFile(p, oldPreview).exists(), "a superseded preview is purged after the acknowledgement");
+            String newPreview = cellSha(p, key(sup) + "/preview");
+            require(newPreview != null && blobFile(p, newPreview).isFile() && blobFile(p, hex("superseded text".getBytes(StandardCharsets.UTF_8))).isFile(), "the current preview and text of a live link stay");
+            require(blobFile(p, sharedSha).isFile(), "a shared digest stays while another link still references it");
+            require(blobFile(p, originalSha).isFile(), "a blob that was never a link digest (a document original) is never purged");
+
+            // The second sharing link goes: the digest is purged only once nothing references it.
+            p.links.delete(twoId); p.store.capture();
+            // The operation that wrote the blob was acknowledged and the deletion carries no blob (null cells): nothing references or needs it.
+            require(!blobFile(p, sharedSha).exists(), "the shared digest is purged at zero references (the writing operation was acknowledged)");
+            exportClean(p, "last sharing link deleted");
+            ackAll(p);
+            exportClean(p, "after the acknowledgement");
+
+            // A link digest that a document file ref also names (the original shares sync_blobs/<sha>) is not purged.
+            String dual = UUID.randomUUID().toString(); String dualId = p.publish(dual, "Dual", hash('7'), "dual text", null, false);
+            p.store.capture(); ackAll(p);
+            String dualSha = hex("dual text".getBytes(StandardCharsets.UTF_8));
+            SyncProtocol.State withFile = p.state(); String doc = UUID.randomUUID().toString();
+            withFile.local(p.replica(), new JSONObject().put(key(dual) + "/text", JSONObject.NULL), new JSONObject().put("kind", "test"));   // in memory: the link's text cell is gone
+            withFile.local(p.desktop, new JSONObject().put("files/originals/" + doc + "/source", new JSONObject().put("path", "originals/" + doc + "/source").put("sha256", dualSha).put("length", "dual text".length())), new JSONObject().put("kind", "test"));
+            TreeMap<String, Long> everything = new TreeMap<>(withFile.frontier);
+            require(p.store.linkSync().purge(withFile, p.replica(), everything) == 0 && blobFile(p, dualSha).isFile(), "a digest named by a files/ ref is never purged");
+            p.links.delete(dualId); p.store.capture(); p.store.purgeLinkBlobs();
+            require(!blobFile(p, dualSha).exists(), "without the (in-memory only) files/ ref nothing references or needs the blob: it goes");
+            exportClean(p, "dual digest purged");
+            ackAll(p);
+
+            // Conflicted alternative: a desktop write concurrent with a phone write keeps the desktop's blob.
+            String alt = UUID.randomUUID().toString(); String altId = p.publish(alt, "Alt", hash('8'), "alt first", null, false);
+            p.store.capture(); ackAll(p);
+            Desk desk = new Desk(p);
+            byte[] other = "desktop alternative text".getBytes(StandardCharsets.UTF_8); String otherSha = hex(other);
+            SyncProtocol.Operation concurrent = desk.write(new JSONObject().put(key(alt) + "/text", new JSONObject().put("sha256", otherSha).put("length", other.length)), "link.capture");
+            p.store.linkSync().keep(otherSha, other.length, new ByteArrayInputStream(other));
+            p.publish(alt, "Alt", hash('9'), "alt second", null, false); p.store.capture(); ackAll(p);
+            String firstSha = hex("alt first".getBytes(StandardCharsets.UTF_8));
+            require(!blobFile(p, firstSha).exists(), "the phone's superseded text is purged");
+            SyncProtocol.State both = p.state(); both.receive(Collections.singletonList(concurrent));
+            require(both.registers.get(key(alt) + "/text").size() == 2, "the desktop write is a conflicted alternative");
+            p.store.linkSync().purge(both, p.replica(), new TreeMap<>(both.frontier));
+            require(blobFile(p, otherSha).isFile(), "a conflicted alternative keeps its blob");
+            require(blobFile(p, hex("alt second".getBytes(StandardCharsets.UTF_8))).isFile(), "the current text of the conflicted link stays");
+
+            // An unacknowledged link.resolve operation keeps its blob even when a later operation superseded the cell.
+            SyncProtocol.State s = p.state(); TreeMap<String, Long> before = new TreeMap<>(s.frontier);
+            String resolveKey = key(UUID.randomUUID().toString()) + "/text", resolveSha = freshBlob(p, "resolution text");
+            s.local(p.replica(), new JSONObject().put(resolveKey, cell(resolveSha)), new JSONObject().put("kind", "link.resolve"));
+            s.local(p.replica(), new JSONObject().put(resolveKey, JSONObject.NULL), new JSONObject().put("kind", "test"));
+            p.store.linkSync().purge(s, p.replica(), before);
+            require(blobFile(p, resolveSha).isFile(), "an unacknowledged link.resolve operation keeps its blob");
+            p.store.linkSync().purge(s, p.replica(), new TreeMap<>(s.frontier));
+            require(!blobFile(p, resolveSha).exists(), "after the acknowledgement the resolution's superseded blob goes");
+
+            // A desktop-written blob that a phone operation rewrites: kept while the desktop operation is unacknowledged (the export's notion, any writer).
+            Desk writer = new Desk(p); SyncProtocol.State t = p.state();
+            String deskKey = key(UUID.randomUUID().toString()) + "/text", deskSha = freshBlob(p, "desktop wrote this");
+            SyncProtocol.Operation deskOp = writer.write(new JSONObject().put(deskKey, cell(deskSha)), "link.capture");
+            t.receive(Collections.singletonList(deskOp));
+            t.local(p.replica(), new JSONObject().put(deskKey, cell(freshBlob(p, "phone rewrote it"))), new JSONObject().put("kind", "link.capture"));
+            p.store.linkSync().purge(t, p.replica(), new TreeMap<>());
+            require(blobFile(p, deskSha).isFile(), "a desktop-written blob is kept while that operation is unacknowledged, although a phone operation rewrote the cell");
+            p.store.linkSync().purge(t, p.replica(), new TreeMap<>(t.frontier));
+            require(!blobFile(p, deskSha).exists(), "after the acknowledgement the rewritten desktop blob goes");
+
+            // A row whose preview still has to be placed keeps its blob.
+            String pendingLink = UUID.randomUUID().toString(); String pendingId = p.publish(pendingLink, "Pending", hash('b'), "pending text", null, false);
+            SyncProtocol.State u = p.state(); String pendingKey = key(UUID.randomUUID().toString()) + "/preview", pendingSha = freshBlob(p, "pending preview");
+            u.local(p.replica(), new JSONObject().put(pendingKey, cell(pendingSha)), new JSONObject().put("kind", "test"));
+            u.local(p.replica(), new JSONObject().put(pendingKey, JSONObject.NULL), new JSONObject().put("kind", "test"));
+            p.db.execSQL("UPDATE link_records SET preview_sha=?, preview_pending=1 WHERE id=?", new Object[]{pendingSha, pendingId});
+            p.store.linkSync().purge(u, p.replica(), new TreeMap<>(u.frontier));
+            require(blobFile(p, pendingSha).isFile(), "a row with preview_pending=1 keeps its blob");
+            p.db.execSQL("UPDATE link_records SET preview_pending=0 WHERE id=?", new Object[]{pendingId});
+            p.store.linkSync().purge(u, p.replica(), new TreeMap<>(u.frontier));
+            require(!blobFile(p, pendingSha).exists(), "once the preview is placed the blob goes");
+            exportClean(p, "end");
+        } finally { p.close(); }
+        mark.accept("Link sync D6: gone, protected and superseded blobs purged only after the acknowledgement, shared digest kept to zero references, document originals and conflicted alternatives never purged");
+    }
+
+    /** P2 review fixes: rule 1 as it really happens, later phone modified, keep phone, a tie that becomes decidable, H-C null vs keep, trashed vs live. */
+    private static void resolutionReview(Instrumentation test, Consumer<String> mark) throws Exception {
+        Phone p = new Phone(test, "ls-resolve2");
+        try {
+            String deleted = UUID.randomUUID().toString(), phoneLater = UUID.randomUUID().toString(), keep = UUID.randomUUID().toString(), becomes = UUID.randomUUID().toString(),
+                same = UUID.randomUUID().toString(), prot = UUID.randomUUID().toString(), trashed = UUID.randomUUID().toString();
+            long old = 1_700_000_000_000L, mid = 1_800_000_000_000L, late = 1_900_000_000_000L;
+            String deletedId = p.publish(deleted, "Deleted", hash('a'), "", null, false);
+            p.publishAt(phoneLater, "Phone later", hash('b'), "", null, false, late);
+            String keepId = p.publish(keep, "Keep phone", hash('1'), "", null, false);
+            p.publish(becomes, "Becomes", hash('3'), "", null, false);
+            String sameId = p.publishAt(same, "Same", hash('e'), "", null, false, mid);
+            String protId = p.publishAt(prot, "Protected", hash('f'), "", null, true, mid);
+            String trashedId = p.publishAt(trashed, "Trashed", hash('7'), "", null, false, mid);
+            p.store.enableLinks(); p.store.capture();   // the phone has enabled links, so its deletes and trashes are published
+            p.links.delete(deletedId); p.links.trash(trashedId, "user"); p.store.capture();
+            Desk desk = new Desk(p, false);   // has seen none of the phone's operations: its enable is concurrent with them, like the real one
+            JSONObject deletedCells = desk.link(deleted, hash('9'), late, "Deleted desktop", null, null, false, "/Docs/d.sam");
+            JSONObject laterCells = desk.link(phoneLater, hash('c'), old, "Later desktop", "desk text", null, false, "/Docs/pl.sam");
+            JSONObject keepCells = desk.link(keep, hash('2'), mid, "Keep desktop", null, null, false, "/Docs/k.sam");
+            JSONObject becomesCells = desk.link(becomes, hash('4'), mid, "Becomes desktop", null, null, false, "/Docs/b.sam");
+            JSONObject sameCells = desk.link(same, hash('e'), late, "Same desktop", "same desk text", null, false, "/Docs/s.sam");
+            JSONObject protCells = desk.link(prot, hash('f'), late, "Protected desktop", "prot desk text", null, false, "/Docs/p.sam");
+            JSONObject trashedCells = desk.link(trashed, hash('8'), late, "Trashed desktop", null, null, false, "/Docs/t.sam");
+            desk.enable(deletedCells, laterCells, keepCells, becomesCells, sameCells, protCells, trashedCells);
+            desk.deliver(p);
+
+            // Rule 1 as it really happens: the phone deleted the link, the desktop's enable carries it live. The phone's gone wins; no row.
+            require(p.count("SELECT count(*) FROM link_records WHERE link_id=?", deleted) == 0 && deletedId != null, "P2 rule 1: a phone-deleted link stays deleted when the desktop carries it live");
+            // Later phone modified wins every cell; its never-written text cell is nulled (hashes differ, H-C).
+            SyncProtocol.Operation later = resolveOp(p, key(phoneLater));
+            require("Phone later".equals(p.text("SELECT title FROM link_records WHERE link_id=?", phoneLater)) && hash('b').equals(p.text("SELECT hash FROM link_records WHERE link_id=?", phoneLater)), "P2: the phone's later modified wins");
+            require(later != null && nullCell(later, key(phoneLater) + "/text"), "H-C: a text cell the phone never wrote is nulled when the hashes differ");
+            // H-C keep: same hash, phone never wrote /text, desktop did, winner not protected: the desktop's text cell is kept.
+            SyncProtocol.Operation keepText = resolveOp(p, key(same));
+            require(keepText != null && !keepText.changes.isNull(key(same) + "/text") && keepText.changes.getJSONObject(key(same) + "/text").getInt("length") == "same desk text".length(), "H-C: the other side's text cell is kept when the hash is the same");
+            // H-C null: same hash but the winner is protected: nulled.
+            SyncProtocol.Operation protText = resolveOp(p, key(prot));
+            require(protText != null && nullCell(protText, key(prot) + "/text"), "H-C: a protected winner nulls the text cell");
+            require(p.count("SELECT count(*) FROM link_records WHERE id=?", sameId) == 1 && p.count("SELECT count(*) FROM link_records WHERE id=?", protId) == 1, "rows exist after the resolutions");
+            // Finding 4 (approved): the desktop wins rule 2 over a phone-trashed link; the link stays trashed.
+            SyncProtocol.Operation trashOp = resolveOp(p, key(trashed));
+            require(trashOp != null && "trashed".equals(trashOp.changes.getJSONObject(key(trashed) + "/presence").getString("state")), "the resolution keeps the phone's trashed presence");
+            require(hash('8').equals(p.text("SELECT hash FROM link_records WHERE id=?", trashedId)) && "trashed".equals(p.text("SELECT state FROM link_records WHERE id=?", trashedId)), "the desktop's content applies, but the link stays in Recently deleted");
+
+            // Ties: keep and becomes-decidable. Both are still conflicted? keep (mid vs mid) yes, becomes (mid vs mid) yes.
+            JSONArray reviews = p.store.status().optJSONArray("link_conflicts");
+            require(reviews != null && reviews.length() == 2, "two ties are listed for review");
+            // Finding 1: a local write that makes a tie decidable leaves no stale review.
+            p.publishAt(becomes, "Becomes", hash('5'), "", null, false, late); p.store.capture();
+            reviews = p.store.status().optJSONArray("link_conflicts");
+            require(reviews.length() == 1 && key(keep).equals(reviews.getJSONObject(0).getString("link")), "a tie made decidable by a local write is resolved, not listed");
+            require(LinkSync.conflictedBases(p.state()).size() == 1, "capture resolved the decidable link");
+            // Keep phone.
+            p.store.resolveLink(key(keep), "phone");
+            require(hash('1').equals(p.text("SELECT hash FROM link_records WHERE id=?", keepId)) && "Keep phone".equals(p.text("SELECT title FROM link_records WHERE id=?", keepId)), "keep phone leaves the phone's cells");
+            require(LinkSync.conflictedKeys(p.state()).isEmpty() && p.store.status().optJSONArray("link_conflicts").length() == 0, "nothing left in review");
+        } finally { p.close(); }
+        mark.accept("Link sync P2 review fixes: rule 1 real case, later phone modified, keep phone, tie made decidable, H-C null vs keep, phone-trashed link stays trashed");
+    }
+    /** The last link.resolve operation of this replica that carries `base`'s identity. */
+    private static SyncProtocol.Operation resolveOp(Phone p, String base) throws Exception {
+        SyncProtocol.Operation found = null;
+        for (SyncProtocol.Operation op : p.linkOps()) if ("link.resolve".equals(evidence(op)) && op.changes.has(base + "/content")) found = op;
+        return found;
     }
 
     private static void reviewPreviewFiles(Instrumentation test, Consumer<String> mark) throws Exception {

@@ -269,7 +269,7 @@ def main():
         full = [py, '-I', TOOLS / 'test_android_archive_interop.py', '--adb', ADB, '--adb-port', ADB_PORT,
                 '--output', logdir / 'interop-phone'] + (['--large'] if large else [])
         run_step('phone-interop', full, timeout=3600 if not large else 7200)
-        for name, option in (('phone-link-contract', 'linkContract'), ('phone-archive', 'archiveOnly'), ('phone-features', 'features')):
+        for name, option in (('phone-link-contract', 'linkContract'), ('phone-archive', 'archiveOnly'), ('phone-features', 'features'), ('phone-link-sync', 'linkSync')):
             phone_suite(adb, name, option)
 
     counts = {s: sum(1 for r in results if r[0] == s) for s in ('PASS', 'FAIL', 'SKIP')}

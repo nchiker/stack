@@ -170,8 +170,8 @@ Findings from reading the code (not yet verified at runtime):
   the lifecycle slice.
 - **Archive.** Format 3 rejects unknown fields, so link records need **format 4** (new `links` array,
   `previews/<uuid>.pdf` entries, older apps refuse it as before). Existing archives restore unchanged.
-- **Sync.** The wire format rejects unsupported graph shapes, so link records need **graph model 3** with cells
-  keyed by `link_records` row identity. The title, text hash, preview and `filen` locator sync; device-local locators and states stay per
+- **Sync.** The wire format rejects unsupported graph shapes, so link records need new `link_records/` cells (graph model
+  stays 2, wire version 1; see "Slice 6, sync of link records" below) keyed by `(owner, link_id)`. The title, text hash, preview and `filen` locator sync; device-local locators and states stay per
   device. User fields (stacks, tags, notes) merge as they do now. This is the largest piece of work and needs the shared
   golden cases extended in both Java and Rust.
 - **Desktop.** Needs the same schema and a Linux "open with" path (a launcher per owner kind). The first slice
@@ -192,6 +192,27 @@ Slice 3 handoff (archive format 4 and encrypted exports): `docs/STACK_LINK_SLICE
 
 `stat`/`refresh` calls (`LinkChecker`: owner identity checked first, 5 s limit, own thread pool, one call per owner, compare-and-set write; only a well-formed `exists:false` makes `missing`), provider `removed` (`{ok:true, changed:bool}`; unknown id is a no-op; `moved`/`unshared`/`delete` answer `unknown_method`), states `live|unreachable|missing|trashed` with `state_since` (missing for 30 days becomes trashed; trashed for 30 days is deleted), Recently deleted for links, "Check linked documents", detail-screen messages and an "Update saved copy" button when the hash changed. Checks: `LinkLifecycleChecks`.
 
+## Slice 6, sync of link records (built, not yet announced)
+
+Full design and implementation notes: `STACK_LINK_SLICE6_DESIGN.md`. Wire details: `desktop/INTEROP_SYNC_PROTOCOL_V1.md`.
+
+- **What syncs.** Phone to desktop (and desktop-only links to the phone): title, locator `filen`, hash, mime, modified, shared,
+  protected, text, preview, presence. The desktop is a read-only mirror: it never edits, deletes or opens links.
+  Not synced: `saf`/`owner` locators, `unreachable`/`missing`, `checked_at`, `state_since`, `revision`, stacks/tags/notes for links.
+- **Protected links** sync metadata only (identity, content, title, filen, presence). No text, no preview, no blob.
+- **Limits.** At most 1000 links, text 1 MiB (UTF-8 bytes), preview 32 MiB, title 200, 2 GiB of link blobs per device.
+  A row over a limit is not synced (marked "not synced"); it never blocks Sync.
+- **Disagreement.** The same link with a different hash on each side: the later `modified` wins, the other value stays in
+  history. Only an equal `modified` goes to review, on the phone, one choice per link. Otherwise the phone's values win.
+- **Delete.** Only presence `gone` deletes a desktop row (phone Delete for good, the 30-day sweep, Remove). Absence deletes
+  nothing. A link only the desktop has arrives on the phone in Recently deleted (reason `user`); if it is not restored in
+  30 days the phone sweep makes it `gone` and the desktop deletes it. Purge removes retained blob bytes after the desktop
+  acknowledges; titles, Filen paths and possibly old text stay in sync history.
+- **Setup.** Nothing to install or run: both apps announce links in the sync handshake and the next Sync does the rest.
+  An older desktop still syncs documents. An older desktop build cannot open a library the new desktop has upgraded (schema 6).
+- **Status.** Both sides are built and tested, but nothing announces `links` yet (`ANNOUNCE_LINKS=false`, step D4b ships last),
+  so no link cells exist on the wire today. Real-LAN test (T3) and the Flatpak launch test (6b) are still to do.
+
 ## Work by project
 
 Changes to the owner apps are part of this plan, not an afterthought. Each slice names who does what.
@@ -203,7 +224,7 @@ Changes to the owner apps are part of this plan, not an afterthought. Each slice
 | 3. Archive 4 and encryption | link records and encrypted export in backups, phone then desktop | none | none |
 | 4. Lifecycle | state machine, Recently deleted, `stat` check | `stat`, `refresh`; emit `moved` and `removed` for its own files; rescan by hash when a file is gone | none |
 | 5. Filen | `filen` locator, shared badge | write the `filen` locator when the file lives in Filen | `moved`/`removed`/`unshared` events from its own file operations; share setup on request; locator lookup by UUID |
-| 6. Sync and desktop | sync graph 3; Flatpak launch test first | **AmiPro-Linux: accept a file argument and hand off to a running instance**; extract and preview on desktop | none |
+| 6. Sync and desktop | `link_records/` sync cells (6); Flatpak launch test is 6b | **AmiPro-Linux: accept a file argument and hand off to a running instance**; extract and preview on desktop | none |
 | 7. Partner (Android and Linux) | publish to a Filen folder, import as foreign, tombstones | none | folder change notice, `filen-in` open |
 | Later: restore and setup | `unreachable` and relink states | setup manifest entry | setup manifest entry |
 

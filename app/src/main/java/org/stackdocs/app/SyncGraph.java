@@ -371,6 +371,22 @@ final class SyncGraph {
     private static boolean linkTitleOk(JSONObject row){return linkFree(row.opt("title"),LINK_TITLE_UNITS)&&linkSafe(row.opt("title_user_edited"),0,1);}
     private static boolean linkBlobOk(JSONObject row,long max){return linkMatch(LINK_HASH,row.opt("sha256"),64)&&linkSafe(row.opt("length"),1,max);}
 
+    /**
+     * The content checks `linkWriter` applies, on a full cell set of one link (full keys `base` + suffix, as the resolution writes it):
+     * identity, presence, and for a live link its content, title, filen, text and preview cells. A null cell is always fine.
+     */
+    static boolean linkCellsOk(JSONObject cells,String base) {
+        JSONObject identity=cells.optJSONObject(base);if(identity==null||!linkIdentityOk(identity))return false;
+        JSONObject presence=cells.optJSONObject(base+"/presence");if(presence!=null&&!linkPresenceOk(presence))return false;
+        if(presence!=null&&"gone".equals(presence.optString("state")))return true;
+        JSONObject content=cells.optJSONObject(base+"/content");if(content==null||!linkContentOk(content))return false;
+        JSONObject title=cells.optJSONObject(base+"/title");if(title!=null&&!linkTitleOk(title))return false;
+        JSONObject filen=cells.optJSONObject(base+"/filen");if(filen!=null&&!linkFilenOk(filen))return false;
+        JSONObject text=cells.optJSONObject(base+"/text");if(text!=null&&!linkBlobOk(text,LINK_TEXT_BYTES))return false;
+        JSONObject preview=cells.optJSONObject(base+"/preview");if(preview!=null&&!linkBlobOk(preview,LINK_PREVIEW_BYTES))return false;
+        return true;
+    }
+
     // ----- writer self-check -----
     /**
      * The writer side of the link graph: turns one link row into its cells, or refuses/skips what the receiver would skip.

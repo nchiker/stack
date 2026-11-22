@@ -1871,3 +1871,171 @@ fn cross_b_java_capture_is_accepted_and_projects_identically() {
     }
     assert!(seen >= 2, "no B scenarios found in {}", dir.display());
 }
+
+// ---------------------------------------------------------------------------
+// Real SIGKILL of a child process at the link durability boundaries (slice 6, T1)
+// ---------------------------------------------------------------------------
+
+/// Child half. Runs only when the parent re-executes this test binary with the variable set (test code only;
+/// nothing in the shipped app reads it). It parks at the named probe, writes the ready marker and waits to be killed.
+#[test]
+fn kill_child() {
+    let Ok(spec) = std::env::var("STACK_LINK_KILL_CHILD") else {
+        return;
+    };
+    let parts: Vec<&str> = spec.split('|').collect();
+    let [kind, point, root, bundle, ready] = parts[..] else {
+        panic!("bad child spec");
+    };
+    let mut library = Library::open(Path::new(root)).unwrap();
+    let (point, ready) = (point.to_owned(), PathBuf::from(ready));
+    library.set_probe(Box::new(move |p| {
+        if p == point {
+            fs::write(&ready, p).unwrap();
+            loop {
+                std::thread::park();
+            }
+        }
+        Ok(())
+    }));
+    match kind {
+        "enable" => {
+            library.sync_links_on_hello(true).unwrap();
+        }
+        _ => {
+            library.sync_import(Path::new(bundle), None).unwrap();
+        }
+    }
+    panic!("checkpoint was not reached");
+}
+
+/// Runs the child to `point`, SIGKILLs it, and returns once it is gone.
+fn kill_at(kind: &str, point: &str, root: &Path, bundle: &Path, dir: &Path) {
+    let ready = dir.join(format!("{point}.ready"));
+    let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "kill_child", "--test-threads=1"])
+        .env(
+            "STACK_LINK_KILL_CHILD",
+            format!(
+                "{kind}|{point}|{}|{}|{}",
+                root.display(),
+                bundle.display(),
+                ready.display()
+            ),
+        )
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    while !ready.exists()
+        && child.try_wait().unwrap().is_none()
+        && std::time::Instant::now() < deadline
+    {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    assert!(ready.exists(), "{point}: not reached");
+    child.kill().unwrap(); // SIGKILL
+    assert!(!child.wait().unwrap().success(), "{point}");
+}
+
+#[test]
+fn sigkill_during_the_enable_never_wedges_and_the_next_enable_succeeds() {
+    for point in [
+        "link_blob_temp",          // blob copied, before fsync
+        "link_blob_kept",          // fsync + rename done, before the DB commit
+        "link_enable_transaction", // inside the transaction
+        "link_enable_committed",   // after the DB commit
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let mut a = library_with(dir.path(), "a", vec![archive_link(1, "kill words", 0)]);
+        let mut phone = join(&mut a, dir.path());
+        let root = a.root().to_owned();
+        drop(a);
+        kill_at("enable", point, &root, Path::new(""), dir.path());
+        let mut a = Library::open(&root).unwrap();
+        let committed = point == "link_enable_committed";
+        assert_eq!(a.sync_links_enabled().unwrap(), committed, "{point}");
+        assert_eq!(projection(&a).is_empty(), !committed, "{point}");
+        if point == "link_blob_kept" || point == "link_enable_transaction" || committed {
+            // A kept blob is present: an orphan before the commit, referenced after it.
+            assert!(root.join("sync_blobs").join(sha(PDF)).exists(), "{point}");
+        }
+        // The next enable succeeds (or, after the commit, is already done) and the phone gets every blob.
+        assert_eq!(a.sync_links_on_hello(true).unwrap(), !committed, "{point}");
+        assert!(a.sync_links_enabled().unwrap(), "{point}");
+        let header = phone.receive(&a);
+        for blob in [PDF, b"kill words"] {
+            assert!(
+                header.blobs.iter().any(|b| b.sha256 == sha(blob)),
+                "{point}"
+            );
+        }
+        assert_eq!(row_of(&a, 1).text, "kill words", "{point}");
+    }
+}
+
+#[test]
+fn sigkill_during_an_import_leaves_the_same_final_rows_after_the_next_import() {
+    for point in [
+        "sync_transaction",     // inside the install transaction
+        "sync_committed",       // after the transaction, before the preview temp file
+        "link_preview_temp",    // preview temp written, before the rename
+        "link_preview_renamed", // renamed, before preview_pending is cleared
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let mut a = library_with(dir.path(), "a", vec![]);
+        let mut phone = join(&mut a, dir.path());
+        phone.publish(
+            &[input(1, "Killed", "killed words", Some(phone.put(PDF)))],
+            true,
+        );
+        let path = phone.bundle(&a);
+        let root = a.root().to_owned();
+        drop(a);
+        kill_at("import", point, &root, &path, dir.path());
+        let a = Library::open(&root).unwrap(); // startup repair runs here
+        if point == "sync_transaction" {
+            assert_eq!(a.link_count().unwrap(), 0, "{point}");
+            assert!(projection(&a).is_empty(), "{point}");
+        } else {
+            let row = row_of(&a, 1);
+            assert_eq!(
+                (row.text.as_str(), row.pending),
+                ("killed words", 0),
+                "{point}"
+            );
+            assert_eq!(fs::read(preview_file(&a, &row)).unwrap(), PDF, "{point}");
+        }
+        assert!(
+            fs::read_dir(root.join("links")).map_or(true, |d| d
+                .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+                .all(|n| !n.ends_with(".part"))),
+            "{point}: no temp file"
+        );
+        let mut a = a;
+        a.sync_import(&path, None).unwrap();
+        let row = row_of(&a, 1);
+        assert_eq!(
+            (
+                row.title.as_str(),
+                row.text.as_str(),
+                row.state.as_str(),
+                row.preview_sha.as_str(),
+                row.pending
+            ),
+            (
+                "Killed",
+                "killed words",
+                "unreachable",
+                sha(PDF).as_str(),
+                0
+            ),
+            "{point}"
+        );
+        assert_eq!(fs::read(preview_file(&a, &row)).unwrap(), PDF, "{point}");
+        assert_eq!(a.link_count().unwrap(), 1, "{point}");
+        a.sync_import(&path, None).unwrap(); // a replay changes nothing
+        assert_eq!(rows(&a).len(), 1, "{point}");
+    }
+}

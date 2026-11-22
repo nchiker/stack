@@ -15,6 +15,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -37,9 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * - P2 conflicts: the one merge rule per link (`LinkResolve`) in `resolveDecided`, the tie review per link in `resolveTie`, and the
  *   open ties for the conflict screen in `linkConflicts`. Conflicted links are never applied until resolved.
  * Only the application's IO executor calls it, inside the transaction of its caller (SyncStore). Nothing here commits.
- *
- * TODO(D6): purge of retained blobs that nothing references any more (after acknowledgement) is work item D6; until then
- * `sync_blobs/<sha>` copies of old previews stay on disk, which is harmless.
+ * - D6 purge: `purge` deletes retained link blobs that nothing references any more (see its comment and LinkPurge).
  */
 final class LinkSync {
     static final String DIRTY = "link_dirty", ENABLE_KIND = "links.enable", CAPTURE_KIND = "link.capture";
@@ -218,7 +217,7 @@ final class LinkSync {
         // M3: bytes newly hashed or copied in this capture; what does not fit is retried (the order below stays the sticky one).
         LinkBudget.Meter work = new LinkBudget.Meter(LinkBudget.CAPTURE_BLOB_BYTES);
         deferred = false; textSkipped = 0;
-        if (withBlobs) for (Map.Entry<String, Long> blob : unackedBlobs(state, replica, acknowledged).entrySet()) unacked.force(blob.getKey(), blob.getValue());
+        if (withBlobs) for (Map.Entry<String, Long> blob : unackedBlobs(state, replica, acknowledged, false).entrySet()) unacked.force(blob.getKey(), blob.getValue());
         JSONObject target = new JSONObject();
         Set<String> present = new HashSet<>();
         long counted = 0;
@@ -314,11 +313,14 @@ final class LinkSync {
     }
 
     /** Blob digests (-> length) of the link cells in this replica's own operations the peer has not acknowledged. */
-    private static Map<String, Long> unackedBlobs(SyncProtocol.State state, String replica, TreeMap<String, Long> acknowledged) throws JSONException {
+    /** `withResolutions`: also count `link.resolve` operations (the budget does not, the purge must: an export may still send their blobs). */
+    private static Map<String, Long> unackedBlobs(SyncProtocol.State state, String replica, TreeMap<String, Long> acknowledged, boolean withResolutions) throws JSONException {
         Map<String, Long> out = new TreeMap<>();
         long seen = acknowledged.getOrDefault(replica, 0L);
         for (SyncProtocol.Operation op : state.history.values()) {
             if (!op.replica.equals(replica) || op.sequence <= seen) continue;
+            JSONObject evidence = op.json.optJSONObject("evidence");
+            if (!withResolutions && evidence != null && RESOLVE_KIND.equals(evidence.optString("kind"))) continue;   // P2: a resolution may repeat the desktop's blob; it is not counted
             for (String key : SyncProtocol.keys(op.changes)) {
                 if (!SyncGraph.isLinkKey(key) || !(key.endsWith("/text") || key.endsWith("/preview")) || op.changes.isNull(key)) continue;
                 JSONObject cell = op.changes.getJSONObject(key);
@@ -326,6 +328,58 @@ final class LinkSync {
             }
         }
         return out;
+    }
+
+    // ---- D6: purge of retained blobs nothing references any more ------------------------------------------------------
+
+    /**
+     * Deletes `sync_blobs/<sha>` files of LINKS whose digest has zero references. Run only AFTER the transaction that changed
+     * the references has committed (the database already says "unreferenced"; a crash before or during the deletes leaves only
+     * files the next pass removes). References, all kept: `files/` refs of history and pending operations (document originals
+     * share the directory), every alternative of every link text/preview register (current cell and conflicted alternatives),
+     * link blobs of every operation (any writer) the peer has not acknowledged, as the export counts them (resolutions included) and of all pending
+     * operations, the link projection, and rows whose preview file still has to be placed. Only a digest that was ever a link
+     * cell digest (history, pending, projection) is deleted, so a document original is never purged. Returns files deleted.
+     */
+    int purge(SyncProtocol.State state, String replica, TreeMap<String, Long> acknowledged) throws IOException, JSONException {
+        String[] names = blobs.list();
+        if (names == null || names.length == 0) return 0;
+        Set<String> everLink = new HashSet<>(), keep = new HashSet<>();
+        List<SyncProtocol.Operation> operations = new ArrayList<>(state.history.values());
+        operations.addAll(state.pending.values());
+        for (SyncProtocol.Operation op : operations) {
+            for (String key : SyncProtocol.keys(op.changes)) {
+                if (op.changes.isNull(key)) continue;
+                if (key.startsWith("files/")) { String sha = shaOf(op.changes.opt(key)); if (sha != null) keep.add(sha); }
+                else if (isBlobKey(key)) { String sha = shaOf(op.changes.opt(key)); if (sha != null) { everLink.add(sha); if (state.pending.containsKey(op.key)) keep.add(sha); } }
+            }
+        }
+        for (Map.Entry<String, List<JSONObject>> entry : state.registers.entrySet()) {
+            if (!isBlobKey(entry.getKey())) continue;
+            for (JSONObject alternative : entry.getValue()) { String sha = shaOf(alternative.opt("value")); if (sha != null) { everLink.add(sha); keep.add(sha); } }
+        }
+        // Q3: a blob is deleted when no register alternative, retained op, pending op, projection or pending preview references it and no
+        // operation the peer has not acknowledged needs it. "Unacknowledged" is the export's notion (SyncExchange.export): every history
+        // operation, of ANY replica, with sequence > acknowledged[op.replica]; its link blobs (resolutions included) are kept.
+        for (SyncProtocol.Operation op : state.history.values()) {
+            if (op.sequence <= acknowledged.getOrDefault(op.replica, 0L)) continue;
+            for (String key : SyncProtocol.keys(op.changes)) if (isBlobKey(key) && !op.changes.isNull(key)) { String sha = shaOf(op.changes.opt(key)); if (sha != null) keep.add(sha); }
+        }
+        JSONObject projection = projection();
+        for (String key : SyncProtocol.keys(projection)) {
+            if (!isBlobKey(key)) continue;
+            String sha = shaOf(projection.opt(key)); if (sha != null) { everLink.add(sha); keep.add(sha); }
+        }
+        try (Cursor c = db.rawQuery("SELECT preview_sha FROM link_records WHERE preview_pending=1", null)) { while (c.moveToNext()) keep.add(c.getString(0)); }
+        int deleted = 0;
+        for (String sha : LinkPurge.deletable(Arrays.asList(names), everLink, keep)) { control.check(); if (new File(blobs, sha).delete()) deleted++; }
+        return deleted;
+    }
+    private static boolean isBlobKey(String key) { return SyncGraph.isLinkKey(key) && (key.endsWith("/text") || key.endsWith("/preview")); }
+    private static String shaOf(Object cell) {
+        if (!(cell instanceof JSONObject)) return null;
+        String sha = ((JSONObject) cell).optString("sha256", null);
+        return LinkPurge.isDigest(sha) ? sha : null;
     }
 
     // ---- blobs: digests and keeping -----------------------------------------------------------------------------------
@@ -578,11 +632,17 @@ final class LinkSync {
      */
     private static JSONObject winnerCells(String base, Map<String, Object> winner, Map<String, Object> other) throws JSONException {
         JSONObject cells = new JSONObject();
+        JSONObject winnerContent = object(winner.get(base + "/content")), otherContent = object(other.get(base + "/content"));
+        // H-C: a /text or /preview cell the winner never wrote (absent, not written-null) is KEPT from the other side when that side's
+        // content hash is the winner's and the winner is not protected; otherwise it is nulled.
+        boolean keepOther = winnerContent != null && otherContent != null && hashOf(winnerContent) != null
+            && hashOf(winnerContent).equals(hashOf(otherContent)) && winnerContent.optLong("protected") != 1;
         for (String suffix : CELL_SUFFIXES) {
             String key = base + suffix;
             Object value = winner.get(key);
             if (suffix.isEmpty() && value == null) value = other.get(key);
             if (suffix.isEmpty() && (value == null || value == JSONObject.NULL)) return null;
+            if (value == null && keepOther && (suffix.equals("/text") || suffix.equals("/preview")) && other.get(key) instanceof JSONObject) value = other.get(key);
             if (value == null || (value == JSONObject.NULL && suffix.equals("/presence"))) value = suffix.equals("/presence") ? livePresence() : JSONObject.NULL;
             cells.put(key, value);
         }
@@ -612,7 +672,13 @@ final class LinkSync {
             if (winner == LinkResolve.Winner.REVIEW) continue;
             boolean phoneWins = winner == LinkResolve.Winner.PHONE;
             JSONObject cells = winnerCells(base, phoneWins ? phone : desk, phoneWins ? desk : phone);
-            if (cells == null) continue;
+            if (cells != null && !phoneWins) {
+                // Rule 2, desktop wins: a link the phone trashed stays trashed (Recently deleted); only its other cells follow the desktop.
+                JSONObject phonePresence = object(phone.get(base + "/presence")), won = object(cells.get(base + "/presence"));
+                if (phonePresence != null && "trashed".equals(phonePresence.optString("state")) && (won == null || "live".equals(won.optString("state"))))
+                    cells.put(base + "/presence", phonePresence);
+            }
+            if (cells == null || !SyncGraph.linkCellsOk(cells, base)) continue;   // same content checks as the writer: a failing link is dropped
             for (String key : SyncProtocol.keys(cells)) changes.put(key, cells.get(key));
             links.put(new JSONObject().put("link", base).put("winner", phoneWins ? "phone" : "desktop").put("basis", "auto"));
             resolved++;
@@ -633,6 +699,16 @@ final class LinkSync {
         sideValues(state, replica, keys, false, desk);
         JSONObject cells = winnerCells(base, phoneSide ? phone : desk, phoneSide ? desk : phone);
         if (cells == null) throw SyncProtocol.invalid("link has no identity");
+        if (!phoneSide) {
+            // Choosing the desktop keeps the phone's causally newer writes: a /title or /filen key that is no longer conflicted was
+            // superseded by a local write, so its register value stays. The content, text and preview cells are the desktop's.
+            JSONObject values = state.values(), conflicts = state.conflicts();
+            for (String suffix : new String[]{"/title", "/filen"}) {
+                String key = base + suffix;
+                if (!conflicts.has(key) && values.has(key)) cells.put(key, values.get(key));
+            }
+        }
+        if (!SyncGraph.linkCellsOk(cells, base)) throw SyncProtocol.invalid("link cells are not valid");
         writeResolution(state, replica, cells, new JSONArray().put(new JSONObject().put("link", base).put("winner", phoneSide ? "phone" : "desktop").put("basis", "review")));
     }
 
@@ -646,6 +722,7 @@ final class LinkSync {
         sideValues(state, replica, keys, true, phone);
         sideValues(state, replica, keys, false, desk);
         for (String base : bases) {
+            if (decide(base, phone, desk) != LinkResolve.Winner.REVIEW) continue;   // a decidable link is not a tie (resolveDecided will write it)
             JSONObject identity = object(phone.get(base)) != null ? object(phone.get(base)) : object(desk.get(base));
             JSONObject phoneTitle = object(phone.get(base + "/title")), deskTitle = object(desk.get(base + "/title"));
             String title = phoneTitle != null ? phoneTitle.optString("title") : deskTitle != null ? deskTitle.optString("title") : "";

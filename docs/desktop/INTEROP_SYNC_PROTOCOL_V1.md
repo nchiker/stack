@@ -108,3 +108,63 @@ kernel. Seven actual SIGKILL cases cover sync originals, transaction, committed
 state, receipt and bundle publication boundaries. File replay never regresses a
 verified acknowledgment. Paired TLS/native controls reuse the same apply path and
 remain distinct from unperformed Android runtime exchange.
+
+## Link records (slice 6; implemented, not yet announced)
+
+Status: both sides can read, write, resolve and purge link cells, but no device announces `links` yet
+(`ANNOUNCE_LINKS=false` in Rust `stack-transport` and Java `PairingTransport`; the switch ships last), so no link cell
+is created today. Wire version stays 1, graph model stays 2, archive format stays 4. The kernel is unchanged. Design:
+`../STACK_LINK_SLICE6_DESIGN.md`.
+
+Hello: optional `"features":["links"]` and optional `"enabled":true|false`, after `frontier`. Absent means the peer does
+not announce. Other unknown fields are still refused. Link cells are never created for a peer that has not announced
+`links`. A client tries `frontier+features`, then `frontier`, then plain within one Sync (a refusal or timeout moves down;
+the level is remembered 15 minutes). On equal frontiers a Sync may end early only if both announce `links` and both are
+`enabled`, or if either does not announce.
+
+Cells: key is `link_records/` + canonical JSON array `["<owner>","<link_id>"]` + suffix. Values are exact-field objects.
+
+| Suffix | Value |
+|---|---|
+| (none) | `{owner, link_id, kind, added_at}`; not null |
+| `/content` | `{hash, mime, modified, shared, protected}` or null |
+| `/text` | `{sha256, length}` (bytes, 1..1,048,576) or null; empty text is null |
+| `/preview` | `{sha256, length}` (1..33,554,432) or null |
+| `/title` | `{title, title_user_edited}` or null; 1..200 UTF-16 units |
+| `/filen` | `{uuid, path}` or null; path at most 1024 UTF-16 units; first filen locator only |
+| `/presence` | `{state: live\|trashed\|gone, reason, since}`; not null; `live` uses since 0; absent means live |
+| `enabled/<replica>` | `{since}` marker, written once by each device in its enable operation (`evidence.kind = "links.enable"`), so the operation is never empty. A device is enabled iff its own marker is in history |
+
+Text and preview bodies are blobs named by digest, kept by copy (never hard link) in `sync_blobs/<sha>` before the
+operation is committed. Link refs are returned in a separate map from document refs and never become paths.
+
+Rules:
+- Receivers check only key shape, exact fields, JSON types, safe-integer range (0..2^53-1) and memory bounds, so one odd
+  cell cannot kill the bundle and the per-origin chain. Semantic limits (patterns, 1000 links, text bytes, title rules,
+  content checks, byte budget) are enforced by the writer, which does not write what fails, and again on projection, which
+  skips and counts an invalid link.
+- Authors: the phone writes every cell on every local change. The desktop writes only one enable operation (empty context,
+  after its hello reply and before it receives a bundle) and never resolves.
+- Conflicts: for a link whose cells conflict the phone applies one rule and writes one `link.resolve` operation with the
+  winner's full 7 cells. Either side `gone`: the phone's cells win. Hashes differ: the later `modified` wins (if the phone
+  had trashed it, trashed is kept). Same hash: the phone's values win. A `modified` tie with different hashes goes to review
+  on the phone only. Conflicted link keys are skipped by projection, hidden from the desktop review screen, refused by
+  desktop `sync_resolve` and ignored by both backup gates.
+- Deletion: the desktop deletes a row only on presence `gone`, never by absence. On `gone` the writer also sends content,
+  text, preview, title and filen as null. A link that is `gone` is never inserted on the phone; a link only the desktop has
+  arrives trashed (reason `user`).
+- Purge: a retained link blob is deleted when it has no reference in document history, current cells, conflicted
+  alternatives or unacknowledged/pending operations (after the peer acknowledges). Cells hold digests only; old text may
+  remain in sync snapshots, and titles and Filen paths remain in history.
+- Caps: 1000 links (non-`gone`), text 1 MiB UTF-8, preview 32 MiB, title 200, 2 GiB of referenced link blobs per device;
+  an operation that would push unacknowledged link blobs over 6 GiB waits for the next acknowledgement. The enable
+  operation on the phone is metadata only (blobs follow). Overall blob limits above (256 MiB each, 8 GiB total) still hold.
+- Protected links (`protected=1`): metadata only; no text or preview cell and no blob.
+- Not synced: `saf`/`owner` locators, `unreachable`/`missing`, `checked_at`, `state_since`, `revision`, stacks/tags/notes
+  for links. Link cells live in a separate projection (`link_projection` on desktop, `sync_link_projection` on the phone;
+  desktop schema 6, phone schema 13) and are cleared, with no link row deleted, by a connection reset.
+
+A pre-slice-6 device that adopts or receives a history containing `link_records/` cells fails in `validate_changes` with
+"unknown graph table". It cannot happen through the hello gate; it can happen through a copied backup or a re-pairing with
+an old app after a connection reset on the new side. There is no silent fallback. An older desktop build refuses a
+schema-6 library.
