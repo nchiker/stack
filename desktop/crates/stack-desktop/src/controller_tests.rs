@@ -10,6 +10,7 @@ use iced::futures::{
     StreamExt,
     stream::{BoxStream, SelectAll},
 };
+use stack_core::keystore::{MemoryStore, SecretStore};
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
@@ -68,6 +69,610 @@ fn sync_settings_exposes_only_connection_and_everyday_actions() {
             driver.send(Message::Back);
             driver.settle().await;
             assert!(!driver.app.sync.open);
+            driver.send(Message::Close);
+            driver.settle().await;
+        });
+}
+
+/// A synthetic encrypted backup in `root` (key bytes 1..=32), with one linked document when asked.
+/// Returns the file and the key as 64 hex characters.
+fn encrypted_backup(root: &Path, with_link: bool) -> (PathBuf, String) {
+    use stack_archive::crypto::{
+        MIN_ITERATIONS, RecoveryKey, SLOT_RECOVERY, Slot, encrypt_to, recovery_slot_key,
+    };
+    let source = root.join("source");
+    std::fs::create_dir_all(source.join("previews")).unwrap();
+    let id = stack_archive::synthetic::id(5001);
+    let pdf: &[u8] = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 72 72]>>endobj\ntrailer<</Root 1 0 R/Size 4>>\n%%EOF\n";
+    std::fs::write(source.join(format!("previews/{id}.pdf")), pdf).unwrap();
+    let mut value = stack_archive::Manifest::empty().into_json();
+    value["version"] = serde_json::json!(4);
+    value["links"] = serde_json::json!([]);
+    if with_link {
+        value["links"] = serde_json::json!([{"id":id,"owner":"org.example.amipro","link_id":stack_archive::synthetic::id(7001),
+        "kind":"doc","title":"Linked budget","mime":"application/vnd.example+json","modified":1,"hash":"a".repeat(64),
+        "shared":0,"protected":1,"locators":"[{\"type\":\"owner\",\"token\":\"t\"}]","state":"live",
+        "title_user_edited":0,"added_at":5,"text":"quarterly zebra budget"}]);
+        value["files"] = serde_json::json!([{"path":format!("previews/{id}.pdf"),"length":pdf.len(),
+        "sha256":stack_archive::digest(pdf)}]);
+    }
+    let manifest = stack_archive::Manifest::from_value(value).unwrap();
+    let mut inner = Vec::new();
+    stack_archive::write(
+        &manifest,
+        &source,
+        &mut inner,
+        &stack_archive::Control::default(),
+    )
+    .unwrap();
+    let key_bytes: [u8; 32] = std::array::from_fn(|i| i as u8 + 1);
+    let salt = [4u8; 16];
+    let slot = recovery_slot_key(&RecoveryKey::from_bytes(key_bytes), &salt);
+    let mut counter = 0u8;
+    let mut random = |b: &mut [u8]| {
+        b.iter_mut().for_each(|x| {
+            counter = counter.wrapping_add(1);
+            *x = counter
+        })
+    };
+    let mut file = Vec::new();
+    let mut writer = encrypt_to(
+        &mut file,
+        &salt,
+        MIN_ITERATIONS,
+        &[Slot {
+            slot_type: SLOT_RECOVERY,
+            key: &slot,
+        }],
+        &mut random,
+    )
+    .unwrap();
+    std::io::Write::write_all(&mut writer, &inner).unwrap();
+    writer.finish().unwrap();
+    let backup = root.join("phone.stackbackup");
+    std::fs::write(&backup, &file).unwrap();
+    let hex: String = key_bytes.iter().map(|b| format!("{b:02x}")).collect();
+    (backup, hex)
+}
+
+/// An encrypted format 4 backup (links only, synthetic key): the key is asked for, a wrong key asks again, the right
+/// key (typed with spaces) reviews and imports the linked documents, which are searchable and open read-only.
+#[test]
+#[ignore = "requires the pinned native engine via STACK_PDFIUM_LIBRARY (the preview is verified by opening it)"]
+fn encrypted_backup_asks_for_a_key_and_imports_linked_documents_read_only() {
+    use crate::transfers_ui::Typed;
+    let _serial = CONTROLLERS.lock().unwrap();
+    let root = tempfile::tempdir().unwrap();
+    let (backup, hex) = encrypted_backup(root.path(), true);
+    let spaced = hex
+        .as_bytes()
+        .chunks(4)
+        .map(|c| std::str::from_utf8(c).unwrap())
+        .collect::<Vec<_>>()
+        .join(" ");
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let mut driver = Driver::new(root.path().join("library"));
+            driver.settle().await;
+            driver.app.transfers.store = Some(Arc::new(MemoryStore::default()));
+            driver.pick(Pick::Archive, vec![backup]).await;
+            assert!(
+                driver.app.transfers.key_entry.is_some() && driver.app.transfers.active.is_none()
+            );
+            // Nothing is staged until a key is entered; an empty submit only explains.
+            driver.send(Message::Transfer(Action::KeySubmit));
+            assert!(
+                driver
+                    .app
+                    .transfers
+                    .key_entry
+                    .as_ref()
+                    .unwrap()
+                    .error
+                    .is_some()
+            );
+            // A malformed key is refused before any work.
+            driver.send(Message::Transfer(Action::KeyTyped(Typed("12345".into()))));
+            driver.send(Message::Transfer(Action::KeySubmit));
+            assert!(
+                driver.app.transfers.active.is_none() && driver.app.transfers.key_entry.is_some()
+            );
+            // A well-formed wrong key fails and asks again; nothing is left behind.
+            driver.send(Message::Transfer(Action::KeyTyped(Typed("ff".repeat(32)))));
+            driver.send(Message::Transfer(Action::KeySubmit));
+            driver.settle().await;
+            let error = driver
+                .app
+                .transfers
+                .key_entry
+                .as_ref()
+                .and_then(|e| e.error.clone())
+                .unwrap();
+            assert!(
+                error.contains("Wrong passphrase or recovery key"),
+                "{error}"
+            );
+            assert!(driver.app.hits.is_empty());
+            let library = driver.app.flags.library.clone().unwrap();
+            assert_eq!(
+                std::fs::read_dir(library.join("operations"))
+                    .unwrap()
+                    .count(),
+                0
+            );
+            // The right key, typed with spaces.
+            driver.send(Message::Transfer(Action::KeyTyped(Typed(spaced))));
+            driver.send(Message::Transfer(Action::KeySubmit));
+            driver.settle().await;
+            assert!(driver.app.transfers.key_entry.is_none());
+            let active = driver.app.transfers.active.as_ref().unwrap();
+            assert_eq!(active.phase, Phase::Review);
+            let review = active.review.as_ref().unwrap();
+            assert_eq!(
+                (review.links_added, review.links_skipped, review.encrypted),
+                (1, 0, true)
+            );
+            driver.send(Message::Transfer(Action::Commit));
+            driver.settle().await;
+            assert!(
+                driver
+                    .app
+                    .transfers
+                    .status
+                    .as_ref()
+                    .unwrap()
+                    .contains("1 linked documents (read-only)")
+            );
+            assert_eq!(driver.app.hits.len(), 1);
+            assert!(driver.app.hits[0].linked);
+            // Searchable by its saved text.
+            driver.send(Message::Query("zebra".into()));
+            driver.settle().await;
+            assert_eq!(driver.app.hits.len(), 1);
+            // Opens read-only: a linked view, never a document with pages.
+            let id = driver.app.hits[0].document_id.clone();
+            driver.send(Message::OpenDocument(id));
+            driver.settle().await;
+            assert!(driver.app.selected.is_none());
+            let linked = driver.app.linked.as_ref().expect("linked view");
+            assert_eq!(
+                (linked.title.as_str(), linked.state.as_str()),
+                ("Linked budget", "unreachable")
+            );
+            let labels = workspace_labels(&driver.app, iced::Size::new(1080., 780.));
+            assert!(
+                labels.iter().any(|l| l.contains("Linked document")),
+                "{labels:?}"
+            );
+            assert!(!labels.iter().any(|l| l == "Open" || l == "Edit document"));
+            driver.send(Message::Back);
+            driver.settle().await;
+            assert!(driver.app.linked.is_none());
+            driver.send(Message::Close);
+            driver.settle().await;
+        });
+}
+
+const FAKE_WRONG_KEY: &str = "ff";
+
+/// With a saved key the backup opens with no prompt; a wrong saved key shows the wrong-key message and the panel;
+/// with nothing saved (or an unavailable store) the panel opens with the plain message. A typed key is saved only
+/// when the box is ticked and only after it opened the backup.
+#[test]
+fn encrypted_backup_uses_the_saved_key_and_falls_back_to_typing() {
+    use crate::transfers_ui::Typed;
+    let _serial = CONTROLLERS.lock().unwrap();
+    let root = tempfile::tempdir().unwrap();
+    let (backup, hex) = encrypted_backup(root.path(), false);
+    let store = Arc::new(MemoryStore::default());
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let mut driver = Driver::new(root.path().join("library"));
+            driver.settle().await;
+            driver.app.transfers.store = Some(store.clone());
+            // Nothing saved: the panel opens with the plain message.
+            driver.pick(Pick::Archive, vec![backup.clone()]).await;
+            assert!(
+                driver.app.transfers.key_entry.is_some() && driver.app.transfers.active.is_none()
+            );
+            let status = driver.app.transfers.status.clone().unwrap();
+            assert!(status == "This backup is locked with a key.", "{status}");
+            // A typed key without the box ticked is not saved, but opens the backup.
+            driver.send(Message::Transfer(Action::KeyTyped(Typed(hex.clone()))));
+            driver.send(Message::Transfer(Action::KeySubmit));
+            driver.settle().await;
+            assert_eq!(
+                driver.app.transfers.active.as_ref().unwrap().phase,
+                Phase::Review
+            );
+            assert!(store.get().unwrap().is_none());
+            driver.send(Message::Transfer(Action::Cancel));
+            driver.settle().await;
+            driver.send(Message::Transfer(Action::Dismiss));
+            // Ticked, but a wrong key: nothing is saved.
+            driver.pick(Pick::Archive, vec![backup.clone()]).await;
+            driver.send(Message::Transfer(Action::SaveKeyToggled(true)));
+            driver.send(Message::Transfer(Action::KeyTyped(Typed(
+                FAKE_WRONG_KEY.repeat(32),
+            ))));
+            driver.send(Message::Transfer(Action::KeySubmit));
+            driver.settle().await;
+            assert!(driver.app.transfers.key_entry.is_some());
+            assert!(
+                store.get().unwrap().is_none(),
+                "a wrong key must never be saved"
+            );
+            driver.send(Message::Transfer(Action::KeyCancel));
+            // Ticked with the right key: saved once the backup has opened.
+            driver.pick(Pick::Archive, vec![backup.clone()]).await;
+            driver.send(Message::Transfer(Action::SaveKeyToggled(true)));
+            driver.send(Message::Transfer(Action::KeyTyped(Typed(hex.clone()))));
+            driver.send(Message::Transfer(Action::KeySubmit));
+            driver.settle().await;
+            assert_eq!(
+                driver.app.transfers.active.as_ref().unwrap().phase,
+                Phase::Review
+            );
+            assert_eq!(store.get().unwrap().unwrap().as_str(), hex);
+            driver.send(Message::Transfer(Action::Cancel));
+            driver.settle().await;
+            driver.send(Message::Transfer(Action::Dismiss));
+            // Saved key: no typing at all; straight to review.
+            driver.pick(Pick::Archive, vec![backup.clone()]).await;
+            assert!(
+                driver.app.transfers.key_entry.is_none() && driver.app.transfers.lookup.is_none(),
+                "{:?}",
+                driver.app.transfers.status
+            );
+            let active = driver.app.transfers.active.as_ref().unwrap();
+            assert_eq!(active.phase, Phase::Review);
+            assert!(active.review.as_ref().unwrap().encrypted);
+            driver.send(Message::Transfer(Action::Cancel));
+            driver.settle().await;
+            driver.send(Message::Transfer(Action::Dismiss));
+            // A wrong saved key: the existing wrong-key message and the panel.
+            store.set(&FAKE_WRONG_KEY.repeat(32)).unwrap();
+            driver.pick(Pick::Archive, vec![backup.clone()]).await;
+            let error = driver
+                .app
+                .transfers
+                .key_entry
+                .as_ref()
+                .unwrap()
+                .error
+                .clone()
+                .unwrap();
+            assert!(
+                error.starts_with("The saved backup key did not open this backup."),
+                "{error}"
+            );
+            assert!(
+                error.contains("Wrong passphrase or recovery key"),
+                "{error}"
+            );
+            driver.send(Message::Transfer(Action::KeyCancel));
+            // An unavailable secret store falls back to typing, with a short message that holds no key.
+            *store.fail.lock().unwrap() =
+                Some("The computer's secret store is not available.".into());
+            driver.pick(Pick::Archive, vec![backup.clone()]).await;
+            assert!(
+                driver.app.transfers.key_entry.is_some() && driver.app.transfers.active.is_none()
+            );
+            let status = driver.app.transfers.status.clone().unwrap();
+            assert!(
+                status.starts_with("The computer's secret store is not available."),
+                "{status}"
+            );
+            assert!(!status.contains(&hex));
+            driver.send(Message::Transfer(Action::KeyCancel));
+            driver.send(Message::Close);
+            driver.settle().await;
+        });
+}
+
+/// The Backup & restore menu only reads the saved-key status: it shows saved / not set / unavailable, never asks the
+/// computer's secret store to unlock, and Remove clears the saved key.
+#[test]
+fn backup_menu_shows_the_key_status_without_unlocking_and_removes_the_key() {
+    use stack_core::keystore::{KeyStatus, fingerprint};
+    use std::sync::atomic::Ordering::SeqCst;
+    let _serial = CONTROLLERS.lock().unwrap();
+    let root = tempfile::tempdir().unwrap();
+    let key = "0123456789abcdef".repeat(4);
+    let store = Arc::new(MemoryStore::default());
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let mut driver = Driver::new(root.path().join("library"));
+            driver.settle().await;
+            driver.app.transfers.store = Some(store.clone());
+            store.set(&key).unwrap();
+            // Locked: opening the menu (twice, quickly) neither unlocks nor reads the key.
+            store.locked.store(true, SeqCst);
+            driver.send(Message::LibraryMenu(true));
+            driver.send(Message::LibraryMenu(false));
+            driver.send(Message::LibraryMenu(true));
+            driver.settle().await;
+            assert_eq!(driver.app.transfers.key_status, Some(Ok(KeyStatus::Locked)));
+            assert_eq!(store.unlocks.load(SeqCst), 0);
+            // Unlocked: the status shows the key is saved (the fingerprint is only a tooltip).
+            store.locked.store(false, SeqCst);
+            driver.send(Message::LibraryMenu(false));
+            driver.send(Message::LibraryMenu(true));
+            driver.settle().await;
+            assert_eq!(
+                driver.app.transfers.key_status,
+                Some(Ok(KeyStatus::Saved {
+                    fingerprint: fingerprint(&key)
+                }))
+            );
+            driver.send(Message::Transfer(Action::RemoveKey));
+            driver.settle().await;
+            assert!(store.get().unwrap().is_none());
+            assert_eq!(driver.app.transfers.key_status, Some(Ok(KeyStatus::NotSet)));
+            driver.send(Message::Close);
+            driver.settle().await;
+        });
+}
+
+/// Starts the panel's paste and returns the request number the clipboard answer must carry.
+fn start_paste(driver: &mut Driver) -> Option<u64> {
+    let before = driver.app.transfers.clip;
+    driver.send(Message::Transfer(Action::PasteKey));
+    let now = driver.app.transfers.clip;
+    if before.is_some() { None } else { now }
+}
+
+/// The panel's paste: late or second clipboard answers never save a key; a wrong key pasted is not saved.
+#[test]
+fn clipboard_answers_are_matched_to_the_panel_request_and_never_save_unverified_keys() {
+    use crate::transfers_ui::Typed;
+    let _serial = CONTROLLERS.lock().unwrap();
+    let root = tempfile::tempdir().unwrap();
+    let (backup, hex) = encrypted_backup(root.path(), false);
+    let good = "11".repeat(32);
+    let wrong = "ff".repeat(32);
+    let store = Arc::new(MemoryStore::default());
+    store.set(&good).unwrap();
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let mut driver = Driver::new(root.path().join("library"));
+            driver.settle().await;
+            driver.app.transfers.store = Some(store.clone());
+            let answer = |id: u64, text: &str| {
+                Message::Transfer(Action::ClipboardKey(id, Some(Typed(text.into()))))
+            };
+            // The saved (wrong) key fails, so the panel opens.
+            driver.pick(Pick::Archive, vec![backup.clone()]).await;
+            assert!(driver.app.transfers.key_entry.is_some());
+            // Pasting a wrong key: the backup does not open and nothing is saved.
+            let id = start_paste(&mut driver).expect("a read starts");
+            assert!(
+                start_paste(&mut driver).is_none(),
+                "a second paste waits for the first"
+            );
+            driver.send(answer(id, &wrong));
+            driver.settle().await;
+            assert!(driver.app.transfers.key_entry.is_some());
+            assert_eq!(store.get().unwrap().unwrap().as_str(), good);
+            // The same answer again (a double delivery) is dropped.
+            driver.send(answer(id, &hex));
+            driver.settle().await;
+            assert!(driver.app.transfers.active.is_none());
+            assert_eq!(store.get().unwrap().unwrap().as_str(), good);
+            // Paste, then Cancel before the answer: the late answer saves nothing and opens nothing.
+            let id = start_paste(&mut driver).unwrap();
+            driver.send(Message::Transfer(Action::KeyCancel));
+            driver.send(answer(id, &hex));
+            driver.settle().await;
+            assert!(
+                driver.app.transfers.key_entry.is_none() && driver.app.transfers.active.is_none()
+            );
+            assert_eq!(store.get().unwrap().unwrap().as_str(), good);
+            // Paste, then a transfer starts by typing the key: the late answer saves nothing.
+            driver.pick(Pick::Archive, vec![backup.clone()]).await;
+            let id = start_paste(&mut driver).unwrap();
+            driver.send(Message::Transfer(Action::KeyTyped(Typed(hex.clone()))));
+            driver.send(Message::Transfer(Action::KeySubmit));
+            driver.settle().await;
+            assert_eq!(
+                driver.app.transfers.active.as_ref().unwrap().phase,
+                Phase::Review
+            );
+            driver.send(answer(id, &wrong));
+            driver.settle().await;
+            assert_eq!(store.get().unwrap().unwrap().as_str(), good);
+            // With no panel and no read pending, an answer does nothing.
+            driver.send(answer(99, &wrong));
+            driver.settle().await;
+            assert_eq!(store.get().unwrap().unwrap().as_str(), good);
+            driver.send(Message::Transfer(Action::Cancel));
+            driver.settle().await;
+            driver.send(Message::Close);
+            driver.settle().await;
+        });
+}
+
+/// A key to save belongs to its own transfer: cancelling it during Preparing, then restoring an unencrypted
+/// backup, saves nothing; and an unencrypted backup reaching review with a pending key saves nothing.
+#[test]
+fn a_pending_key_is_dropped_with_its_transfer_and_never_saved_for_a_plain_backup() {
+    use crate::transfers_ui::Typed;
+    let _serial = CONTROLLERS.lock().unwrap();
+    let root = tempfile::tempdir().unwrap();
+    let (backup, hex) = encrypted_backup(root.path(), false);
+    let plain = root.path().join("plain.stackbackup");
+    {
+        let source = root.path().join("plain-source");
+        std::fs::create_dir_all(&source).unwrap();
+        let mut bytes = Vec::new();
+        stack_archive::write(
+            &stack_archive::Manifest::empty(),
+            &source,
+            &mut bytes,
+            &stack_archive::Control::default(),
+        )
+        .unwrap();
+        std::fs::write(&plain, bytes).unwrap();
+    }
+    let store = Arc::new(MemoryStore::default());
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let mut driver = Driver::new(root.path().join("library"));
+            driver.settle().await;
+            driver.app.transfers.store = Some(store.clone());
+            driver.pick(Pick::Archive, vec![backup.clone()]).await;
+            driver.send(Message::Transfer(Action::SaveKeyToggled(true)));
+            driver.send(Message::Transfer(Action::KeyTyped(Typed(hex.clone()))));
+            driver.send(Message::Transfer(Action::KeySubmit));
+            // Cancel while still preparing, before any reply is handled.
+            driver.send(Message::Transfer(Action::Cancel));
+            driver.settle().await;
+            driver.send(Message::Transfer(Action::Dismiss));
+            assert!(driver.app.transfers.active.is_none());
+            assert!(store.get().unwrap().is_none());
+            // A later plain restore saves nothing.
+            driver.pick(Pick::Archive, vec![plain.clone()]).await;
+            let active = driver.app.transfers.active.as_ref().unwrap();
+            assert_eq!(active.phase, Phase::Review);
+            assert!(!active.review.as_ref().unwrap().encrypted);
+            assert!(store.get().unwrap().is_none());
+            // Even with a key pending, reaching review of a plain backup is no proof of the key.
+            driver.app.transfers.active.as_mut().unwrap().pending_save =
+                Some(zeroize::Zeroizing::new(hex.clone()));
+            driver.send(Message::Transfer(Action::ReviewAgain));
+            driver.settle().await;
+            let active = driver.app.transfers.active.as_ref().unwrap();
+            assert_eq!(active.phase, Phase::Review);
+            assert!(active.pending_save.is_none());
+            assert!(store.get().unwrap().is_none());
+            driver.send(Message::Transfer(Action::Cancel));
+            driver.settle().await;
+            driver.send(Message::Close);
+            driver.settle().await;
+        });
+}
+
+/// Guided flow: no key saved, the user picks an encrypted backup, and one paste from Key Vault opens the same backup
+/// for review (no further action); a bad clipboard stays on the panel; Import lands in the library.
+#[test]
+fn pasting_the_key_on_the_panel_opens_the_same_backup() {
+    guided_paste_flow(false);
+}
+
+/// The same flow with a linked document: the import lands in the library and the link is there (needs PDFium).
+#[test]
+#[ignore = "requires the pinned native engine via STACK_PDFIUM_LIBRARY (the preview is verified by opening it)"]
+fn pasting_the_key_on_the_panel_imports_and_shows_the_linked_document() {
+    guided_paste_flow(true);
+}
+
+fn guided_paste_flow(with_link: bool) {
+    use crate::transfers_ui::Typed;
+    let _serial = CONTROLLERS.lock().unwrap();
+    let root = tempfile::tempdir().unwrap();
+    let (backup, hex) = encrypted_backup(root.path(), with_link);
+    let store = Arc::new(MemoryStore::default());
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let mut driver = Driver::new(root.path().join("library"));
+            driver.settle().await;
+            driver.app.transfers.store = Some(store.clone());
+            driver.pick(Pick::Archive, vec![backup.clone()]).await;
+            assert!(driver.app.transfers.key_entry.is_some());
+            // The panel's one primary button reads the clipboard.
+            let labels = workspace_labels(&driver.app, iced::Size::new(1080., 900.));
+            assert!(
+                labels.iter().any(|l| l == "Paste key from Key Vault"),
+                "{labels:?}"
+            );
+            // An invalid or unreadable clipboard stays on the panel with one short line.
+            let id = start_paste(&mut driver).unwrap();
+            driver.send(Message::Transfer(Action::ClipboardKey(
+                id,
+                Some(Typed("nope".into())),
+            )));
+            driver.settle().await;
+            let id = start_paste(&mut driver).unwrap();
+            driver.send(Message::Transfer(Action::ClipboardKey(id, None)));
+            driver.settle().await;
+            let entry = driver
+                .app
+                .transfers
+                .key_entry
+                .as_ref()
+                .expect("still on the panel");
+            assert_eq!(
+                entry.error.as_deref(),
+                Some(
+                    "The clipboard does not hold a Stack key. In Key Vault, click Copy Stack key."
+                )
+            );
+            assert!(driver.app.transfers.active.is_none() && store.get().unwrap().is_none());
+            // A valid key continues by itself to the review of that same backup.
+            let id = start_paste(&mut driver).unwrap();
+            driver.send(Message::Transfer(Action::ClipboardKey(
+                id,
+                Some(Typed(format!("stackkey1:{hex}\n"))),
+            )));
+            driver.settle().await;
+            assert!(
+                driver.app.transfers.key_entry.is_none(),
+                "{:?}",
+                driver.app.transfers.status
+            );
+            let active = driver
+                .app
+                .transfers
+                .active
+                .as_ref()
+                .expect("review reached");
+            assert_eq!(active.phase, Phase::Review);
+            let receipt = active.review.as_ref().unwrap();
+            assert_eq!(
+                (receipt.documents_added, receipt.links_added),
+                (0, usize::from(with_link))
+            );
+            assert_eq!(store.get().unwrap().unwrap().as_str(), hex);
+            let labels = workspace_labels(&driver.app, iced::Size::new(1080., 900.));
+            let ready = if with_link {
+                "Ready to import: 0 documents, 1 linked document (read-only)"
+            } else {
+                "Ready to import: 0 documents"
+            };
+            assert!(labels.iter().any(|l| l == ready), "{labels:?}");
+            assert!(
+                labels.iter().any(|l| l == "Import 0 documents"),
+                "{labels:?}"
+            );
+            // Import, then the library shows everything: search and stack filter are cleared.
+            driver.send(Message::Query("something".into()));
+            driver.send(Message::Transfer(Action::Commit));
+            driver.settle().await;
+            let status = driver.app.transfers.status.clone().unwrap();
+            assert!(status.starts_with("Saved 0 imported documents"), "{status}");
+            assert_eq!(status.contains("1 linked documents (read-only)"), with_link);
+            assert!(driver.app.query.is_empty() && driver.app.filter.is_none());
+            assert!(!driver.app.sync.open && !driver.app.catalog.open);
+            assert_eq!(driver.app.hits.len(), usize::from(with_link));
+            assert!(driver.app.hits.iter().all(|h| h.linked));
             driver.send(Message::Close);
             driver.settle().await;
         });
@@ -845,7 +1450,7 @@ fn archive_review_pointer_click_survives_a_progress_tick() {
                 iced::mouse::Cursor::Unavailable,
             );
             let nodes: Vec<_> = ui.a11y_nodes(iced::mouse::Cursor::Unavailable).into();
-            assert!(nodes.iter().any(|(_, n)| n.label() == Some("Import reviewed copies")), "review action must be exposed to accessibility");
+            assert!(nodes.iter().any(|(_, n)| n.label() == Some("Import 1 document")), "review action must be exposed to accessibility");
             let mut target = ButtonBounds(None);
             ui.operate(&renderer, &mut target);
             let bounds = target.0.expect("import commit control");

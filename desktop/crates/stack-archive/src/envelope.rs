@@ -61,6 +61,35 @@ pub fn read_into(
     verifier: &dyn SourceVerifier,
     control: &Control,
 ) -> Result<StagedArchive> {
+    stage(input, directory, verifier, control, false)
+}
+
+/// Reads an encrypted backup (outer envelope, inner archive of format 4) into a staging directory. The staging
+/// directory is removed unless the envelope's final chunk verified, so a caller may commit the result as soon as
+/// this returns `Ok`; nothing from a damaged, truncated or extended file survives.
+pub fn read_encrypted_into(
+    input: impl Read,
+    secret: crate::crypto::Secret<'_>,
+    directory: &Path,
+    verifier: &dyn SourceVerifier,
+    control: &Control,
+) -> Result<StagedArchive> {
+    let mut reader = crate::crypto::DecryptReader::open(input, secret)?;
+    let staged = stage(&mut reader, directory, verifier, control, true)?;
+    if let Err(error) = reader.finish() {
+        let _ = fs::remove_dir_all(directory);
+        return Err(error);
+    }
+    Ok(staged)
+}
+
+fn stage(
+    input: &mut impl Read,
+    directory: &Path,
+    verifier: &dyn SourceVerifier,
+    control: &Control,
+    require_v4: bool,
+) -> Result<StagedArchive> {
     control.check()?;
     fs::create_dir(directory)?;
     fs::set_permissions(directory, fs::Permissions::from_mode(0o700))?;
@@ -69,7 +98,7 @@ pub fn read_into(
     input.read_exact(&mut magic)?;
     if &magic != MAGIC {
         return Err(Error::Invalid(
-            "Choose a Stack .stackbackup file, formats 1/2/3",
+            "Choose a Stack .stackbackup file, formats 1 to 4",
         ));
     }
     let mut length = [0; 4];
@@ -88,6 +117,11 @@ pub fn read_into(
     }
     let source_hash = crate::digest(&source_manifest);
     let manifest = Manifest::parse(&source_manifest)?;
+    if require_v4 && manifest.source_version() != 4 {
+        return Err(Error::Invalid(
+            "An encrypted backup must contain archive format 4",
+        ));
+    }
     fs::create_dir(directory.join("originals"))?;
     fs::set_permissions(
         directory.join("originals"),
@@ -106,7 +140,12 @@ pub fn read_into(
         input.read_exact(&mut name)?;
         let path = std::str::from_utf8(&name)
             .map_err(|_| Error::Invalid("Original path must be UTF-8"))?;
-        let (document, _) = original_path(path)?;
+        let preview = path.starts_with("previews/");
+        let document = if preview {
+            crate::links::preview_id(path)?
+        } else {
+            original_path(path)?.0
+        };
         let mut length = [0; 8];
         input.read_exact(&mut length)?;
         let length = i64::from_be_bytes(length);
@@ -115,7 +154,11 @@ pub fn read_into(
                 "Original entry order/path/length disagrees with manifest",
             ));
         }
-        let parent = directory.join("originals").join(document);
+        let parent = if preview {
+            directory.join("previews")
+        } else {
+            directory.join("originals").join(document)
+        };
         if !parent.exists() {
             fs::create_dir(&parent)?;
             fs::set_permissions(&parent, fs::Permissions::from_mode(0o700))?;
@@ -146,6 +189,16 @@ pub fn read_into(
     for entry in manifest.rows("files") {
         control.check()?;
         let path = entry["path"].as_str().expect("validated path");
+        if path.starts_with("previews/") {
+            let mut head = [0u8; 5];
+            let mut file = read_regular(&directory.join(path))?;
+            if file.read_exact(&mut head).is_err() || &head != b"%PDF-" {
+                return Err(Error::Invalid("A preview is not a PDF"));
+            }
+            drop(file);
+            verifier.verify(&directory.join(path), "application/pdf", None)?;
+            continue;
+        }
         let (id, filename) = original_path(path)?;
         let doc = manifest
             .rows("documents")
@@ -165,6 +218,9 @@ pub fn read_into(
         verifier.verify(&directory.join(path), mime, pages)?;
     }
     sync_directory(&directory.join("originals"))?;
+    if directory.join("previews").exists() {
+        sync_directory(&directory.join("previews"))?;
+    }
     sync_directory(directory)?;
     guard.1 = false;
     Ok(StagedArchive {
@@ -190,9 +246,14 @@ pub fn write(
     for entry in manifest.rows("files") {
         control.check()?;
         let path = entry["path"].as_str().expect("validated path");
-        let (doc, _) = original_path(path)?;
-        crate::read_directory(&directory.join("originals"))?;
-        crate::read_directory(&directory.join("originals").join(doc))?;
+        if path.starts_with("previews/") {
+            crate::links::preview_id(path)?;
+            crate::read_directory(&directory.join("previews"))?;
+        } else {
+            let (doc, _) = original_path(path)?;
+            crate::read_directory(&directory.join("originals"))?;
+            crate::read_directory(&directory.join("originals").join(doc))?;
+        }
         let length = entry["length"].as_u64().expect("validated length");
         let mut input = read_regular(&directory.join(path))?;
         if input.metadata()?.len() != length {

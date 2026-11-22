@@ -66,7 +66,7 @@ impl Stack {
         self.tiles.metadata.clear();
         self.tiles.images.clear();
         self.tiles.errors.clear();
-        if self.selected.is_some() || self.opening_document.is_some() {
+        if self.selected.is_some() || self.linked.is_some() || self.opening_document.is_some() {
             return app::Task::none();
         }
         let ids = self
@@ -74,6 +74,7 @@ impl Stack {
             .iter()
             .skip(self.browse_offset)
             .take(crate::RESULTS_PER_PAGE)
+            .filter(|h| !h.linked)
             .map(|h| h.document_id.clone())
             .collect();
         let Some(worker) = &self.repository else {

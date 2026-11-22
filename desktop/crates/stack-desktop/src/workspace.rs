@@ -79,6 +79,8 @@ impl Stack {
                 .is_some_and(|draft| draft.has_changes(document))
         }) {
             "Unsaved changes · use Edit document to review and save".to_owned()
+        } else if self.linked.is_some() {
+            "Linked document · read-only · Stored on this device".to_owned()
         } else if let Some(document) = &self.selected {
             let count = document.pages.len();
             format!(
@@ -108,6 +110,9 @@ impl Stack {
         }
         if self.selected.is_some() {
             return self.document_workspace();
+        }
+        if self.linked.is_some() {
+            return self.linked_workspace();
         }
         if self.opening_document.is_some() {
             return widget::container(self.body("Loading document…"))
@@ -270,23 +275,27 @@ impl Stack {
     }
 
     fn document_card<'a>(&'a self, hit: &'a SearchHit, grid: bool) -> Element<'a, Message> {
-        let marker: Element<'_, Message> =
-            if let Some(image) = self.tiles.images.get(&hit.document_id) {
-                widget::image(image.clone())
-                    .content_fit(iced::ContentFit::Contain)
-                    .width(iced::Length::Fill)
-                    .height(iced::Length::Fill)
-                    .into()
-            } else {
-                widget::container(
-                    widget::icon::from_name("text-x-generic-symbolic")
-                        .icon()
-                        .size(28),
-                )
-                .center_x(iced::Length::Fill)
-                .center_y(iced::Length::Fill)
+        let marker: Element<'_, Message> = if let Some(image) = self
+            .tiles
+            .images
+            .get(&hit.document_id)
+            .filter(|_| !hit.linked)
+        {
+            widget::image(image.clone())
+                .content_fit(iced::ContentFit::Contain)
+                .width(iced::Length::Fill)
+                .height(iced::Length::Fill)
                 .into()
-            };
+        } else {
+            widget::container(
+                widget::icon::from_name("text-x-generic-symbolic")
+                    .icon()
+                    .size(28),
+            )
+            .center_x(iced::Length::Fill)
+            .center_y(iced::Length::Fill)
+            .into()
+        };
         let thumb = widget::container(marker)
             .padding(if grid { 8 } else { 3 })
             .width(if grid {
@@ -306,7 +315,9 @@ impl Stack {
                     iced::advanced::text::EllipsizeHeightLimit::Lines(2),
                 )),
         );
-        if let Some(tile) = self.tiles.metadata.get(&hit.document_id) {
+        if hit.linked {
+            text = text.push(widget::text::caption("Linked document"));
+        } else if let Some(tile) = self.tiles.metadata.get(&hit.document_id) {
             let names: Vec<_> = tile
                 .memberships
                 .iter()
@@ -351,6 +362,67 @@ impl Stack {
             .class(cosmic::theme::Button::ListItem([6.; 4]))
             .on_press(Message::OpenDocument(hit.document_id.clone()))
             .into()
+    }
+
+    /// Read-only view of a linked document: its saved preview and saved text. No Open, no editing.
+    fn linked_workspace(&self) -> Element<'_, Message> {
+        let linked = self.linked.as_ref().expect("linked document");
+        const SHOWN: usize = 20_000;
+        let mut info = widget::column::with_capacity(10)
+            .spacing(12)
+            .push(widget::text::heading("Linked document"))
+            .push(widget::text::caption("Name"))
+            .push(self.body(linked.title.clone()))
+            .push(widget::text::caption("Made in"))
+            .push(self.body(linked.owner.clone()))
+            .push(widget::text::caption("Status"))
+            .push(self.body(
+                "Saved copy only. The original is not reachable from this computer, so it cannot be opened here.",
+            ))
+            .push(widget::text::caption("Saved text"));
+        let text: String = linked.text.chars().take(SHOWN).collect();
+        info = info.push(
+            widget::container(self.body(if text.is_empty() {
+                "No saved text".to_owned()
+            } else if linked.text.chars().nth(SHOWN).is_some() {
+                format!("{text}…")
+            } else {
+                text
+            }))
+            .padding(8)
+            .width(iced::Length::Fill)
+            .class(cosmic::theme::Container::custom(|theme| {
+                flat_surface(theme, true)
+            })),
+        );
+        let preview: Element<'_, Message> = if linked.preview.is_some() {
+            self.preview_view()
+        } else {
+            widget::container(self.body("This linked document has no saved preview."))
+                .padding(24)
+                .width(iced::Length::Fill)
+                .height(iced::Length::Fill)
+                .into()
+        };
+        let body: Element<'_, Message> = if self.narrow {
+            widget::column::with_capacity(3)
+                .push(widget::container(preview).height(iced::Length::FillPortion(1)))
+                .push(widget::divider::horizontal::default())
+                .push(
+                    widget::container(widget::scrollable(info))
+                        .height(iced::Length::FillPortion(1)),
+                )
+                .height(iced::Length::Fill)
+                .into()
+        } else {
+            widget::row::with_capacity(3)
+                .push(widget::container(preview).width(iced::Length::FillPortion(3)))
+                .push(widget::divider::vertical::default())
+                .push(widget::container(widget::scrollable(info)).width(320))
+                .height(iced::Length::Fill)
+                .into()
+        };
+        widget::container(body).padding(0).into()
     }
 
     fn document_workspace(&self) -> Element<'_, Message> {

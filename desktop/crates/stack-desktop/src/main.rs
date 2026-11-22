@@ -311,6 +311,8 @@ struct Stack {
     viewport_height: f32,
     opening_document: Option<String>,
     selected: Option<DocumentView>,
+    /// A linked document being viewed (read-only: saved text and preview).
+    linked: Option<stack_core::LinkedDocument>,
     filter: Option<String>,
     also: Option<String>,
     overlaps: Vec<stack_core::StackOverlap>,
@@ -454,6 +456,7 @@ impl cosmic::Application for Stack {
             viewport_height: 780.,
             opening_document: None,
             selected: None,
+            linked: None,
             filter: None,
             also: None,
             overlaps: Vec::new(),
@@ -666,8 +669,11 @@ impl Stack {
         if self.repository.is_some() {
             return widget::column::with_capacity(3)
                 .push_maybe(
-                    (!self.sync.open && self.selected.is_none() && self.opening_document.is_none())
-                        .then(|| widget::container(self.search_bar()).padding([12, 20])),
+                    (!self.sync.open
+                        && self.selected.is_none()
+                        && self.linked.is_none()
+                        && self.opening_document.is_none())
+                    .then(|| widget::container(self.search_bar()).padding([12, 20])),
                 )
                 .push_maybe(
                     (self.transfers.status.is_some() || self.transfers.active.is_some())
@@ -855,10 +861,24 @@ impl Stack {
         self.editor_open = false;
         self.invalidate_preview();
         self.selected = None;
+        self.linked = None;
         self.opening_document = None;
         self.page = 0;
         self.page_count = 0;
         self.refresh_browser()
+    }
+
+    /// The library view with every document: closes Sync/Manage stacks, clears search and stack filter.
+    fn show_all_documents(&mut self) -> app::Task<Message> {
+        self.sync.open = false;
+        self.catalog.open = false;
+        self.query.clear();
+        self.filter = None;
+        self.also = None;
+        self.browse_offset = 0;
+        self.browse_scroll = 0.;
+        self.rebuild_navigation();
+        self.browse()
     }
 
     fn refresh_browser(&mut self) -> app::Task<Message> {
@@ -983,7 +1003,9 @@ impl Stack {
                 return iced::exit();
             }
             Message::Transfer(action) => {
-                self.library_menu_open = false;
+                if !matches!(action, transfers_ui::Action::KeyStatus(_)) {
+                    self.library_menu_open = false;
+                }
                 return self.transfer_action(action);
             }
             Message::Sync(action) => return self.sync_action(action),
@@ -1074,7 +1096,12 @@ impl Stack {
                 self.browse_scroll = 0.;
                 return self.browse();
             }
-            Message::LibraryMenu(open) => self.library_menu_open = open,
+            Message::LibraryMenu(open) => {
+                self.library_menu_open = open;
+                if open {
+                    return self.refresh_key_status();
+                }
+            }
             Message::RefreshBrowser => {
                 self.library_menu_open = false;
                 return self.refresh_browser();
@@ -1090,6 +1117,13 @@ impl Stack {
             Message::OpenDocument(id) => {
                 self.editor_open = false;
                 self.information_visible = false;
+                if self.hits.iter().any(|h| h.document_id == id && h.linked) {
+                    self.cancel_thumbnails();
+                    self.invalidate_preview();
+                    self.selected = None;
+                    self.opening_document = None;
+                    return self.repository_request(Request::SelectLinked { id });
+                }
                 let matching_page = self
                     .hits
                     .iter()
@@ -1109,6 +1143,7 @@ impl Stack {
                 self.repository_generation += 1;
                 self.invalidate_preview();
                 self.selected = None;
+                self.linked = None;
                 self.library_loading = true;
                 let generation = self.repository_generation;
                 return cosmic::task::future(async move {
@@ -1304,6 +1339,24 @@ impl Stack {
                             return self.select_document(stack_archive::synthetic::id(1), 0);
                         }
                         return self.load_tiles();
+                    }
+                    Ok(Response::SelectedLinked(linked)) => {
+                        let preview = linked.preview.clone();
+                        self.linked = Some(linked);
+                        self.page = 0;
+                        self.page_count = 0;
+                        return match preview {
+                            Some(source) => self.render_job(RenderJob {
+                                source,
+                                page: 0,
+                                rotation: Rotation::None,
+                                saved: None,
+                            }),
+                            None => {
+                                self.invalidate_preview();
+                                app::Task::none()
+                            }
+                        };
                     }
                     Ok(Response::Selected {
                         document,

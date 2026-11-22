@@ -70,3 +70,8 @@ AmiPro cannot tell a deleted Downloads file from one it cannot read (the read gr
 `exists:false` only on a clear file-not-found with no row left; otherwise `unreachable`. The user removes such a record by hand ("Remove from Stack",
 which goes to Recently deleted). No Stack change. Verified on the TEST app: stat/refresh work against real AmiPro; `removed` is covered by
 `LinkLifecycleChecks`, not yet seen from the real AmiPro (it cannot be triggered on this phone). Remaining: release build and publish, on the user's go-ahead.
+
+## Published (2026-11-21)
+**Stack 0.18.0 (code 35)** is on GitHub (release v0.18.0, source checkpoint 1f0d260, signer e873f2fd…, SHA-256 of the APK cf597e37…3ed4). Staged in
+`.artifacts/stack-release-20261121-v0.18.0/`. The test phone still runs the TEST build; the production phone (`5A101JEA313018`) is NOT updated: the user does that
+from Stack's Update notice. Next slices: 5 (unshare/delete in Stack), 6 (sync tombstones), 3b (desktop reads format 4 and encrypted backups), a read-only view of a trashed link.

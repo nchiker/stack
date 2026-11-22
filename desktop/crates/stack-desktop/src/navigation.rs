@@ -12,6 +12,9 @@ pub enum Location {
     ManageStacks,
 }
 
+/// The Backup & restore menu is this wide at most, so it stays inside the sidebar; its labels wrap.
+pub const MENU_WIDTH: f32 = 224.0;
+
 impl Stack {
     pub fn rebuild_navigation(&mut self) {
         self.nav.clear();
@@ -82,6 +85,7 @@ impl Stack {
             || self.sync.open
             || self.editor_open
             || self.selected.is_some()
+            || self.linked.is_some()
             || self.opening_document.is_some()
             || self.also.is_some()
     }
@@ -106,7 +110,7 @@ impl Stack {
         if self.editor_open {
             return self.editor_action(crate::editor::Action::Close);
         }
-        if self.selected.is_some() || self.opening_document.is_some() {
+        if self.selected.is_some() || self.linked.is_some() || self.opening_document.is_some() {
             let browse = self.browse();
             return self.restore_list_position(browse);
         }
@@ -143,7 +147,7 @@ impl Stack {
         .modal(false)
         .on_close(Message::LibraryMenu(false));
         if self.library_menu_open {
-            let actions = widget::column::with_capacity(3)
+            let actions = widget::column::with_capacity(4)
                 .spacing(8)
                 .push(
                     self.button("Import backup…").on_press_maybe(
@@ -157,6 +161,31 @@ impl Stack {
                             .then_some(Message::Transfer(Action::Pick(Pick::ArchiveExport))),
                     ),
                 );
+            use stack_core::keystore::KeyStatus;
+            // One short row; the fingerprint is only in the tooltip. Pasting a key lives in the import panel.
+            let key_row: Element<'_, Message> = match &self.transfers.key_status {
+                Some(Ok(KeyStatus::Saved { fingerprint })) => widget::row::with_capacity(2)
+                    .spacing(8)
+                    .align_y(iced::Alignment::Center)
+                    .push(
+                        widget::tooltip(
+                            widget::text::body("Backup key: saved").width(iced::Length::Fill),
+                            widget::text::caption(format!("Fingerprint {fingerprint}")),
+                            widget::tooltip::Position::Top,
+                        )
+                        .gap(4),
+                    )
+                    .push(self.button("Remove").on_press_maybe(
+                        (!self.transfers.busy()).then_some(Message::Transfer(Action::RemoveKey)),
+                    ))
+                    .into(),
+                Some(Ok(KeyStatus::NotSet)) => widget::text::body("Backup key: not set").into(),
+                Some(Ok(KeyStatus::Locked)) | Some(Err(_)) => {
+                    widget::text::body("Backup key: unavailable").into()
+                }
+                None => widget::text::body("Backup key: checking…").into(),
+            };
+            let actions = actions.push(key_row);
             let actions = actions.push(
                 self.button("Reset or rebuild library…").on_press_maybe(
                     (!self.transfers.busy() && !self.sync.busy && !self.saving)
@@ -165,6 +194,7 @@ impl Stack {
             );
             popup = popup.popup(
                 widget::container(actions)
+                    .width(iced::Length::Fixed(MENU_WIDTH))
                     .padding(12)
                     .class(cosmic::theme::Container::Dropdown),
             );

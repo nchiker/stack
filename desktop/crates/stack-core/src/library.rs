@@ -103,7 +103,7 @@ impl Library {
         lock.try_lock().map_err(|_| Error::Busy)?;
         let lock = Arc::new(lock);
         let mut reset = crate::reset::ColdReset::begin(&root, lock.clone())?;
-        for dir in ["originals", "operations"] {
+        for dir in ["originals", "operations", "links"] {
             private_dir(&root.join(dir))?;
         }
         let database = root.join("library.sqlite3");

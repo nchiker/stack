@@ -16,7 +16,8 @@ use std::{
 #[derive(Clone, Debug)]
 pub enum Kind {
     Source(PathBuf),
-    Archive(PathBuf),
+    /// A backup file and, for an encrypted one, its key. The key is zeroed when the last clone drops.
+    Archive(PathBuf, Option<Arc<stack_core::BackupKey>>),
     ExportArchive(PathBuf),
     ExportPdf {
         token: stack_core::library::DocumentToken,
@@ -103,7 +104,7 @@ pub fn repository(
         RepoRequest::Prepare { id, kind, control } => {
             control.check()?;
             let work = match kind.clone() {
-                Kind::Source(_) | Kind::Archive(_) => Work::Input(library.prepare_import()?, kind),
+                Kind::Source(_) | Kind::Archive(..) => Work::Input(library.prepare_import()?, kind),
                 Kind::ExportArchive(destination) => Work::Export(
                     library.prepare_snapshot(&control)?,
                     library.prepare_output()?,
@@ -247,9 +248,10 @@ pub fn start(store: Store) -> Worker<TransferRequest, TransferOutcome> {
                         Work::Input(work, kind) => {
                             let renderer = stack_render::Renderer::from_environment();
                             let (staged, archive) = match kind {
-                                Kind::Archive(source) => (
-                                    work.archive(
+                                Kind::Archive(source, key) => (
+                                    work.archive_with_key(
                                         &mut stack_archive::read_regular(&source)?,
+                                        key.as_deref(),
                                         &renderer,
                                         &control,
                                     )?,

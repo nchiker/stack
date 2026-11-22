@@ -37,3 +37,4 @@
 
 # Prepared local application deliveries, including binaries and vendored sources.
 /.artifacts/
+.claude/settings.local.json

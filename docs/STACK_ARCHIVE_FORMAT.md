@@ -296,6 +296,37 @@ The manifest and file table are inside the encryption.
   as 64 hex characters, and a confirm-back of its first 6 and last 6 characters before anything is stored.
 - Restoring an unencrypted archive adds "not encrypted, so it cannot be checked for tampering" to the review text.
 
+- Desktop (3b, 2026-11-21): `stack-archive` reads format 4 and the envelope (`crypto.rs`, `links.rs`, `read_encrypted_into`: the staging
+  directory exists only if the final chunk's tag verified; inside an envelope the inner manifest must be version 4). `stack-core`
+  decides by the first 8 bytes: `STACKEN\x01` needs a key (`BackupKey`: the 64-character recovery key, or a passphrase), `STACKBK\x01` is read as
+  before and a key given for it is ignored; the review says "not encrypted, so it cannot be checked for tampering" for plain files. A missing
+  key says "No key for this backup", a wrong one "Wrong passphrase or recovery key, or damaged.". Link rows go to their own tables
+  (`link_records`, `link_search`, schema 5) and previews to `links/<row id>.pdf`, outside the document graph and the sync graph, so nothing that
+  expects pages can meet one. Restore follows the phone: new row ids, state always `unreachable`, a link whose `(owner, link_id)` exists is kept and
+  counted as skipped, previews are moved into `links/` after the restore journal (`links` list) is written and before the single transaction, and
+  an unfinished or failed restore removes them. The receipt carries `links_added`, `links_skipped`, `encrypted`. Linked documents show in All
+  documents and search (title and saved text, labelled "Linked document"), open to a read-only view (saved preview page 1, saved text), with no
+  Open and no editing in the UI; the stored columns keep the locators, hash and flags so a desktop editor could use them later. The desktop does
+  not write link records into its own exports (its archives stay format 3) and does not sync them (slice 6). The key is typed or pasted into a
+  password field (desktop) or read from a file or stdin without echo (`stack-cli archive ROOT restore FILE --saved-key|--key-file PATH|--key-stdin|
+  --passphrase-file PATH|--passphrase-stdin`; never a command-line value), held zeroed-on-drop, and never printed, logged or stored.
+  Saved key (2026-11-21): the desktop keeps the recovery key itself, like the phone. Backup & restore shows one short row: "Backup key: saved" with a
+  "Remove" button (the 12-character fingerprint, the phone's: first 6 bytes of SHA-256 over the lowercase hex text, is only a tooltip;
+  `stack_core::keystore::fingerprint`), "Backup key: not set", or "Backup key: unavailable" (locked or no store; opening the menu never unlocks the
+  store). Pasting lives only in the import panel. Key text (pasted or typed) is parsed by one function: 64 hex characters, optional `stackkey1:` prefix,
+  spaces and dashes ignored. Storage is the OS secret store through `oo7` (`keystore::SystemStore`: Secret portal inside a Flatpak, otherwise Secret Service)
+  behind the `keystore::SecretStore` trait (tests use `MemoryStore`); exactly one entry is kept (set replaces, several or a non-key entry is an error).
+  Opening an encrypted backup uses the saved key with no prompt; with none saved, or a saved key that fails, the key panel opens ("Paste key from Key Vault"
+  continues straight to the review; typing the key or passphrase is the fallback). A pasted or typed key is saved (replacing the old one) only after it
+  opened an encrypted backup, never for a wrong key or a plain archive (core refuses a key for a plain archive). The clipboard answer is matched to its
+  request. A clipboard manager may keep a copy of the pasted key. New computer: Key Vault "Copy Stack key", then Import backup, then "Paste key from Key Vault".
+  CLI: `stack-cli archive ROOT ... --saved-key` uses the same store. A Flatpak build keeps the key in its own sandboxed store, so a host-side
+  `stack-cli --saved-key` will not see it (use `--key-file`/`--key-stdin`, or paste in the app). The Flatpak has no keyring permission. The earlier Key Vault
+  launcher was removed (it needed a dev-machine path and cannot run in the Flatpak sandbox).
+  **Setting up a new computer:** in Key Vault click "Copy Stack key"; in Stack choose Import backup, pick the backup, and click "Paste key from Key Vault"
+  (it opens the backup for review and saves the key on this computer). The fingerprint (menu tooltip) should match the one Key Vault or the phone shows. After that
+  encrypted backups open without asking. The Backup & restore menu shows the key status and a Remove button.
+
 ### Shared test vector (envelope v1)
 Inputs: salt = bytes 100..115; passphrase `correct horse`, 600,000 iterations; recovery key = bytes 200..231 (slot key =
 HMAC-SHA256 as above); random source = a counter returning bytes 1, 2, 3, ... in the order data key (32), passphrase-slot nonce

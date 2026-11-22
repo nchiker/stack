@@ -25,6 +25,7 @@ const OWNED: &[&str] = &[
     "pairing/policy.json",
     "pairing/peer.der",
     "pairing/names.json",
+    "links",
 ];
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

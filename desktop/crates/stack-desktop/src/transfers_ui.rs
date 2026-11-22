@@ -5,7 +5,57 @@ use crate::{
 };
 use cosmic::{Element, app, dialog::file_chooser, iced, widget};
 use stack_archive::Control;
-use std::{collections::VecDeque, path::PathBuf, time::Duration};
+use std::{collections::VecDeque, path::PathBuf, sync::Arc, time::Duration};
+use zeroize::Zeroizing;
+
+/// Text typed into a key field. It never prints: messages are Debug-formatted in places.
+#[derive(Clone)]
+pub struct Typed(pub String);
+impl Drop for Typed {
+    fn drop(&mut self) {
+        zeroize::Zeroize::zeroize(&mut self.0);
+    }
+}
+impl std::fmt::Debug for Typed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Typed(<redacted>)")
+    }
+}
+
+/// An encrypted backup waiting for its key. Held in memory only (zeroed when dropped), never saved or logged.
+pub struct KeyEntry {
+    pub(crate) path: PathBuf,
+    pub(crate) key: Zeroizing<String>,
+    pub(crate) passphrase: Zeroizing<String>,
+    pub(crate) error: Option<String>,
+    /// "Save this key on this computer" (only used with a recovery key).
+    pub(crate) save: bool,
+}
+impl KeyEntry {
+    fn new(path: PathBuf, error: Option<String>) -> Self {
+        Self {
+            path,
+            key: Zeroizing::default(),
+            passphrase: Zeroizing::default(),
+            error,
+            save: false,
+        }
+    }
+}
+
+const NO_SAVED_KEY: &str = "This backup is locked with a key.";
+const CLIPBOARD_NOT_A_KEY: &str =
+    "The clipboard does not hold a Stack key. In Key Vault, click Copy Stack key.";
+
+/// True when the file starts with the encrypted-backup magic (`STACKEN` and version 1).
+fn is_encrypted(path: &std::path::Path) -> bool {
+    use std::io::Read;
+    let mut magic = [0u8; 8];
+    stack_archive::read_regular(path)
+        .and_then(|mut file| file.read_exact(&mut magic).map_err(Into::into))
+        .is_ok()
+        && &magic == stack_archive::crypto::ENVELOPE_MAGIC
+}
 
 #[derive(Clone, Debug)]
 pub enum Pick {
@@ -26,6 +76,24 @@ pub enum Action {
     Retry,
     RetryCleanup,
     Dismiss,
+    KeyTyped(Typed),
+    PassphraseTyped(Typed),
+    KeySubmit,
+    KeyCancel,
+    SaveKeyToggled(bool),
+    /// The saved key was looked up for an encrypted backup (the number says which request; an old answer is ignored
+    /// and its key dropped). `None` means no key is saved.
+    SavedKey(u64, Result<Option<Arc<stack_core::BackupKey>>, String>),
+    /// "Paste key from Key Vault" on the key panel.
+    PasteKey,
+    /// The clipboard text for that request number (`None` when it could not be read); never printed.
+    ClipboardKey(u64, Option<Typed>),
+    /// A paste, or a key entered for a backup, was saved (the fingerprint) or could not be.
+    KeySaved(Result<String, String>),
+    RemoveKey,
+    KeyRemoved(Result<(), String>),
+    /// The saved-key status was read (for the Backup key section).
+    KeyStatus(Result<stack_core::keystore::KeyStatus, String>),
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Phase {
@@ -45,6 +113,10 @@ pub struct Active {
     pub review: Option<stack_core::RestoreReceipt>,
     pub committed: Option<stack_core::RestoreReceipt>,
     pub published: bool,
+    /// The backup was opened with a key (which only the worker holds; it is not kept here).
+    pub keyed: bool,
+    /// A recovery key to save once this backup has opened with it (zeroed when dropped with the transfer).
+    pub(crate) pending_save: Option<Zeroizing<String>>,
 }
 #[derive(Default)]
 pub struct Ui {
@@ -57,10 +129,30 @@ pub struct Ui {
     retry: Option<Kind>,
     control: Control,
     pub bytes: u64,
+    pub key_entry: Option<KeyEntry>,
+    /// An encrypted backup waiting for the saved key to be looked up: (request number, file).
+    pub lookup: Option<(u64, PathBuf)>,
+    lookups: u64,
+    /// The current backup was opened with the saved key (so a failure says the saved key was wrong).
+    used_saved: bool,
+    /// The clipboard read the key panel is waiting for: its request number. Answers for any other number are dropped.
+    pub(crate) clip: Option<u64>,
+    clips: u64,
+    /// A saved-key status read is in flight.
+    key_status_reading: bool,
+    /// What the Backup key section shows; `None` until read.
+    pub key_status: Option<Result<stack_core::keystore::KeyStatus, String>>,
+    /// Where the key is saved; `None` means the computer's secret store. Tests set an in-memory store.
+    pub store: Option<Arc<dyn stack_core::keystore::SecretStore>>,
 }
 impl Ui {
+    pub fn secret_store(&self) -> Arc<dyn stack_core::keystore::SecretStore> {
+        self.store
+            .clone()
+            .unwrap_or_else(|| Arc::new(stack_core::keystore::SystemStore))
+    }
     pub fn busy(&self) -> bool {
-        self.active.is_some() || self.picking
+        self.active.is_some() || self.picking || self.key_entry.is_some() || self.lookup.is_some()
     }
 }
 
@@ -175,6 +267,170 @@ impl Stack {
                 self.transfers.status = None;
                 self.transfers.outcomes.clear();
             }
+            Action::KeyTyped(mut text) => {
+                if let Some(entry) = self.transfers.key_entry.as_mut() {
+                    entry.key = Zeroizing::new(std::mem::take(&mut text.0));
+                    entry.error = None;
+                }
+            }
+            Action::PassphraseTyped(mut text) => {
+                if let Some(entry) = self.transfers.key_entry.as_mut() {
+                    entry.passphrase = Zeroizing::new(std::mem::take(&mut text.0));
+                    entry.error = None;
+                }
+            }
+            Action::SaveKeyToggled(on) => {
+                if let Some(entry) = self.transfers.key_entry.as_mut() {
+                    entry.save = on;
+                }
+            }
+            Action::SavedKey(id, result) => {
+                // An answer for an old request is ignored; its key is dropped (and zeroed) here.
+                if self.transfers.lookup.as_ref().is_none_or(|(c, _)| *c != id) {
+                    return app::Task::none();
+                }
+                let (_, path) = self.transfers.lookup.take().expect("checked above");
+                match result {
+                    Ok(Some(key)) => {
+                        self.transfers.control = Control::default();
+                        self.transfers.used_saved = true;
+                        return self.begin_transfer(Kind::Archive(path, Some(key)));
+                    }
+                    Ok(None) => {
+                        self.transfers.key_entry = Some(KeyEntry::new(path, None));
+                        self.transfers.status = Some(NO_SAVED_KEY.into());
+                    }
+                    Err(message) => {
+                        self.transfers.key_entry = Some(KeyEntry::new(path, None));
+                        self.transfers.status = Some(format!(
+                            "{message} Paste or type the key to open this backup."
+                        ));
+                    }
+                }
+            }
+            Action::KeyCancel => {
+                let waiting = self.transfers.lookup.take().is_some();
+                self.transfers.clip = None; // a late clipboard answer is dropped, never saved
+                if self.transfers.key_entry.take().is_some() || waiting {
+                    self.transfers.status = Some("Backup not opened.".into());
+                }
+            }
+            Action::PasteKey
+                if self.transfers.key_entry.is_some()
+                    && self.transfers.active.is_none()
+                    && !self.transfers.picking
+                    && self.transfers.lookup.is_none()
+                    && self.transfers.clip.is_none() =>
+            {
+                self.transfers.clips += 1;
+                let id = self.transfers.clips;
+                self.transfers.clip = Some(id);
+                return iced::clipboard::read()
+                    .map(move |text| Message::Transfer(Action::ClipboardKey(id, text.map(Typed))))
+                    .map(cosmic::Action::App);
+            }
+            Action::ClipboardKey(id, text) => {
+                // Only the answer to the read the panel is waiting for counts; the text is dropped (zeroed) otherwise.
+                if self.transfers.clip != Some(id) {
+                    return app::Task::none();
+                }
+                self.transfers.clip = None;
+                if self.transfers.active.is_some() || self.transfers.key_entry.is_none() {
+                    return app::Task::none();
+                }
+                let Some(hex) = text
+                    .as_ref()
+                    .and_then(|t| stack_core::keystore::parse_key_text(&t.0))
+                else {
+                    // Stay on the key panel with one short line.
+                    if let Some(entry) = self.transfers.key_entry.as_mut() {
+                        entry.error = Some(CLIPBOARD_NOT_A_KEY.into());
+                    }
+                    return app::Task::none();
+                };
+                let entry = self.transfers.key_entry.take().expect("checked above");
+                // Open this same backup with the pasted key. The key is saved on this computer (replacing an older
+                // one) only once it has opened the backup; a wrong key is never saved. The clipboard is cleared now.
+                let path = entry.path.clone();
+                drop(entry);
+                let open = self.begin_keyed(path, hex.clone(), Some(hex));
+                return app::Task::batch([
+                    open,
+                    iced::clipboard::write::<cosmic::Action<Message>>(String::new()),
+                ]);
+            }
+            Action::KeySaved(result) => match result {
+                Ok(fingerprint) => {
+                    self.transfers.status = Some(format!(
+                        "Backup key saved on this computer. Fingerprint {fingerprint}; check it matches Key Vault."
+                    ));
+                    self.transfers.key_status =
+                        Some(Ok(stack_core::keystore::KeyStatus::Saved { fingerprint }));
+                }
+                Err(message) => {
+                    self.transfers.status =
+                        Some(format!("The backup key was not saved. {message}"));
+                }
+            },
+            Action::RemoveKey if !self.transfers.busy() => {
+                let store = self.transfers.secret_store();
+                return cosmic::task::future(async move {
+                    let result = tokio::task::spawn_blocking(move || store.remove())
+                        .await
+                        .unwrap_or_else(|_| Err("Removing the key failed.".into()));
+                    Message::Transfer(Action::KeyRemoved(result))
+                });
+            }
+            Action::KeyRemoved(result) => match result {
+                Ok(()) => {
+                    self.transfers.status =
+                        Some("Saved backup key removed from this computer.".into());
+                    self.transfers.key_status = Some(Ok(stack_core::keystore::KeyStatus::NotSet));
+                }
+                Err(message) => {
+                    self.transfers.status =
+                        Some(format!("The saved key was not removed. {message}"));
+                }
+            },
+            Action::KeyStatus(result) => {
+                self.transfers.key_status_reading = false;
+                self.transfers.key_status = Some(result);
+            }
+            Action::KeySubmit => {
+                let Some(mut entry) = self.transfers.key_entry.take() else {
+                    return app::Task::none();
+                };
+                let mut pending = None;
+                let key = if !entry.key.trim().is_empty() {
+                    let Some(hex) = stack_core::keystore::parse_key_text(&entry.key) else {
+                        entry.error = Some(
+                            "The recovery key is 64 characters (0-9, a-f); spaces and dashes are fine."
+                                .into(),
+                        );
+                        self.transfers.key_entry = Some(entry);
+                        return app::Task::none();
+                    };
+                    // Saved only once the backup has opened with it (a wrong key is never saved).
+                    pending = entry.save.then(|| hex.clone());
+                    stack_core::BackupKey::recovery(hex.to_string())
+                } else if !entry.passphrase.is_empty() {
+                    stack_core::BackupKey::passphrase(entry.passphrase.to_string())
+                } else {
+                    entry.error = Some("Enter the recovery key, or the passphrase.".into());
+                    self.transfers.key_entry = Some(entry);
+                    return app::Task::none();
+                };
+                let path = entry.path.clone();
+                drop(entry); // zeroes the typed text
+                self.transfers.used_saved = false;
+                self.transfers.control = Control::default();
+                self.transfers.clip = None;
+                let task = self.begin_transfer(Kind::Archive(path, Some(Arc::new(key))));
+                if let Some(active) = self.transfers.active.as_mut() {
+                    active.pending_save = pending;
+                }
+                return task;
+            }
             _ => {}
         }
         app::Task::none()
@@ -213,7 +469,27 @@ impl Stack {
                 self.transfers.queue = files.into();
                 self.next_import()
             }
-            Pick::Archive => self.begin_transfer(Kind::Archive(files[0].clone())),
+            Pick::Archive => {
+                if is_encrypted(&files[0]) {
+                    // The saved key opens it with no prompt. The lookup is off the UI thread (the secret store
+                    // may ask the user to unlock it); typing the key is the fallback.
+                    self.transfers.lookups += 1;
+                    let id = self.transfers.lookups;
+                    let store = self.transfers.secret_store();
+                    self.transfers.lookup = Some((id, files[0].clone()));
+                    self.transfers.status = Some("Looking for the saved backup key…".into());
+                    return cosmic::task::future(async move {
+                        let result = tokio::task::spawn_blocking(move || {
+                            stack_core::keystore::saved_backup_key(store.as_ref())
+                                .map(|key| key.map(Arc::new))
+                        })
+                        .await
+                        .unwrap_or_else(|_| Err("The saved key could not be read.".into()));
+                        Message::Transfer(Action::SavedKey(id, result))
+                    });
+                }
+                self.begin_transfer(Kind::Archive(files[0].clone(), None))
+            }
             Pick::ArchiveExport => self.begin_transfer(Kind::ExportArchive(files[0].clone())),
             Pick::Pdf { token, .. } => self.begin_transfer(Kind::ExportPdf {
                 token,
@@ -243,17 +519,44 @@ impl Stack {
         self.refresh_browser()
     }
 
+    /// Opens an encrypted backup with a recovery key from the panel; `pending` is saved once it has opened.
+    fn begin_keyed(
+        &mut self,
+        path: PathBuf,
+        hex: Zeroizing<String>,
+        pending: Option<Zeroizing<String>>,
+    ) -> app::Task<Message> {
+        self.transfers.used_saved = false;
+        self.transfers.control = Control::default();
+        self.transfers.clip = None;
+        let task = self.begin_transfer(Kind::Archive(
+            path,
+            Some(Arc::new(stack_core::BackupKey::recovery(hex.to_string()))),
+        ));
+        if let Some(active) = self.transfers.active.as_mut() {
+            active.pending_save = pending;
+        }
+        task
+    }
+
     fn begin_transfer(&mut self, kind: Kind) -> app::Task<Message> {
         let id = uuid::Uuid::new_v4().to_string();
         let control = self.transfers.control.clone();
+        // Only the worker keeps an archive's key (dropped when it is done with it); `Active` never holds it.
+        let (shown, keyed) = match &kind {
+            Kind::Archive(path, key) => (Kind::Archive(path.clone(), None), key.is_some()),
+            other => (other.clone(), false),
+        };
         self.transfers.active = Some(Active {
             id: id.clone(),
-            kind: kind.clone(),
+            kind: shown,
+            keyed,
             control: control.clone(),
             phase: Phase::Preparing,
             review: None,
             committed: None,
             published: false,
+            pending_save: None,
         });
         self.transfers.status = Some("Preparing saved-library operation…".into());
         self.transfer_repository(RepoRequest::Prepare { id, kind, control })
@@ -292,6 +595,7 @@ impl Stack {
             return app::Task::none();
         };
         active.phase = Phase::Cleaning;
+        active.pending_save = None; // an unsaved key goes with its transfer
         let id = active.id.clone();
         self.transfer_request(TransferRequest::Discard(id))
     }
@@ -340,13 +644,26 @@ impl Stack {
                 if active.control.check().is_err() {
                     return self.discard_transfer();
                 }
-                self.transfers.status = Some(format!(
-                    "Archive review · {} documents to add · {} matching stacks · {} document ID collisions. This adds copies; selecting this archive again adds more copies.",
-                    receipt.documents_added, receipt.merged_stacks, receipt.document_collisions
-                ));
+                self.transfers.status = None;
+                // Reaching review proves the key only for an encrypted backup (a plain one never used it).
+                let pending = active.pending_save.take().filter(|_| receipt.encrypted);
                 active.review = Some(receipt);
                 active.phase = Phase::Review;
-                app::Task::none()
+                // The key opened this backup, so it is now safe to save it.
+                match pending {
+                    Some(hex) => {
+                        let store = self.transfers.secret_store();
+                        cosmic::task::future(async move {
+                            let result = tokio::task::spawn_blocking(move || {
+                                stack_core::keystore::save_key(store.as_ref(), &hex)
+                            })
+                            .await
+                            .unwrap_or_else(|_| Err("Saving the key failed.".into()));
+                            Message::Transfer(Action::KeySaved(result))
+                        })
+                    }
+                    None => app::Task::none(),
+                }
             }
             RepoOutcome::Committed {
                 id,
@@ -362,8 +679,13 @@ impl Stack {
                     return app::Task::none();
                 };
                 self.transfers.status = Some(format!(
-                    "Saved {} imported documents{}",
+                    "Saved {} imported documents{}{}",
                     receipt.documents_added,
+                    if receipt.links_added > 0 {
+                        format!(" and {} linked documents (read-only)", receipt.links_added)
+                    } else {
+                        String::new()
+                    },
                     if cleanup_needed {
                         "; local cleanup needs retry."
                     } else {
@@ -373,7 +695,7 @@ impl Stack {
                 active.committed = Some(receipt);
                 if cleanup_needed {
                     active.phase = Phase::CleanupNeeded;
-                    return self.refresh_browser();
+                    return self.show_all_documents();
                 }
                 if let Kind::Source(source) = &active.kind {
                     self.transfers
@@ -447,7 +769,7 @@ impl Stack {
                 {
                     self.transfers.status = Some(
                         match &active.kind {
-                            Kind::Archive(_) => {
+                            Kind::Archive(..) => {
                                 "Archive restore canceled; saved library unchanged."
                             }
                             Kind::Source(_) => "Import canceled; completed imports remain saved.",
@@ -461,6 +783,10 @@ impl Stack {
                 }
                 if matches!(active.kind, Kind::ExportArchive(_) | Kind::ExportPdf { .. }) {
                     return app::Task::none();
+                }
+                if active.committed.is_some() && matches!(active.kind, Kind::Archive(..)) {
+                    // Show the imported documents: the library, every stack, no search.
+                    return self.show_all_documents();
                 }
                 self.refresh_browser()
             }
@@ -481,6 +807,7 @@ impl Stack {
             return app::Task::none();
         }
         let canceled = active.control.check().is_err();
+        let keyed = active.keyed;
         if active.phase == Phase::Committing
             && active.review.is_some()
             && !canceled
@@ -504,6 +831,18 @@ impl Stack {
                     self.transfers.failed.push(path.clone());
                 }
             }
+            // An encrypted backup that failed (most often a wrong key) asks for the key again; the key itself
+            // is not kept for a retry.
+            Kind::Archive(path, _) if keyed => {
+                if !canceled {
+                    let message = if self.transfers.used_saved {
+                        format!("The saved backup key did not open this backup. {status}")
+                    } else {
+                        status.clone()
+                    };
+                    self.transfers.key_entry = Some(KeyEntry::new(path.clone(), Some(message)));
+                }
+            }
             kind => {
                 if !canceled {
                     self.transfers.retry = Some(kind.clone());
@@ -512,6 +851,24 @@ impl Stack {
         }
         self.transfers.status = Some(status);
         self.discard_transfer()
+    }
+
+    /// Reads the saved-key status for the Backup key section (off the UI thread).
+    pub fn refresh_key_status(&mut self) -> app::Task<Message> {
+        if self.transfers.key_status_reading {
+            return app::Task::none();
+        }
+        self.transfers.key_status_reading = true;
+        let store = self.transfers.secret_store();
+        // Never unlocks the store: a locked one is shown as unavailable.
+        cosmic::task::future(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                stack_core::keystore::key_status(store.as_ref())
+            })
+            .await
+            .unwrap_or_else(|_| Err("The saved key could not be read.".into()));
+            Message::Transfer(Action::KeyStatus(result))
+        })
     }
 
     pub fn transfer_panel(&self) -> Element<'_, Message> {
@@ -543,12 +900,35 @@ impl Stack {
             }
             let mut actions: Vec<Element<'_, Message>> = Vec::with_capacity(3);
             if active.phase == Phase::Review {
-                actions.push(
-                    self.button("Import reviewed copies")
-                        .id(cosmic::iced::widget::Id::new("stack-import-reviewed"))
-                        .on_press(Message::Transfer(Action::Commit))
-                        .into(),
-                );
+                if let Some(receipt) = &active.review {
+                    let documents =
+                        |n: usize| format!("{n} document{}", if n == 1 { "" } else { "s" });
+                    let mut ready =
+                        format!("Ready to import: {}", documents(receipt.documents_added));
+                    if receipt.links_added > 0 {
+                        let n = receipt.links_added;
+                        ready.push_str(&format!(
+                            ", {n} linked document{} (read-only)",
+                            if n == 1 { "" } else { "s" }
+                        ));
+                    }
+                    content = content.push(self.body(ready));
+                    if !receipt.encrypted {
+                        content = content.push(widget::text::caption(
+                            "This backup is not encrypted, so it cannot be checked for tampering.",
+                        ));
+                    }
+                    let n = receipt.documents_added;
+                    actions.push(
+                        widget::button::suggested(format!("Import {}", documents(n)))
+                            .font_size(14)
+                            .line_height(20)
+                            .height(32.0)
+                            .id(cosmic::iced::widget::Id::new("stack-import-reviewed"))
+                            .on_press(Message::Transfer(Action::Commit))
+                            .into(),
+                    );
+                }
                 actions.push(
                     self.button("Review again")
                         .on_press(Message::Transfer(Action::ReviewAgain))
@@ -566,12 +946,18 @@ impl Stack {
                 && !active.published
             {
                 actions.push(
-                    self.button("Cancel operation")
-                        .on_press(Message::Transfer(Action::Cancel))
-                        .into(),
+                    self.button(if active.phase == Phase::Review {
+                        "Cancel"
+                    } else {
+                        "Cancel operation"
+                    })
+                    .on_press(Message::Transfer(Action::Cancel))
+                    .into(),
                 );
             }
             content = content.push(widget::flex_row(actions).spacing(8));
+        } else if let Some(entry) = &self.transfers.key_entry {
+            content = content.push(self.key_entry_view(entry));
         } else if self.transfers.status.is_some() {
             content = content.push(
                 widget::row::with_capacity(2)
@@ -602,6 +988,59 @@ impl Stack {
             content = content.push(widget::scrollable(outcomes).height(100));
         }
         widget::container(content).padding(12).into()
+    }
+}
+
+impl Stack {
+    fn key_entry_view<'a>(&'a self, entry: &'a KeyEntry) -> Element<'a, Message> {
+        let mut column = widget::column::with_capacity(8).spacing(8);
+        column = column.push(self.body("In Key Vault, click Copy Stack key first."));
+        column = column.push(widget::text::caption(
+            "A clipboard manager may keep a copy of the key.",
+        ));
+        if let Some(error) = &entry.error {
+            column = column.push(self.body(error.as_str()));
+        }
+        column = column
+            .push(
+                widget::button::suggested("Paste key from Key Vault")
+                    .font_size(14)
+                    .line_height(20)
+                    .height(32.0)
+                    .id(widget::Id::new("stack-paste-key"))
+                    .on_press(Message::Transfer(Action::PasteKey)),
+            )
+            .push(widget::text::caption("Type the key or passphrase instead"))
+            .push(
+                widget::secure_input("Recovery key", entry.key.as_str(), None, true)
+                    .on_input(|v| Message::Transfer(Action::KeyTyped(Typed(v))))
+                    .on_submit(|_| Message::Transfer(Action::KeySubmit))
+                    .id(widget::Id::new("stack-backup-key")),
+            )
+            .push(
+                widget::secure_input("Passphrase", entry.passphrase.as_str(), None, true)
+                    .on_input(|v| Message::Transfer(Action::PassphraseTyped(Typed(v))))
+                    .on_submit(|_| Message::Transfer(Action::KeySubmit)),
+            );
+        column
+            .push(
+                widget::checkbox(entry.save)
+                    .label("Save this key on this computer")
+                    .on_toggle(|on| Message::Transfer(Action::SaveKeyToggled(on))),
+            )
+            .push(
+                widget::row::with_capacity(2)
+                    .spacing(8)
+                    .push(
+                        self.button("Open backup")
+                            .on_press(Message::Transfer(Action::KeySubmit)),
+                    )
+                    .push(
+                        self.button("Cancel")
+                            .on_press(Message::Transfer(Action::KeyCancel)),
+                    ),
+            )
+            .into()
     }
 }
 

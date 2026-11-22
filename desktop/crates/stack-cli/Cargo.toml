@@ -13,3 +13,8 @@ stack-sync.workspace = true
 stack-render.workspace = true
 serde_json.workspace = true
 serde.workspace = true
+zeroize.workspace = true
+rustix = { workspace = true, features = ["termios", "stdio"] }
+
+[dev-dependencies]
+tempfile.workspace = true

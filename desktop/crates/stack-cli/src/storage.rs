@@ -244,9 +244,12 @@ pub fn run(args: &[OsString]) -> Result<()> {
                 .collect::<Result<Vec<_>>>()?;
             report(&library.edit_stacks(library.revision()?, StackEdit::Order(ids), &control)?)
         }
-        ("archive", "validate" | "review" | "restore", [input]) => {
-            let staged = library.stage_archive(
+        ("archive", "validate" | "review" | "restore", [input, options @ ..]) => {
+            // An encrypted backup needs its key: from a file or from stdin (no echo on a terminal), never an argument.
+            let key = backup_key(options)?;
+            let staged = library.stage_archive_with_key(
                 &mut stack_archive::read_regular(Path::new(input))?,
+                key.as_ref(),
                 &renderer,
                 &control,
             )?;
@@ -265,6 +268,97 @@ pub fn run(args: &[OsString]) -> Result<()> {
         _ => Err(usage().into()),
     }
 }
+/// `--saved-key` (the key saved on this computer by the desktop app, from the OS secret store), `--key-file PATH`, `--key-stdin`, `--passphrase-file PATH`, `--passphrase-stdin`. The secret is read into a
+/// buffer that is zeroed on drop; it is never printed, logged or accepted as a command-line value.
+fn backup_key(options: &[OsString]) -> Result<Option<stack_core::BackupKey>> {
+    use stack_core::BackupKey;
+    let (recovery, source) = match options {
+        [] => return Ok(None),
+        [flag] if flag == "--saved-key" => {
+            return stack_core::keystore::saved_backup_key(&stack_core::keystore::SystemStore)?
+                .ok_or_else(|| "No backup key is saved on this computer".into())
+                .map(Some);
+        }
+        [flag] if flag == "--key-stdin" => (true, None),
+        [flag] if flag == "--passphrase-stdin" => (false, None),
+        [flag, path] if flag == "--key-file" => (true, Some(path)),
+        [flag, path] if flag == "--passphrase-file" => (false, Some(path)),
+        _ => return Err(usage().into()),
+    };
+    let mut text = match source {
+        Some(path) => read_secret_file(Path::new(path))?,
+        None => read_secret_stdin(if recovery {
+            "Recovery key: "
+        } else {
+            "Passphrase: "
+        })?,
+    };
+    // One trailing line break from a file or a terminal is not part of the secret.
+    while text.ends_with(['\n', '\r']) {
+        text.pop();
+    }
+    if text.is_empty() {
+        return Err("The key is empty".into());
+    }
+    Ok(Some(if recovery {
+        BackupKey::recovery(text)
+    } else {
+        BackupKey::passphrase(text)
+    }))
+}
+
+fn read_secret_file(path: &Path) -> Result<String> {
+    use std::io::Read;
+    let mut bytes = zeroize::Zeroizing::new(Vec::new());
+    stack_archive::read_regular(path)?
+        .take(4097)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() > 4096 {
+        return Err("The key file is too large".into());
+    }
+    String::from_utf8(std::mem::take(&mut *bytes))
+        .map_err(|_| "The key file must be UTF-8 text".into())
+}
+
+/// Reads one line from standard input a byte at a time (no buffered copy of the secret is left behind), with
+/// terminal echo off when it is a terminal.
+fn read_secret_stdin(prompt: &str) -> Result<String> {
+    use rustix::termios::{LocalModes, OptionalActions, isatty, tcgetattr, tcsetattr};
+    use std::io::Write;
+    let stdin = rustix::stdio::stdin();
+    struct Restore(rustix::termios::Termios);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            let _ = tcsetattr(rustix::stdio::stdin(), OptionalActions::Flush, &self.0);
+        }
+    }
+    let _restore = if isatty(stdin) {
+        let original = tcgetattr(stdin)?;
+        let mut quiet = original.clone();
+        quiet.local_modes.remove(LocalModes::ECHO);
+        tcsetattr(stdin, OptionalActions::Flush, &quiet)?;
+        eprint!("{prompt}");
+        std::io::stderr().flush()?;
+        Some(Restore(original))
+    } else {
+        None
+    };
+    let mut bytes = zeroize::Zeroizing::new(Vec::new());
+    let mut one = [0u8; 1];
+    loop {
+        if rustix::io::read(stdin, &mut one)? == 0 || one[0] == b'\n' {
+            break;
+        }
+        if bytes.len() >= 4096 {
+            return Err("The key is too long".into());
+        }
+        bytes.push(one[0]);
+    }
+    if _restore.is_some() {
+        eprintln!();
+    }
+    String::from_utf8(std::mem::take(&mut *bytes)).map_err(|_| "The key must be UTF-8 text".into())
+}
 fn visibility(value: &str) -> Result<bool> {
     match value {
         "show" => Ok(true),
@@ -273,7 +367,7 @@ fn visibility(value: &str) -> Result<bool> {
     }
 }
 fn usage() -> &'static str {
-    "Usage: stack-cli library ROOT status|reindex|manifest|journal|search QUERY [STACK]|import FILE TITLE|rename ID TITLE|notes ID TEXT|file ID [STACK...]|detail ID JSON_FILE|remove-detail ID FIELD|delete ID|page-order ID PAGE...|stack-create NAME COLOR show/hide|stack-rename ID NAME|stack-visibility ID show/hide|stack-delete ID|stack-order ID...; stack-cli archive ROOT validate|review|restore FILE|export NEW_FILE; stack-cli m1-fixtures M0_FIXTURES NEW_DIRECTORY"
+    "Usage: stack-cli library ROOT status|reindex|manifest|journal|search QUERY [STACK]|import FILE TITLE|rename ID TITLE|notes ID TEXT|file ID [STACK...]|detail ID JSON_FILE|remove-detail ID FIELD|delete ID|page-order ID PAGE...|stack-create NAME COLOR show/hide|stack-rename ID NAME|stack-visibility ID show/hide|stack-delete ID|stack-order ID...; stack-cli archive ROOT validate|review|restore FILE [--saved-key|--key-file PATH|--key-stdin|--passphrase-file PATH|--passphrase-stdin]|export NEW_FILE; stack-cli m1-fixtures M0_FIXTURES NEW_DIRECTORY"
 }
 
 /// External SIGKILL harness hook, restricted to explicit synthetic /tmp roots.
@@ -351,4 +445,39 @@ fn interruption(
         _ => return Err("Expected restore, export or sync-import probe".into()),
     }
     Err("Checkpoint was not reached".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn key_options_read_a_file_and_refuse_anything_else() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("key.txt");
+        fs::write(&file, format!("{}\n", "ab".repeat(32))).unwrap();
+        let args = |v: &[&str]| v.iter().map(OsString::from).collect::<Vec<_>>();
+        assert!(backup_key(&[]).unwrap().is_none());
+        let key = backup_key(&args(&["--key-file", file.to_str().unwrap()]))
+            .unwrap()
+            .unwrap();
+        assert_eq!(format!("{key:?}"), "BackupKey(<redacted>)");
+        assert!(
+            backup_key(&args(&["--passphrase-file", file.to_str().unwrap()]))
+                .unwrap()
+                .is_some()
+        );
+        // A key on the command line is not an option; unknown or missing values are usage errors.
+        assert!(backup_key(&args(&["--key", &"ab".repeat(32)])).is_err());
+        assert!(backup_key(&args(&["--key-file"])).is_err());
+        assert!(
+            backup_key(&args(&[
+                "--key-file",
+                dir.path().join("none").to_str().unwrap()
+            ]))
+            .is_err()
+        );
+        fs::write(&file, "\n").unwrap();
+        assert!(backup_key(&args(&["--key-file", file.to_str().unwrap()])).is_err());
+    }
 }

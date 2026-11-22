@@ -1,11 +1,14 @@
 //! Android-compatible Stack archive metadata and streaming envelope. No UI or database.
+pub mod crypto;
 mod envelope;
+pub mod links;
 pub mod strict_json;
 pub mod synthetic;
 pub mod validation;
 
 pub use envelope::{
-    Control, SourceVerifier, StagedArchive, file_hash, read_into, reserve_space, transfer, write,
+    Control, SourceVerifier, StagedArchive, file_hash, read_encrypted_into, read_into,
+    reserve_space, transfer, write,
 };
 pub use validation::{Manifest, clean_name, java_case_key, utf16_len};
 
@@ -21,13 +24,35 @@ pub enum Error {
     #[error("Archive metadata is invalid: {0}")]
     Metadata(String),
     #[error("Archive I/O failed: {0}")]
-    Io(#[from] std::io::Error),
+    Io(std::io::Error),
+    #[error("{0}")]
+    Envelope(#[from] crypto::EnvelopeError),
     #[error("Archive JSON failed: {0}")]
     Json(#[from] serde_json::Error),
     #[error("Original could not be validated: {0}")]
     Source(String),
     #[error("Operation canceled before commit")]
     Canceled,
+}
+
+impl From<std::io::Error> for Error {
+    /// Envelope failures travel through `Read` as io errors; recover them as typed errors.
+    fn from(error: std::io::Error) -> Self {
+        if error
+            .get_ref()
+            .is_some_and(|inner| inner.is::<crypto::EnvelopeError>())
+        {
+            if let Ok(inner) = error
+                .into_inner()
+                .expect("checked")
+                .downcast::<crypto::EnvelopeError>()
+            {
+                return Error::Envelope(*inner);
+            }
+            unreachable!("type was checked");
+        }
+        Error::Io(error)
+    }
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

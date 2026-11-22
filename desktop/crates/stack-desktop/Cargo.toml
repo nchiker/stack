@@ -22,6 +22,7 @@ iced-accessibility.workspace = true
 tokio.workspace = true
 image.workspace = true
 qrcodegen.workspace = true
+zeroize.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

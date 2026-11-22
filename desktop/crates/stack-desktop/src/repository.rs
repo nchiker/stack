@@ -26,6 +26,9 @@ pub enum Request {
         also: Option<String>,
         sort: Option<Sort>,
     },
+    SelectLinked {
+        id: String,
+    },
     Select {
         id: String,
         page: usize,
@@ -101,6 +104,7 @@ pub enum Response {
     SavedDocument(DocumentView),
     DeletedDocument(String),
     Operation(crate::operations::RepoOutcome),
+    SelectedLinked(stack_core::LinkedDocument),
     Selected {
         document: DocumentView,
         page: usize,
@@ -318,6 +322,9 @@ pub fn start_operations(
                 Request::Delete { token } => {
                     library.delete_document(&token, &stack_archive::Control::default())?;
                     Ok(Response::DeletedDocument(token.id))
+                }
+                Request::SelectLinked { id } => {
+                    Ok(Response::SelectedLinked(library.linked_document(&id)?))
                 }
                 Request::Select {
                     id,

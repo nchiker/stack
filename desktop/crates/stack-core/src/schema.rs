@@ -1,7 +1,7 @@
 use crate::library::{Error, Result};
 use rusqlite::Connection;
 
-pub const VERSION: i64 = 4;
+pub const VERSION: i64 = 5;
 const APPLICATION_ID: i64 = 0x53544b44;
 
 pub const V1: &str = "
@@ -27,6 +27,13 @@ INSERT INTO meta VALUES('next_sequence','1');
 const V3: &str = "
 CREATE TABLE text_jobs(page_id TEXT PRIMARY KEY,document_id TEXT NOT NULL,incarnation TEXT NOT NULL,content_revision INTEGER NOT NULL,config TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN('queued','reading','ready','no_text','failed','cancelled')),attempt INTEGER NOT NULL DEFAULT 0,nonce TEXT NOT NULL DEFAULT '',error TEXT NOT NULL DEFAULT '',method TEXT NOT NULL DEFAULT '');
 CREATE INDEX text_jobs_queue ON text_jobs(state,document_id,page_id);
+";
+
+/// Linked-document records (archive format 4). They live outside `documents`/`objects`: they have no pages, are not
+/// part of the sync graph and are never exported by the desktop. The preview PDF is a file in `links/<row_id>.pdf`.
+const V5: &str = "
+CREATE TABLE link_records(row_id TEXT PRIMARY KEY,owner TEXT NOT NULL,link_id TEXT NOT NULL,kind TEXT NOT NULL,title TEXT NOT NULL,mime TEXT NOT NULL,modified INTEGER NOT NULL,hash TEXT NOT NULL,shared INTEGER NOT NULL,protected INTEGER NOT NULL,locators TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN('live','unreachable','missing','trashed')),title_user_edited INTEGER NOT NULL,added_at INTEGER NOT NULL,text TEXT NOT NULL,preview INTEGER NOT NULL CHECK(preview IN(0,1)),UNIQUE(owner,link_id));
+CREATE VIRTUAL TABLE link_search USING fts5(row_id UNINDEXED,title,body,tokenize='unicode61');
 ";
 
 pub fn migrate(db: &mut Connection) -> Result<()> {
@@ -79,6 +86,10 @@ pub fn migrate(db: &mut Connection) -> Result<()> {
         db.prepare("SELECT singleton,state,projection,baseline FROM sync_state LIMIT 0")?;
         db.prepare("SELECT peer,frontier FROM sync_receipts LIMIT 0")?;
     }
+    if version >= 5 {
+        db.prepare("SELECT row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,title_user_edited,added_at,text,preview FROM link_records LIMIT 0")?;
+        db.prepare("SELECT row_id,title,body FROM link_search LIMIT 0")?;
+    }
     if version < VERSION {
         let tx = db.transaction()?;
         if version < 1 {
@@ -92,6 +103,9 @@ pub fn migrate(db: &mut Connection) -> Result<()> {
         }
         if version < 4 {
             tx.execute_batch("CREATE TABLE sync_state(singleton INTEGER PRIMARY KEY CHECK(singleton=1),state TEXT NOT NULL,projection TEXT NOT NULL,baseline TEXT NOT NULL);CREATE TABLE sync_receipts(peer TEXT PRIMARY KEY,frontier TEXT NOT NULL);")?;
+        }
+        if version < 5 {
+            tx.execute_batch(V5)?;
         }
         tx.pragma_update(None, "application_id", APPLICATION_ID)?;
         tx.pragma_update(None, "user_version", VERSION)?;

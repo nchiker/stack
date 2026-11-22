@@ -1,4 +1,5 @@
 //! Complete row allowlists, exact typed values and graph validation for formats 1/2/3.
+use crate::links;
 use crate::{Error, MANIFEST_LIMIT, Result, strict_json};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -35,7 +36,7 @@ impl Manifest {
         }
         let mut value = strict_json::object(bytes)?;
         validate(&value)?;
-        let source_version = number(&value, "version", 1, 3)? as u8;
+        let source_version = number(&value, "version", 1, 4)? as u8;
         if source_version == 1 {
             for doc in value["documents"]
                 .as_array_mut()
@@ -362,7 +363,7 @@ fn validate(value: &Value) -> Result<()> {
     let version = number(value, "version", 1, i64::MAX)?;
     let schema = number(value, "schema", 0, i64::MAX)?;
     if string(value, "format", 64)? != "org.stackdocs.library"
-        || !matches!((version, schema), (1, 6) | (2, 7) | (3, 8))
+        || !matches!((version, schema), (1, 6) | (2, 7) | (3, 8) | (4, 8))
     {
         return Err(Error::Invalid(
             "Unsupported archive version/schema; keep it for a compatible release",
@@ -372,6 +373,8 @@ fn validate(value: &Value) -> Result<()> {
         value,
         if version == 1 {
             "format,version,schema,created_at,documents,pages,stacks,memberships,suggestions,choices,decision_evidence,files"
+        } else if version == 4 {
+            "format,version,schema,created_at,documents,pages,stacks,memberships,suggestions,choices,decision_evidence,files,details,tags,document_tags,links"
         } else {
             "format,version,schema,created_at,documents,pages,stacks,memberships,suggestions,choices,decision_evidence,files,details,tags,document_tags"
         },
@@ -439,13 +442,13 @@ fn validate(value: &Value) -> Result<()> {
     for (position, row) in rows(value, "stacks", 1000)?.iter().enumerate() {
         keys(
             row,
-            if version == 3 {
+            if version >= 3 {
                 "id,name,color,visible,sort_order"
             } else {
                 "id,name,color,visible"
             },
         )?;
-        if version == 3 {
+        if version >= 3 {
             number(row, "sort_order", position as i64, position as i64)?;
         }
         let id = string(row, "id", 80)?;
@@ -641,9 +644,26 @@ fn validate(value: &Value) -> Result<()> {
     let mut paths = BTreeSet::new();
     let mut owners = BTreeSet::new();
     let mut total = 0_u64;
+    let link_ids = if version >= 4 {
+        links::validate(rows(value, "links", links::LINK_LIMIT)?)?
+    } else {
+        BTreeSet::new()
+    };
     for row in rows(value, "files", 20_000)? {
         keys(row, "path,length,sha256")?;
         let path = string(row, "path", 160)?;
+        if path.starts_with("previews/") {
+            let id = links::preview_id(path)?;
+            if !link_ids.contains(id) || !paths.insert(path) {
+                return Err(Error::Invalid("Invalid or duplicate preview entry"));
+            }
+            total += number(row, "length", 1, links::MAX_PREVIEW as i64)? as u64;
+            if total > crate::TOTAL_BYTES {
+                return Err(Error::Invalid("Archive exceeds 8 GiB original-byte limit"));
+            }
+            sha(string(row, "sha256", 64)?)?;
+            continue;
+        }
         let (doc, _) = crate::original_path(path)?;
         if !documents.contains_key(doc) || !paths.insert(path) {
             return Err(Error::Invalid("Invalid or duplicate original entry"));

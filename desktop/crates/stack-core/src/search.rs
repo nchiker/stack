@@ -14,6 +14,8 @@ pub struct SearchHit {
     pub title: String,
     pub snippet: String,
     pub page_id: Option<String>,
+    /// A linked document (archive format 4): read-only, opened with `Library::linked_document`.
+    pub linked: bool,
 }
 
 /// Another stack that shares documents with a chosen stack.
@@ -82,7 +84,7 @@ impl Library {
             Sort::Name => "s.title COLLATE NOCASE,d.id",
         };
         let mut sql = String::from(
-            "SELECT d.id,s.title FROM document_search s JOIN documents d ON d.id=s.document_id WHERE d.active=1 AND (?1 IS NULL OR EXISTS(SELECT 1 FROM objects o WHERE o.kind='memberships' AND o.active=1 AND o.document_id=d.id AND json_extract(o.payload,'$.stack_id')=?1)) AND (?4 IS NULL OR EXISTS(SELECT 1 FROM objects o WHERE o.kind='memberships' AND o.active=1 AND o.document_id=d.id AND json_extract(o.payload,'$.stack_id')=?4))",
+            "SELECT d.id,s.title,json_extract(d.payload,'$.added_at') FROM document_search s JOIN documents d ON d.id=s.document_id WHERE d.active=1 AND (?1 IS NULL OR EXISTS(SELECT 1 FROM objects o WHERE o.kind='memberships' AND o.active=1 AND o.document_id=d.id AND json_extract(o.payload,'$.stack_id')=?1)) AND (?4 IS NULL OR EXISTS(SELECT 1 FROM objects o WHERE o.kind='memberships' AND o.active=1 AND o.document_id=d.id AND json_extract(o.payload,'$.stack_id')=?4))",
         );
         if !expression.is_empty() {
             sql.push_str(" AND document_search MATCH ?2");
@@ -92,11 +94,17 @@ impl Library {
         sql.push_str(&format!(" ORDER BY {order} LIMIT ?3"));
         let mut statement = self.db.prepare(&sql)?;
         let rows = statement.query_map(params![stack, expression, limit, also], |r| {
-            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, i64>(2)?,
+            ))
         })?;
         let mut hits = Vec::new();
+        let mut keys = Vec::new();
         for row in rows {
-            let (id, title) = row?;
+            let (id, title, added) = row?;
+            keys.push(added);
             let page: Option<(String, String)> = if expression.is_empty() {
                 None
             } else {
@@ -112,7 +120,42 @@ impl Library {
                 title,
                 snippet,
                 page_id,
+                linked: false,
             });
+        }
+        // Linked documents have no stacks yet, so they join only unfiltered results.
+        if stack.is_none() && also.is_none() {
+            let links = self.link_hits(&expression, sort, limit)?;
+            if !links.is_empty() {
+                let mut merged: Vec<(i64, SearchHit)> = keys.into_iter().zip(hits).collect();
+                merged.extend(links.into_iter().map(|(id, title, added, snippet)| {
+                    (
+                        added,
+                        SearchHit {
+                            document_id: id,
+                            title,
+                            snippet,
+                            page_id: None,
+                            linked: true,
+                        },
+                    )
+                }));
+                match sort {
+                    Sort::Newest => merged.sort_by(|a, b| {
+                        b.0.cmp(&a.0)
+                            .then_with(|| a.1.document_id.cmp(&b.1.document_id))
+                    }),
+                    Sort::Name => merged.sort_by(|a, b| {
+                        // SQLite NOCASE folds ASCII only.
+                        a.1.title
+                            .to_ascii_lowercase()
+                            .cmp(&b.1.title.to_ascii_lowercase())
+                            .then_with(|| a.1.document_id.cmp(&b.1.document_id))
+                    }),
+                }
+                merged.truncate(limit as usize);
+                return Ok(merged.into_iter().map(|(_, hit)| hit).collect());
+            }
         }
         Ok(hits)
     }

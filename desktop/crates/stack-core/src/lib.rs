@@ -3,7 +3,9 @@ mod browsing;
 pub mod clock;
 mod editing;
 mod interchange;
+pub mod keystore;
 pub mod library;
+mod links;
 pub mod reset;
 mod schema;
 mod search;
@@ -15,6 +17,7 @@ pub use interchange::{
     FrozenSnapshot, IdMappings, ImportWork, OutputWork, RestorePlan, RestoreReceipt, SnapshotWork,
     StagedImport,
 };
+pub use links::{BackupKey, LinkedDocument};
 pub use search::{SearchHit, Sort, StackOverlap};
 pub use text::{TEXT_CONFIG, TextJob, TextOutput, TextStatus};
 

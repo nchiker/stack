@@ -27,7 +27,7 @@ Keep only the `stable` branch installed so the launcher cannot start an older
 build. The app uses the existing library in the host's
 `~/.local/share/org.stackdocs.desktop`; removing the Flatpak does not remove it.
 Permissions: display, GPU, local network sync, Stack's own data and preferences,
-and read-only COSMIC settings. File import/export goes through the desktop portal.
+and read-only COSMIC settings. The saved backup key is kept through the Secret portal (no host keyring permission; the Flatpak keeps it in its own sandboxed store). File import/export goes through the desktop portal.
 
 `tools/package_desktop.py` still prepares a standalone (non-Flatpak) install from
 locally built binaries and refuses binaries older than the source;

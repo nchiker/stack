@@ -1,7 +1,9 @@
+use crate::BackupKey;
 use crate::library::{
     self, Error, Library, Result, bindings, journal, meta, private_dir, put_meta, sync_id,
     write_graph,
 };
+use crate::links::preview_file;
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -22,6 +24,9 @@ pub struct IdMappings {
     pub stacks: BTreeMap<String, String>,
     pub tags: BTreeMap<String, String>,
     pub scans: BTreeMap<String, String>,
+    /// Linked-document source id to local row id (only links that were inserted).
+    #[serde(default)]
+    pub links: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -33,9 +38,48 @@ pub struct RestoreReceipt {
     pub source_version: u8,
     pub source_hash: String,
     pub mappings: IdMappings,
+    /// Linked documents added as read-only records.
+    #[serde(default)]
+    pub links_added: usize,
+    /// Linked documents left out because the same `(owner, link_id)` is already here.
+    #[serde(default)]
+    pub links_skipped: usize,
+    /// The archive came in an encrypted envelope (otherwise it could not be checked for tampering).
+    #[serde(default)]
+    pub encrypted: bool,
+}
+
+impl RestoreReceipt {
+    /// Plain words for the review and the saved message.
+    pub fn summary(&self) -> String {
+        let mut text = format!(
+            "{} documents to add, {} matching stacks, {} document ID collisions",
+            self.documents_added, self.merged_stacks, self.document_collisions
+        );
+        if self.links_added > 0 || self.links_skipped > 0 {
+            text.push_str(&format!(
+                "; {} linked documents imported (read-only), {} linked documents skipped (already here)",
+                self.links_added, self.links_skipped
+            ));
+        }
+        if !self.encrypted {
+            text.push_str(". This archive is not encrypted, so it cannot be checked for tampering");
+        }
+        text
+    }
+}
+
+/// A linked document ready to insert: validated archive row plus its new local id.
+#[derive(Clone)]
+struct LinkInsert {
+    source_id: String,
+    row_id: String,
+    row: Value,
+    preview: bool,
 }
 
 pub struct StagedImport {
+    encrypted: bool,
     operation: String,
     directory: PathBuf,
     library_root: PathBuf,
@@ -62,9 +106,61 @@ impl ImportWork {
         verifier: &dyn SourceVerifier,
         control: &Control,
     ) -> Result<StagedImport> {
-        let archive =
-            stack_archive::read_into(input, &self.directory.join("input"), verifier, control)?;
+        self.archive_with_key(input, None, verifier, control)
+    }
+    /// Plain or encrypted archive. The first 8 bytes decide: `STACKEN\x01` is the encrypted envelope (a key is
+    /// required; nothing is staged without one), `STACKBK\x01` is a plain archive (a key is refused: reaching review must never be mistaken for proof of the key).
+    pub fn archive_with_key(
+        self,
+        input: &mut impl Read,
+        key: Option<&BackupKey>,
+        verifier: &dyn SourceVerifier,
+        control: &Control,
+    ) -> Result<StagedImport> {
+        let mut magic = [0u8; 8];
+        let mut have = 0;
+        while have < magic.len() {
+            let n = input.read(&mut magic[have..])?;
+            if n == 0 {
+                break;
+            }
+            have += n;
+        }
+        let mut stream = std::io::Cursor::new(magic[..have].to_vec()).chain(input);
+        let target = self.directory.join("input");
+        let encrypted = have == 8 && &magic == stack_archive::crypto::ENVELOPE_MAGIC;
+        let archive = if encrypted {
+            let key = key.ok_or(Error::Invalid(
+                "No key for this backup: it is encrypted. Enter its recovery key or passphrase.",
+            ))?;
+            if key.recovery {
+                let recovery = stack_archive::crypto::RecoveryKey::parse(&key.text)?;
+                stack_archive::read_encrypted_into(
+                    &mut stream,
+                    stack_archive::crypto::Secret::Recovery(&recovery),
+                    &target,
+                    verifier,
+                    control,
+                )?
+            } else {
+                stack_archive::read_encrypted_into(
+                    &mut stream,
+                    stack_archive::crypto::Secret::Passphrase(&key.text),
+                    &target,
+                    verifier,
+                    control,
+                )?
+            }
+        } else {
+            if key.is_some() {
+                return Err(Error::Invalid(
+                    "This backup is not encrypted, so a key does not apply to it.",
+                ));
+            }
+            stack_archive::read_into(&mut stream, &target, verifier, control)?
+        };
         Ok(StagedImport {
+            encrypted,
             operation: self.operation.clone(),
             directory: self.directory.clone(),
             library_root: self.library_root.clone(),
@@ -140,6 +236,7 @@ impl ImportWork {
         guard.1 = false;
         let lease = self.lease.clone();
         let staged = StagedImport {
+            encrypted: false,
             operation,
             directory,
             library_root: self.library_root.clone(),
@@ -171,6 +268,7 @@ pub struct RestorePlan {
     source: Manifest,
     source_manifest: Vec<u8>,
     pristine: bool,
+    links: Vec<LinkInsert>,
     _lease: Arc<StageLease>,
 }
 impl RestorePlan {
@@ -416,7 +514,18 @@ impl Library {
         verifier: &dyn SourceVerifier,
         control: &Control,
     ) -> Result<StagedImport> {
-        let staged = self.prepare_import()?.archive(input, verifier, control)?;
+        self.stage_archive_with_key(input, None, verifier, control)
+    }
+    pub fn stage_archive_with_key(
+        &mut self,
+        input: &mut impl Read,
+        key: Option<&BackupKey>,
+        verifier: &dyn SourceVerifier,
+        control: &Control,
+    ) -> Result<StagedImport> {
+        let staged = self
+            .prepare_import()?
+            .archive_with_key(input, key, verifier, control)?;
         (self.probe)("staged")?;
         Ok(staged)
     }
@@ -523,6 +632,11 @@ impl Library {
                 maps.tags.insert(old.to_owned(), id);
             }
         }
+        let (links, links_skipped) = self.plan_links(staged)?;
+        maps.links = links
+            .iter()
+            .map(|l| (l.source_id.clone(), l.row_id.clone()))
+            .collect();
         let mut incoming = remap(source, &maps)?;
         let mut graph = existing.into_json();
         graph["stacks"] = json!(stacks);
@@ -549,6 +663,9 @@ impl Library {
             source_version: source.source_version(),
             source_hash: staged.archive.source_hash.clone(),
             mappings: maps,
+            links_added: links.len(),
+            links_skipped,
+            encrypted: staged.encrypted,
         };
         Ok(RestorePlan {
             receipt,
@@ -559,8 +676,71 @@ impl Library {
             source: source.clone(),
             source_manifest: staged.archive.source_manifest.clone(),
             pristine,
+            links,
             _lease: staged.lease.clone(),
         })
+    }
+
+    /// Link rows to insert (new local ids) and how many are skipped because `(owner, link_id)` already exists.
+    fn plan_links(&self, staged: &StagedImport) -> Result<(Vec<LinkInsert>, usize)> {
+        let rows: &[Value] = staged
+            .archive
+            .manifest
+            .json()
+            .get("links")
+            .and_then(Value::as_array)
+            .map_or(&[], Vec::as_slice);
+        let mut used: BTreeSet<String> = BTreeSet::new();
+        let mut known: BTreeSet<(String, String)> = BTreeSet::new();
+        {
+            let mut query = self
+                .db
+                .prepare("SELECT row_id,owner,link_id FROM link_records")?;
+            for row in query.query_map([], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                ))
+            })? {
+                let (id, owner, link) = row?;
+                used.insert(id);
+                known.insert((owner, link));
+            }
+        }
+        if !rows.is_empty() {
+            for entry in fs::read_dir(self.root.join("links"))? {
+                if let Some(name) = entry?.file_name().to_str() {
+                    used.insert(name.trim_end_matches(".pdf").to_owned());
+                }
+            }
+        }
+        let mut inserts = Vec::new();
+        let mut skipped = 0;
+        for row in rows {
+            let id = row["id"].as_str().expect("validated link id");
+            let key = (
+                row["owner"].as_str().expect("owner").to_owned(),
+                row["link_id"].as_str().expect("link_id").to_owned(),
+            );
+            if known.contains(&key) {
+                skipped += 1;
+                continue;
+            }
+            let path = stack_archive::links::preview_path(id);
+            inserts.push(LinkInsert {
+                source_id: id.to_owned(),
+                row_id: mapped(&staged.operation, "link", id, &mut used)?,
+                row: row.clone(),
+                preview: staged
+                    .archive
+                    .manifest
+                    .rows("files")
+                    .iter()
+                    .any(|f| f["path"] == path),
+            });
+        }
+        Ok((inserts, skipped))
     }
 
     pub fn commit_archive(
@@ -596,6 +776,16 @@ impl Library {
                 return Err(Error::Stale);
             }
         }
+        for link in plan.links.iter().filter(|l| l.preview) {
+            if self
+                .root
+                .join(preview_file(&link.row_id))
+                .symlink_metadata()
+                .is_ok()
+            {
+                return Err(Error::Stale);
+            }
+        }
         // Bind the reviewed graph to verified immutable staging bytes again before publication.
         for file in plan.source.rows("files") {
             let path = plan
@@ -620,9 +810,15 @@ impl Library {
 
     fn install_archive(&mut self, plan: &RestorePlan, control: &Control) -> Result<RestoreReceipt> {
         let documents: Vec<_> = plan.receipt.mappings.documents.values().cloned().collect();
+        let previews: Vec<&str> = plan
+            .links
+            .iter()
+            .filter(|l| l.preview)
+            .map(|l| l.row_id.as_str())
+            .collect();
         write_new_json(
             &plan.directory.join("journal.json"),
-            &json!({"operation":plan.receipt.operation,"documents":documents}),
+            &json!({"operation":plan.receipt.operation,"documents":documents,"links":previews}),
         )?;
         stack_archive::sync_directory(&plan.directory)?;
         (self.probe)("journal")?;
@@ -651,11 +847,71 @@ impl Library {
             stack_archive::sync_directory(&plan.directory.join("input/originals"))?;
             (self.probe)(&format!("original-{}", index + 1))?;
         }
+        stack_archive::read_directory(&self.root.join("links"))?;
+        for (index, link) in plan.links.iter().filter(|l| l.preview).enumerate() {
+            control.check()?;
+            let from = plan
+                .directory
+                .join("input")
+                .join(stack_archive::links::preview_path(&link.source_id));
+            stack_archive::read_regular(&from)?;
+            rustix::fs::renameat_with(
+                rustix::fs::CWD,
+                &from,
+                rustix::fs::CWD,
+                self.root.join(preview_file(&link.row_id)),
+                rustix::fs::RenameFlags::NOREPLACE,
+            )
+            .map_err(std::io::Error::from)?;
+            stack_archive::sync_directory(&self.root.join("links"))?;
+            stack_archive::sync_directory(&plan.directory.join("input/previews"))?;
+            (self.probe)(&format!("link-{}", index + 1))?;
+        }
         control.check()?;
         let tx = self
             .db
             .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
         write_graph(&tx, &plan.graph)?;
+        // A link restored (or added) since the review would change the counts the user saw: review again.
+        for link in &plan.links {
+            let exists: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM link_records WHERE (owner=?1 AND link_id=?2) OR row_id=?3)",
+                params![link.row["owner"].as_str(), link.row["link_id"].as_str(), link.row_id],
+                |r| r.get(0),
+            )?;
+            if exists {
+                return Err(Error::Stale);
+            }
+            // Restored links are always `unreachable`: their locators belong to another device or time.
+            tx.execute(
+                "INSERT INTO link_records VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,'unreachable',?12,?13,?14,?15)",
+                params![
+                    link.row_id,
+                    link.row["owner"].as_str(),
+                    link.row["link_id"].as_str(),
+                    link.row["kind"].as_str(),
+                    link.row["title"].as_str(),
+                    link.row["mime"].as_str(),
+                    link.row["modified"].as_i64(),
+                    link.row["hash"].as_str(),
+                    link.row["shared"].as_i64(),
+                    link.row["protected"].as_i64(),
+                    link.row["locators"].as_str(),
+                    link.row["title_user_edited"].as_i64(),
+                    link.row["added_at"].as_i64(),
+                    link.row["text"].as_str(),
+                    i64::from(link.preview),
+                ],
+            )?;
+            tx.execute(
+                "INSERT INTO link_search VALUES(?1,?2,?3)",
+                params![
+                    link.row_id,
+                    link.row["title"].as_str(),
+                    link.row["text"].as_str()
+                ],
+            )?;
+        }
         // One transaction contains the entire graph, source identity map, event and retry marker.
         tx.execute(
             "INSERT INTO restore_commits VALUES(?1,?2,?3,?4)",
@@ -849,7 +1105,14 @@ impl Library {
                 let journal = directory.join("journal.json");
                 if journal.exists() {
                     let value = read_json(&journal, 128 * 1024)?;
-                    validation::keys(&value, "operation,documents")?;
+                    validation::keys(
+                        &value,
+                        if value.get("links").is_some() {
+                            "operation,documents,links"
+                        } else {
+                            "operation,documents"
+                        },
+                    )?;
                     if value["operation"] != operation {
                         return Err(Error::Invalid("Import journal ownership disagrees"));
                     }
@@ -865,9 +1128,37 @@ impl Library {
                         stack_archive::uuid(id)?;
                         ids.push(id.to_owned());
                     }
+                    let mut previews = Vec::new();
+                    for id in value["links"].as_array().into_iter().flatten() {
+                        let id = id
+                            .as_str()
+                            .filter(|_| previews.len() < 1000)
+                            .ok_or(Error::Invalid("Invalid recovery link ID"))?;
+                        stack_archive::uuid(id)?;
+                        previews.push(id.to_owned());
+                    }
                     if self.committed(operation)?.is_some() {
                         return self.cleanup_committed(directory, &ids, operation);
                     }
+                    for id in previews {
+                        let file = self.root.join(preview_file(&id));
+                        if file.symlink_metadata().is_err() {
+                            continue;
+                        }
+                        let present: bool = self.db.query_row(
+                            "SELECT EXISTS(SELECT 1 FROM link_records WHERE row_id=?1)",
+                            [&id],
+                            |r| r.get(0),
+                        )?;
+                        if present {
+                            return Err(Error::Invalid(
+                                "Recovery refuses to remove previews with uncertain ownership",
+                            ));
+                        }
+                        stack_archive::read_regular(&file)?;
+                        fs::remove_file(file)?;
+                    }
+                    stack_archive::sync_directory(&self.root.join("links"))?;
                     for id in ids {
                         let owned = self.root.join("originals").join(&id);
                         if !owned.exists() {
@@ -1097,6 +1388,12 @@ pub(crate) fn remap(source: &Manifest, maps: &IdMappings) -> Result<Value> {
             }
         }
     }
+    // Link previews are not originals: they never enter the library graph (they are stored under `links/`).
+    value["files"].as_array_mut().expect("files").retain(|f| {
+        !f["path"]
+            .as_str()
+            .is_some_and(|p| p.starts_with("previews/"))
+    });
     for file in value["files"].as_array_mut().expect("files") {
         let (id, name) = stack_archive::original_path(file["path"].as_str().expect("path"))?;
         file["path"] = json!(format!("originals/{}/{name}", maps.documents[id]));
