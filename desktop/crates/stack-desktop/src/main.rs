@@ -1,3 +1,4 @@
+mod ami_open;
 mod catalog;
 mod catalog_smoke;
 #[cfg(test)]
@@ -56,6 +57,7 @@ struct Flags {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    stack_render::limit_ocr_threads();
     let mut flags = Flags {
         visual_review: None,
         demo: None,
@@ -297,6 +299,7 @@ struct Stack {
     thumbnail_worker: Option<Worker<stack_core::DocumentTile, widget::image::Handle>>,
     tiles: thumbnails::Tiles,
     text: text_ui::Ui,
+    ami: ami_open::Ui,
     text_worker: Option<Worker<stack_core::TextJob, stack_core::TextOutput>>,
     context_title: String,
     reset: reset_ui::Ui,
@@ -345,6 +348,7 @@ enum Message {
     Close,
     Reset(reset_ui::Action),
     Text(text_ui::Event),
+    Ami(ami_open::Event),
     KeepEditing,
     DiscardAndQuit,
     Shutdown(Result<(), String>),
@@ -443,6 +447,7 @@ impl cosmic::Application for Stack {
             thumbnail_worker: Some(thumbnails::start()),
             tiles: thumbnails::Tiles::default(),
             text: text_ui::Ui::default(),
+            ami: ami_open::Ui::default(),
             text_worker: Some(text_ui::worker()),
             context_title: String::new(),
             reset: reset_ui::Ui::default(),
@@ -952,6 +957,7 @@ impl Stack {
         match message {
             Message::Reset(action) => return self.reset_action(action),
             Message::Text(event) => return self.text_action(event),
+            Message::Ami(event) => return self.ami_action(event),
             Message::Close
                 if !self.closing
                     && (self.catalog.has_unsaved_changes()
@@ -1245,6 +1251,7 @@ impl Stack {
                         Response::TextClaim { .. }
                         | Response::TextFinished { .. }
                         | Response::ResetPreview(_)
+                        | Response::LinkFileSaved
                         | Response::ResetScheduled
                         | Response::ResetRecovery(_),
                     ) => {}
@@ -1342,6 +1349,7 @@ impl Stack {
                         return self.load_tiles();
                     }
                     Ok(Response::SelectedLinked(linked)) => {
+                        self.ami = ami_open::Ui::default();
                         let preview = linked.preview.clone();
                         self.linked = Some(linked);
                         self.page = 0;

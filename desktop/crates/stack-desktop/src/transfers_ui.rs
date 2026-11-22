@@ -1087,46 +1087,49 @@ impl Stack {
     }
 }
 
+pub(crate) async fn window_parent(
+    owner: std::sync::Arc<dyn iced::runtime::window::Window + Send + Sync>,
+) -> Result<cosmic::dialog::ashpd::WindowIdentifier, String> {
+    use cosmic::dialog::ashpd;
+    tokio::task::spawn_blocking(move || {
+        use iced::runtime::window::raw_window_handle::{RawDisplayHandle, RawWindowHandle};
+        let window = owner.window_handle().map_err(|e| e.to_string())?;
+        let display = owner.display_handle().map_err(|e| e.to_string())?;
+        let identifier = match (window.as_raw(), display.as_raw()) {
+            (RawWindowHandle::Xlib(handle), _) => {
+                Some(ashpd::WindowIdentifier::from_xid(handle.window))
+            }
+            (RawWindowHandle::Xcb(handle), _) => Some(ashpd::WindowIdentifier::from_xid(
+                handle.window.get().into(),
+            )),
+            (RawWindowHandle::Wayland(window), RawDisplayHandle::Wayland(display)) => {
+                // SAFETY: native owner stays alive across export and the
+                // complete chooser request; both handles came from it.
+                unsafe {
+                    tokio::runtime::Handle::current().block_on(
+                        ashpd::WindowIdentifier::from_wayland_raw(
+                            window.surface.as_ptr(),
+                            display.display.as_ptr(),
+                        ),
+                    )
+                }
+            }
+            _ => None,
+        };
+        identifier.ok_or_else(|| "Could not export the native chooser parent".to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 async fn pick_files(
     pick: Pick,
     directory: Option<PathBuf>,
     caption: Option<String>,
     owner: Option<std::sync::Arc<dyn iced::runtime::window::Window + Send + Sync>>,
 ) -> Result<Option<Vec<PathBuf>>, String> {
-    use cosmic::dialog::ashpd;
-    let parent = if let Some(owner) = owner.as_ref() {
-        let owner = owner.clone();
-        Some(
-            tokio::task::spawn_blocking(move || {
-                use iced::runtime::window::raw_window_handle::{RawDisplayHandle, RawWindowHandle};
-                let window = owner.window_handle().map_err(|e| e.to_string())?;
-                let display = owner.display_handle().map_err(|e| e.to_string())?;
-                let identifier = match (window.as_raw(), display.as_raw()) {
-                    (RawWindowHandle::Xlib(handle), _) => {
-                        Some(ashpd::WindowIdentifier::from_xid(handle.window))
-                    }
-                    (RawWindowHandle::Xcb(handle), _) => Some(ashpd::WindowIdentifier::from_xid(
-                        handle.window.get().into(),
-                    )),
-                    (RawWindowHandle::Wayland(window), RawDisplayHandle::Wayland(display)) => {
-                        // SAFETY: native owner stays alive across export and the
-                        // complete chooser request; both handles came from it.
-                        unsafe {
-                            tokio::runtime::Handle::current().block_on(
-                                ashpd::WindowIdentifier::from_wayland_raw(
-                                    window.surface.as_ptr(),
-                                    display.display.as_ptr(),
-                                ),
-                            )
-                        }
-                    }
-                    _ => None,
-                };
-                identifier.ok_or_else(|| "Could not export the native chooser parent".to_string())
-            })
-            .await
-            .map_err(|e| e.to_string())??,
-        )
+    let parent = if let Some(owner) = owner {
+        Some(window_parent(owner).await?)
     } else {
         if std::env::var_os("STACK_M2_PORTAL_PROTOCOL").is_none() {
             return Err("The native window closed before opening its chooser".into());
@@ -1199,7 +1202,7 @@ async fn pick_files(
 
 // The pinned libcosmic open wrapper omits its directory option in the portal
 // branch. Use its existing ashpd re-export so the native request honours it.
-async fn open_files(
+pub(crate) async fn open_files(
     title: String,
     directory: Option<PathBuf>,
     filter: file_chooser::FileFilter,

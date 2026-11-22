@@ -29,6 +29,11 @@ pub enum Request {
     SelectLinked {
         id: String,
     },
+    /// Remember (Some) or forget (None) where this computer found a link's original file.
+    LinkFile {
+        id: String,
+        path: Option<String>,
+    },
     Select {
         id: String,
         page: usize,
@@ -105,6 +110,7 @@ pub enum Response {
     DeletedDocument(String),
     Operation(crate::operations::RepoOutcome),
     SelectedLinked(stack_core::LinkedDocument),
+    LinkFileSaved,
     Selected {
         document: DocumentView,
         page: usize,
@@ -322,6 +328,10 @@ pub fn start_operations(
                 Request::Delete { token } => {
                     library.delete_document(&token, &stack_archive::Control::default())?;
                     Ok(Response::DeletedDocument(token.id))
+                }
+                Request::LinkFile { id, path } => {
+                    library.set_link_local_file(&id, path.as_deref())?;
+                    Ok(Response::LinkFileSaved)
                 }
                 Request::SelectLinked { id } => {
                     Ok(Response::SelectedLinked(library.linked_document(&id)?))

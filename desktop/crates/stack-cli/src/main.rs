@@ -4,6 +4,7 @@ use stack_render::{Renderer, fixtures};
 use std::path::PathBuf;
 
 fn main() {
+    stack_render::limit_ocr_threads();
     let result = run();
     let text_shutdown = stack_render::shutdown_text_worker();
     let shutdown = stack_render::shutdown_pdf_worker();

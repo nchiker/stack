@@ -364,6 +364,42 @@ impl Stack {
             .into()
     }
 
+    fn ami_controls(&self) -> Element<'_, Message> {
+        let mut column = widget::column::with_capacity(4).spacing(8);
+        let state = self.ami_button_state();
+        let mut button = self.button("Open in Ami Pro");
+        if matches!(
+            state,
+            Some(crate::ami_open::Button::Choose | crate::ami_open::Button::Open)
+        ) && !self.ami.busy
+            && self.ami.differs.is_none()
+        {
+            button = button.on_press(Message::Ami(crate::ami_open::Event::Press));
+        }
+        column = column.push(button);
+        if let Some(crate::ami_open::Button::Disabled(hint)) = state {
+            column = column.push(widget::text::caption(hint));
+        }
+        if let Some(status) = &self.ami.status {
+            column = column.push(self.body(status.clone()));
+        }
+        if self.ami.differs.is_some() {
+            column = column.push(
+                widget::row::with_capacity(2)
+                    .spacing(8)
+                    .push(
+                        self.button("Cancel")
+                            .on_press(Message::Ami(crate::ami_open::Event::CancelDiffers)),
+                    )
+                    .push(
+                        self.button("Open anyway")
+                            .on_press(Message::Ami(crate::ami_open::Event::OpenAnyway)),
+                    ),
+            );
+        }
+        column.into()
+    }
+
     /// Read-only view of a linked document: its saved preview and saved text. No Open, no editing.
     fn linked_workspace(&self) -> Element<'_, Message> {
         let linked = self.linked.as_ref().expect("linked document");
@@ -376,9 +412,8 @@ impl Stack {
             .push(widget::text::caption("Made in"))
             .push(self.body(linked.owner.clone()))
             .push(widget::text::caption("Status"))
-            .push(self.body(
-                "Saved copy only. The original is not reachable from this computer, so it cannot be opened here.",
-            ))
+            .push(self.body("Saved copy shown here. Open in Ami Pro edits the original file."))
+            .push(self.ami_controls())
             .push(widget::text::caption("Saved text"));
         let text: String = linked.text.chars().take(SHOWN).collect();
         info = info.push(

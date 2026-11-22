@@ -1,7 +1,7 @@
 use crate::library::{Error, Result};
 use rusqlite::Connection;
 
-pub const VERSION: i64 = 6;
+pub const VERSION: i64 = 7;
 const APPLICATION_ID: i64 = 0x53544b44;
 
 pub const V1: &str = "
@@ -46,6 +46,13 @@ ALTER TABLE link_records ADD COLUMN removed_reason TEXT NOT NULL DEFAULT '';
 ALTER TABLE link_records ADD COLUMN preview_sha TEXT NOT NULL DEFAULT '';
 ALTER TABLE link_records ADD COLUMN preview_pending INTEGER NOT NULL DEFAULT 0;
 CREATE TABLE link_projection(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+";
+
+/// Where this computer last found the original file of a linked document (the file chooser portal's path). Local
+/// to this installation: it is not in the sync graph, not in `link_projection`, and never exported to an archive, so
+/// archive format 4 and link sync are unchanged. No foreign key: a row may outlive or precede its link row harmlessly.
+const V7: &str = "
+CREATE TABLE link_local_files(row_id TEXT PRIMARY KEY,path TEXT NOT NULL);
 ";
 
 pub fn migrate(db: &mut Connection) -> Result<()> {
@@ -106,6 +113,9 @@ pub fn migrate(db: &mut Connection) -> Result<()> {
         db.prepare("SELECT state_since,removed_reason,preview_sha,preview_pending FROM link_records LIMIT 0")?;
         db.prepare("SELECT key,value FROM link_projection LIMIT 0")?;
     }
+    if version >= 7 {
+        db.prepare("SELECT row_id,path FROM link_local_files LIMIT 0")?;
+    }
     if version < VERSION {
         let tx = db.transaction()?;
         if version < 1 {
@@ -125,6 +135,9 @@ pub fn migrate(db: &mut Connection) -> Result<()> {
         }
         if version < 6 {
             tx.execute_batch(V6)?;
+        }
+        if version < 7 {
+            tx.execute_batch(V7)?;
         }
         tx.pragma_update(None, "application_id", APPLICATION_ID)?;
         tx.pragma_update(None, "user_version", VERSION)?;
@@ -180,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    fn schema_5_library_with_links_migrates_to_6_additively() {
+    fn schema_5_library_with_links_migrates_to_7_additively() {
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path().join("library");
         drop(Library::open(&root).unwrap());
@@ -214,7 +227,7 @@ mod tests {
         .unwrap();
         drop(db);
         let library = Library::open(&root).unwrap();
-        assert_eq!(library.status().unwrap().schema, 6);
+        assert_eq!(library.status().unwrap().schema, 7);
         assert_eq!(library.link_count().unwrap(), 1);
         let row: (String, i64, String, i64, i64, i64, String) = library
             .db
@@ -234,11 +247,18 @@ mod tests {
             .query_row("SELECT count(*) FROM link_projection", [], |r| r.get(0))
             .unwrap();
         assert_eq!(projection, 0);
+        // The new local table starts empty and the old link has no remembered file.
+        assert_eq!(
+            library
+                .link_local_file("11111111-1111-4111-8111-111111111111")
+                .unwrap(),
+            None
+        );
         let version: i64 = library
             .db
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 6);
+        assert_eq!(version, 7);
         drop(library);
         // Reopening is a no-op, and the previous release (VERSION 5) would refuse this library because
         // `version > VERSION` is an error (see `rejects_future_foreign_and_partial_schema...`).

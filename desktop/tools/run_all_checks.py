@@ -240,6 +240,43 @@ def flatpak_key_store(cargo_env):
             save_log(name, '\n'.join(log))
 
 
+def deb_package_checks(cargo_env):
+    """Build the release .deb (offline) and test it unpacked, in a private home, private D-Bus session and private
+    keyring, against a synthetic library (tools/test_deb_package.py). Nothing is installed or published."""
+    name = 'deb-package'
+    begin(name)
+    desktop = REPO / 'desktop'
+    out = Path(tempfile.mkdtemp(prefix='stack-deb-build-', dir='/tmp')) / 'deb'
+    log = []
+    try:
+        for cmd in (['cargo', 'build', '--offline', '-p', 'stack-cli', '--example', 'archive_interop'],
+                    ['cargo', 'build', '--release', '--offline', '--locked', '-p', 'stack-desktop', '-p', 'stack-cli', '-p', 'stack-transport'],
+                    [sys.executable, '-I', TOOLS / 'package_deb.py', '--output', out]):
+            b = subprocess.run([str(a) for a in cmd], cwd=desktop, env=cargo_env, capture_output=True, timeout=3600)
+            log.append(b.stdout.decode(errors='replace') + b.stderr.decode(errors='replace'))
+            if b.returncode:
+                report('FAIL', name, f'{Path(str(cmd[0])).name} {cmd[1]}: ' + last_line(log[-1]))
+                return
+        debs = sorted(out.glob('stack-docs_*_amd64.deb'))
+        if len(debs) != 1:
+            report('FAIL', name, 'no package was produced')
+            return
+        t = subprocess.run([sys.executable, str(TOOLS / 'test_deb_package.py'), '--deb', str(debs[0])], capture_output=True, timeout=1800)
+        text = t.stdout.decode(errors='replace') + t.stderr.decode(errors='replace')
+        log.append(text)
+        bad = [l for l in text.splitlines() if l.startswith('FAIL')]
+        if t.returncode or bad:
+            report('FAIL', name, scrub(bad[0])[:140] if bad else last_line(text))
+        else:
+            skipped = [l.split(':')[0][5:] for l in text.splitlines() if l.startswith('SKIP')]
+            report('PASS', name, debs[0].name + (f' (skipped: {", ".join(skipped)})' if skipped else ''))
+    except (OSError, subprocess.SubprocessError) as e:
+        report('FAIL', name, f'{type(e).__name__}: {e}')
+    finally:
+        save_log(name, '\n'.join(log))
+        shutil.rmtree(out.parent, ignore_errors=True)
+
+
 def main():
     global logdir
     large = '--large' in sys.argv[1:]
@@ -247,7 +284,7 @@ def main():
     logdir = Path('/tmp') / f'stack-checks-{stamp}'
     logdir.mkdir(mode=0o700)
     started = time.time()
-    print('Stack checks - this takes about 2 minutes, please wait.', flush=True)
+    print('Stack checks - this takes a few minutes (longer the first time: it builds the release package), please wait.', flush=True)
     print('Full logs: ' + str(logdir) + '\n', flush=True)
     cargo_env = {**os.environ, 'CARGO_HOME': str(Path.home() / '.cache/stack-cargo-home')}
     py = sys.executable
@@ -260,6 +297,7 @@ def main():
     run_step('desktop-interop', desk + (['--large'] if large else []))
 
     flatpak_key_store(cargo_env)
+    deb_package_checks(cargo_env)
 
     adb, why = phone_state()
     if adb is None:

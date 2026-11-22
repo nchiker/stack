@@ -5217,6 +5217,7 @@ dependencies = [
  "libcosmic",
  "qrcodegen",
  "serde_json",
+ "sha2 0.10.9",
  "stack-archive",
  "stack-core",
  "stack-render",

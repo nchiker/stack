@@ -2,7 +2,9 @@
 mod appearance;
 pub mod fixtures;
 pub mod pdf;
+mod runtime;
 mod text;
+pub use runtime::limit_ocr_threads;
 pub use text::{OcrRuntime, shutdown_text_worker};
 
 use image::{DynamicImage, ImageDecoder, ImageReader, RgbaImage};
@@ -27,7 +29,7 @@ pub enum RenderError {
     #[error("{0}")]
     Invalid(&'static str),
     #[error(
-        "PDF preview needs the packaged PDFium engine; set STACK_PDFIUM_LIBRARY to its absolute library path"
+        "PDF preview needs the packaged PDFium engine; reinstall Stack (or set STACK_PDFIUM_LIBRARY to its absolute library path)"
     )]
     MissingPdfium,
 }
@@ -142,8 +144,7 @@ impl Renderer {
     }
 
     pub fn from_environment() -> Self {
-        let library = std::env::var_os("STACK_PDFIUM_LIBRARY").map(PathBuf::from);
-        Self::new(library)
+        Self::new(runtime::pdfium_library())
     }
 
     /// Type/page-count inspection without rendering or decoding full image pixels.

@@ -50,6 +50,8 @@ pub struct LinkedDocument {
     pub text: String,
     /// Saved preview PDF, when the archive carried one.
     pub preview: Option<PathBuf>,
+    /// Where this computer last found the original file (a path from the file chooser portal). Local only.
+    pub remembered_file: Option<String>,
 }
 
 pub(crate) fn preview_file(row_id: &str) -> String {
@@ -63,6 +65,45 @@ impl Library {
             [],
             |r| r.get::<_, i64>(0),
         )? as usize)
+    }
+
+    /// The remembered original-file path for a link on this computer, if one was chosen.
+    pub fn link_local_file(&self, id: &str) -> Result<Option<String>> {
+        stack_archive::uuid(id)?;
+        Ok(self
+            .db
+            .query_row(
+                "SELECT path FROM link_local_files WHERE row_id=?1",
+                [id],
+                |r| r.get(0),
+            )
+            .optional()?)
+    }
+
+    /// Remember (or, with `None`, forget) the original file for a link. Refuses ids that are not link rows.
+    pub fn set_link_local_file(&self, id: &str, path: Option<&str>) -> Result<()> {
+        stack_archive::uuid(id)?;
+        match path {
+            Some(path) if !path.is_empty() => {
+                let known: bool = self.db.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM link_records WHERE row_id=?1)",
+                    [id],
+                    |r| r.get(0),
+                )?;
+                if !known {
+                    return Err(Error::Stale);
+                }
+                self.db.execute(
+                    "INSERT OR REPLACE INTO link_local_files(row_id,path) VALUES(?1,?2)",
+                    params![id, path],
+                )?;
+            }
+            _ => {
+                self.db
+                    .execute("DELETE FROM link_local_files WHERE row_id=?1", [id])?;
+            }
+        }
+        Ok(())
     }
 
     pub fn linked_document(&self, id: &str) -> Result<LinkedDocument> {
@@ -87,6 +128,7 @@ impl Library {
                             hash: r.get(8)?,
                             text: r.get(9)?,
                             preview: None,
+                            remembered_file: None,
                         },
                         r.get::<_, i64>(10)? != 0,
                     ))
@@ -95,6 +137,7 @@ impl Library {
             .optional()?
             .ok_or(Error::Stale)?;
         let (mut link, has_preview) = row;
+        link.remembered_file = self.link_local_file(id)?;
         if has_preview {
             stack_archive::read_directory(&self.root.join("links"))?;
             let path = self.root.join(preview_file(id));
@@ -135,5 +178,54 @@ impl Library {
             }
         }
         Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::library::Library;
+
+    const ID: &str = "11111111-1111-4111-8111-111111111111";
+
+    fn library() -> (tempfile::TempDir, Library) {
+        let dir = tempfile::tempdir().unwrap();
+        let library = Library::open(&dir.path().join("library")).unwrap();
+        library
+            .db
+            .execute(
+                "INSERT INTO link_records(row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,title_user_edited,added_at,text,preview) VALUES(?1,'o','22222222-2222-4222-8222-222222222222','doc','T','m',1,'',0,0,'[]','live',0,1,'',0)",
+                [ID],
+            )
+            .unwrap();
+        (dir, library)
+    }
+
+    #[test]
+    fn remembered_file_is_per_link_replaceable_and_forgettable() {
+        let (_dir, library) = library();
+        assert_eq!(library.linked_document(ID).unwrap().remembered_file, None);
+        library.set_link_local_file(ID, Some("/a/b.sam")).unwrap();
+        library.set_link_local_file(ID, Some("/c/d.sam")).unwrap();
+        assert_eq!(
+            library
+                .linked_document(ID)
+                .unwrap()
+                .remembered_file
+                .as_deref(),
+            Some("/c/d.sam")
+        );
+        library.set_link_local_file(ID, None).unwrap();
+        assert_eq!(library.link_local_file(ID).unwrap(), None);
+    }
+
+    #[test]
+    fn unknown_link_and_bad_id_are_refused() {
+        let (_dir, library) = library();
+        assert!(
+            library
+                .set_link_local_file("33333333-3333-4333-8333-333333333333", Some("/x"))
+                .is_err()
+        );
+        assert!(library.set_link_local_file("nope", Some("/x")).is_err());
     }
 }

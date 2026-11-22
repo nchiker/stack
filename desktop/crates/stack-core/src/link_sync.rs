@@ -1040,6 +1040,7 @@ impl Library {
             if let Some(id) = id {
                 tx.execute("DELETE FROM link_search WHERE row_id=?1", [&id])?;
                 tx.execute("DELETE FROM link_records WHERE row_id=?1", [&id])?;
+                tx.execute("DELETE FROM link_local_files WHERE row_id=?1", [&id])?;
                 removals.push(id);
                 report.deleted += 1;
             }

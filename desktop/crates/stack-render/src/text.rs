@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, mpsc};
 
 const MODEL_SHA: &str = "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2";
+const LEPTONICA_SHA: &str = "b31a50179665871ddb6bdbcfeefc8673febaa29a006e78136024d4083b6ee5e5";
 const ENGINE_SHA: &str = "0d3b71cd757860c6639918c1b2d9407c8652ee22babc8d5c5f18cc35dde6334b";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -19,8 +20,8 @@ pub struct OcrRuntime {
 }
 impl OcrRuntime {
     pub fn from_environment() -> Result<Self, RenderError> {
-        let library = std::env::var_os("STACK_TESSERACT_LIBRARY").map(PathBuf::from);
-        let tessdata = std::env::var_os("STACK_TESSDATA_DIR").map(PathBuf::from);
+        let library = crate::runtime::tesseract_library();
+        let tessdata = crate::runtime::tessdata_dir();
         match (library, tessdata) {
             (Some(library), Some(tessdata)) if library.is_absolute() && tessdata.is_absolute() => {
                 Ok(Self { library, tessdata })
@@ -184,6 +185,22 @@ fn verify(path: &Path, expected: &str, limit: u64) -> Result<(), RenderError> {
     Ok(())
 }
 
+/// Load `liblept.so.5` from the engine's own folder by absolute path (checked against its pinned hash) when it is there.
+/// The dynamic loader then reuses it by name when the engine is opened.
+fn preload_leptonica(engine: &Path) -> Result<Option<Library>, RenderError> {
+    let Some(path) = engine.parent().map(|d| d.join("liblept.so.5")) else {
+        return Ok(None);
+    };
+    if !path.exists() {
+        return Ok(None);
+    }
+    verify(&path, LEPTONICA_SHA, 16 * 1024 * 1024)?;
+    // SAFETY: a pinned, verified Leptonica 1.82.0 library; it has no load-time side effects beyond its own initialisers.
+    unsafe { Library::new(&path) }
+        .map(Some)
+        .map_err(|e| RenderError::Native(e.to_string()))
+}
+
 type Handle = *mut c_void;
 type Delete = unsafe extern "C" fn(Handle);
 type SetImage = unsafe extern "C" fn(Handle, *const u8, c_int, c_int, c_int, c_int);
@@ -200,6 +217,8 @@ struct Engine {
     delete_text: DeleteText,
     // Retained after every function pointer and handle is no longer used.
     _library: Library,
+    // The bundled liblept, loaded first so the engine's `liblept.so.5` need is met by it (not by the system copy or LD_LIBRARY_PATH).
+    _leptonica: Option<Library>,
 }
 impl Engine {
     fn new(runtime: &OcrRuntime) -> Result<Self, RenderError> {
@@ -215,6 +234,7 @@ impl Engine {
         // signatures below are the upstream 5.3.4 capi.h ABI. Engine is created,
         // used and dropped exclusively on the single text worker thread.
         unsafe {
+            let leptonica = preload_leptonica(&runtime.library)?;
             let library =
                 Library::new(&runtime.library).map_err(|e| RenderError::Native(e.to_string()))?;
             macro_rules! symbol {
@@ -263,6 +283,7 @@ impl Engine {
                 get_text,
                 delete_text,
                 _library: library,
+                _leptonica: leptonica,
             })
         }
     }
