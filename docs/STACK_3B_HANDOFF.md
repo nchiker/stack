@@ -42,7 +42,7 @@ the desktop can open, review and restore/import format 4 and encrypted backups m
 - Stack 0.18.0 (code 35) is published (GitHub v0.18.0). The slice 4 handoff is `docs/STACK_LINK_SLICE4_HANDOFF.md`.
 - Phone checks: `-e linkContract true`, `-e archiveOnly true`, `-e features true` all pass on the TEST build.
 
-## Status (2026-11-21, end of phase 2; nothing committed or published)
+## Status (2026-11-21, 3b finished and tested by the user; source pushed, no release)
 Decision taken by the user: linked documents are kept read-only in the imported library as "Linked document" records (text and preview, searchable,
 no Open); the data model stays open to a desktop editor later (all archive columns are stored; only the UI is read-only).
 
@@ -57,14 +57,14 @@ Done
 - Tests: `stack-core/tests/links.rs` (encrypted end to end, passphrase, skip-existing, unreachable-on-restore, id collision, wrong/missing key,
   rollback at two failure points, unfinished restore cleaned on reopen, plain archives unchanged) and a desktop controller test of the whole key flow.
 
-- Saved backup key (2026-11-21, uncommitted; replaces the Key Vault launcher, which was removed): the desktop stores the recovery key itself in the OS secret
+- Saved backup key (2026-11-21, committed d0b907c; replaces the Key Vault launcher, which was removed): the desktop stores the recovery key itself in the OS secret
   store (`oo7` 0.6.0, tokio, `native_crypto`; Secret portal in the Flatpak, Secret Service otherwise; the manifest has no keyring permission, the Flatpak keeps its own store).
   Code: `stack-core/src/keystore.rs` (`SecretStore`, `SystemStore`, `MemoryStore`, `parse_key_text`, `fingerprint`, `save_key`, `saved_backup_key`,
   `key_status`); `transfers_ui.rs` (`Action::PasteKey`, `ClipboardKey`, `KeySaved`, `RemoveKey`, `SavedKey`, `SaveKeyToggled`), the menu key row (saved + Remove, fingerprint in a tooltip, width-limited) is in
   `navigation.rs` `library_menu`; pasting is only on the key panel. Encrypted backups open with the saved key, else the key panel (with "Save this key on this computer"). CLI: `--saved-key`.
   Tests use the in-memory store. Security review fixes applied (2026-11-21): clipboard answers carry a request number and are dropped if stale; the pending key lives in the transfer and is saved only for an encrypted review; core refuses a key for a plain archive; menu open never unlocks; one-entry store; shared key parser; Typed zeroizes. NOT yet run against a real Secret Service or inside the Flatpak (needs a manual check: paste, restart, open a backup).
   New computer: Key Vault "Copy Stack key", then in Stack choose Import backup and click "Paste key from Key Vault". To replace a saved key, import a backup the saved key cannot open; the panel's paste replaces it once the backup opens.
-- Guided import (2026-11-21, uncommitted; from a real user test where the flow was not understood): choosing an encrypted backup with no saved key opens the key
+- Guided import (2026-11-21, committed d0b907c; from a real user test where the flow was not understood): choosing an encrypted backup with no saved key opens the key
   panel ("In Key Vault, click Copy Stack key first." and one primary button "Paste key from Key Vault"; typing a key or passphrase is a small option below).
   A valid clipboard key opens that same backup straight to review (the key is saved once it has opened the backup, the clipboard is cleared); a bad clipboard
   or wrong key stays on the panel with one short line. The review shows "Ready to import: N documents[, M linked documents (read-only)]" with a primary
@@ -74,7 +74,7 @@ Done
   After Prepare `Active` holds no key (`Active.keyed` only); the worker drops it when its work ends.
 
 Left / not done
-- Real phone-made backup checked (2026-11-21, `Stack-2026-11-21-182252.stackbackup`, 218 MB from test phone): `archive ... review` with the key piped from Key Vault (`keyvault unseal stack/stack-backup-recovery-key.txt --stdout | stack-cli ... --key-stdin`) gave format 4, encrypted, 164 documents, 2 links, 0 skipped. Still to try: restore of that file and opening it in the desktop app.
+- Real phone-made backup (2026-11-21, `Stack-2026-11-21-182252.stackbackup`, 218 MB from test phone, key-only envelope) was reviewed with the CLI (format 4, encrypted, 164 documents, 2 links, 0 skipped) and then, after the key-storage and guided-import work, imported end to end in the desktop test app by the user with the key copied from Key Vault ("it worked"). Not yet checked by hand: the new menu's width against the real sidebar (a fixed 224 px popup, never seen rendered), the real Secret Service and the Flatpak (the key store is `oo7`; only the in-memory fake is tested), and clipboard clearing on COSMIC/Wayland (see the Key Vault list below).
 - The CLI needs `STACK_PDFIUM_LIBRARY` for any backup with link previews (the packaged app ships PDFium). `review` prints the full id mapping JSON (very long); consider a short form.
 - The desktop export (and any export) still writes format 3 without link records, so a desktop round trip drops linked documents. Sync of link records is slice 6.
 - Linked view shows page 1 of the preview only, and the first 20,000 characters of text. No stacks, tags, notes or delete for linked documents yet.
@@ -83,9 +83,11 @@ Left / not done
 - Decryption code reviewed by a read-only Opus agent (no critical/high findings); its medium and low findings are fixed: previews go through the verifier, plain v4 import covered by a test, `aes` zeroize, `DecryptReader` fails for good after an error, writer rejects duplicate slots, wrong-key message matches the spec. fmt and clippy are clean.
 - One desktop test (`encrypted_backup_asks_for_a_key_and_imports_linked_documents_read_only`) is `#[ignore]`d because it needs PDFium; run it with `STACK_PDFIUM_LIBRARY=<path to libpdfium.so>` (e.g. the one under `.artifacts/stack-desktop-20261111-v0.3.0/stage/runtime/pdfium/lib/`).
 - New crates in the desktop Cargo.lock (copied from the other Cargo cache with checksums verified): aes-gcm, aes, hmac, pbkdf2, unicode-normalization and their helpers.
-- Committed on main (2026-11-21); not published.
+- Committed on main (d0b907c, plus an ignore rule for local Claude settings) and pushed as a public source checkpoint (`tools/backup_github.py`, nchiker/stack commit 444331b). No release, Flatpak or APK was built or published. The permission to run that one push command is in the git-ignored `.claude/settings.local.json`.
+- Key Vault (separate repo `~/Projects/APK-Keys`, nchiker/keyvault-tool, commit 22425ff): compact menu-bar window and a "Copy Stack key" button (clipboard with a sensitive hint, overwritten after 60 s, cleared on close/signals), reviewed read-only by Opus (fixes applied, 22 tests). Hand checks still open: wait 60 s in another app then paste (should be empty), copy something else during the countdown (left alone), close mid-countdown, menus and tooltips, and the QR button after its worker code changed. Two minor nits: green status text is faint on the grey panel; the "Key copied" message is orange like a warning.
+- Two other ignored desktop tests (`ordinary_desktop_import_reads_text_offline_and_preserves_typed_draft`, `application_pdf_import_reorder_subset_and_output_use_saved_snapshot`) already fail without an OCR runtime; PDFium tests must be run one at a time (`PdfiumLibraryBindingsAlreadyInitialized` otherwise). New crates from the `oo7` work (oo7 0.6.0, ashpd 0.13.13, cbc, hkdf, md-5, num*, serde_bytes, zeroize_derive) were fetched with the user's approval; oo7 0.7.3 needs a newer tokio than the pinned 1.53.3.
 
 Next
-1. Restore the real backup into a throwaway root and open it in the desktop app (key from Key Vault, never printed).
+1. User hand checks listed above (menu width, Key Vault clipboard, real keyring/Flatpak) before any release; fix what they show.
 2. Decide with the user: desktop export of linked documents (format 4, encrypted; needs an OS random source) vs leaving it to slice 6; link count in CLI Status JSON.
-3. Publishing only on the user's explicit go-ahead.
+3. A desktop release (Flatpak build and publish) only on the user's explicit go-ahead. Rule for all work: setup must live in the app, never in scripts or dev-machine paths (see `CLAUDE.md`).

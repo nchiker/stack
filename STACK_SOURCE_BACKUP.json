@@ -1,7 +1,7 @@
 {
   "format": "org.stackdocs.source-backup",
   "version": 1,
-  "source_base_commit": "f9f6181db6fd4a281fb9eec838338debebb03935",
+  "source_base_commit": "e6749f795983bdbccba7d85cf03c1844003d65e3",
   "qualification": "Source checkpoint including unfinished edits; not a verified release or personal document backup",
   "files_sha256": {
     ".gitattributes": "3383d326899ee0a8d15632c00b0f658292aa00127d9617fb83712853ef7250bb",
@@ -529,7 +529,7 @@
     "desktop/tools/test_sync_graph_java.py": "3f1f78df19dde8e18b6e53e39348fdb92f1f4f0848458069ad94af69aee2faab",
     "desktop/tools/test_sync_java.py": "7c681b1a5e13d70a65d715358eb826b6d44be3ccc8dc0aeff82df2b640da2a0e",
     "desktop/tools/test_sync_process_stops.py": "0f1cc233ac86657f24102e6f1b64d4c055bdd805debb9c97d76e88a1d8d5c1f5",
-    "docs/STACK_3B_HANDOFF.md": "321f966076c9d8e051239fd0d259e8ca97319eee48b5f4363f76397f373ba349",
+    "docs/STACK_3B_HANDOFF.md": "ef7918e2a866f137ea9d5a858a63b4b5cf3de314b54c662cef10b68a96b29828",
     "docs/STACK_ANDROID_SIGNING.md": "cf3529053d5b82e664bf300ec933a653bfafd304d89b3f90bed1909b21072188",
     "docs/STACK_ARCHIVE_FORMAT.md": "0beceae5ecf12f68cb8fe4323404960de457f4cf00eff4c975001d595344ceb1",
     "docs/STACK_DESKTOP_PHONE_TRANSFER.md": "f55b1da01de4cef2af82315d6890a1def90a2a21e504ee49c7727a8a961e09d6",
