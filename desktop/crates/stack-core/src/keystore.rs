@@ -211,6 +211,40 @@ fn sandbox_keyring_path() -> Option<std::path::PathBuf> {
     )
 }
 
+/// Where Stack 0.4.0 and earlier kept the same file inside the Flatpak: the launcher then pointed `XDG_DATA_HOME`
+/// at the shared library folder (the host's data folder), and the keyring library used `keyrings/v1/` under it.
+fn old_sandbox_keyring_path() -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("HOST_XDG_DATA_HOME")
+        .map(std::path::PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .map(std::path::PathBuf::from)
+                .filter(|p| p.is_absolute())
+                .map(|h| h.join(".local/share"))
+        })?;
+    Some(base.join("keyrings/v1/default.keyring"))
+}
+
+/// A saved key from the old place stays usable after an update: when the new file does not exist yet and the old
+/// one does, the old file is copied (and left where it is). The file is encrypted and is never read here.
+fn copy_old_keyring(old: &std::path::Path, new: &std::path::Path) {
+    if new.exists() || !old.is_file() {
+        return;
+    }
+    let Some(parent) = new.parent() else { return };
+    let Ok(mut tmp) = tempfile::NamedTempFile::new_in(parent) else {
+        return;
+    };
+    let Ok(mut src) = std::fs::File::open(old) else {
+        return;
+    };
+    if std::io::copy(&mut src, &mut tmp).is_ok() {
+        // Never replaces a file that appeared meanwhile.
+        let _ = tmp.persist_noclobber(new);
+    }
+}
+
 /// Opens the keyring. In a Flatpak, the file keyring is opened at an explicit place inside the app's own data
 /// folder (the key comes from the Secret portal), so the app and `stack-cli` always use the same file. Elsewhere
 /// this is the Secret Service.
@@ -224,6 +258,9 @@ async fn open_keyring() -> Result<oo7::Keyring, StoreError> {
         std::fs::create_dir_all(parent).map_err(|_| {
             StoreError::Failed("The computer's secret store could not be started.".into())
         })?;
+    }
+    if let Some(old) = old_sandbox_keyring_path() {
+        copy_old_keyring(&old, &path);
     }
     let secret = oo7::ashpd::desktop::secret::retrieve()
         .await
@@ -373,6 +410,28 @@ impl SecretStore for SystemStore {
 mod tests {
     use super::*;
     const KEY: &str = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
+
+    #[test]
+    fn old_keyring_is_copied_once_and_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = dir.path().join("old/default.keyring");
+        let new = dir.path().join("new/data/default.keyring");
+        std::fs::create_dir_all(old.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(new.parent().unwrap()).unwrap();
+        std::fs::write(&old, b"encrypted-old").unwrap();
+        copy_old_keyring(&old, &new);
+        assert_eq!(std::fs::read(&new).unwrap(), b"encrypted-old");
+        assert!(old.exists());
+        // An existing new file is never overwritten.
+        std::fs::write(&old, b"changed").unwrap();
+        copy_old_keyring(&old, &new);
+        assert_eq!(std::fs::read(&new).unwrap(), b"encrypted-old");
+        // Missing old file: nothing happens.
+        let none = dir.path().join("none.keyring");
+        let other = dir.path().join("new/data/other.keyring");
+        copy_old_keyring(&none, &other);
+        assert!(!other.exists());
+    }
 
     #[test]
     fn parses_plain_and_qr_forms_and_refuses_the_rest() {

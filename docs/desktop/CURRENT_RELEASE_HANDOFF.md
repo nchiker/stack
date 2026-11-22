@@ -13,6 +13,13 @@
   stack-core/stack-desktop pass. Desktop UI checked with the app's own window capture on a throwaway library (chip row,
   `İnvoices › Receipts` heading with the chip highlighted, Back button). `stack-transport` localhost tests are timing-sensitive (fixed 80 ms sleep before
   connecting) and failed twice when run alongside other heavy builds; they pass on a quiet machine.
+- **Desktop 0.5.0 published 2026-11-22** with `publish_flatpak_repo.py --push` (site commit b093ba0, Pages build "built";
+  Flatpak commit 65511cc1e15e920f95bd56a3b3baadaae737110007ad0b269958fe4f1634b37b, signed; a throwaway ostree remote with the public
+  key pulled its metadata with signature checking on). Source commit 96c8790. Bundle
+  `.artifacts/stack-desktop-20261122-v0.5.0/Stack-0.5.0-x86_64.flatpak`, SHA-256
+  `34da3b07d62cd15f829bd6e1ce5b3a266aa1d538227bb970d4cfa35375f849d1`. Contents: link sync, key store fixes, and the Flatpak keyring now
+  in the app's own data folder; a key saved by 0.4.0 (old file `$HOME/.local/share/keyrings/v1/default.keyring`) is copied
+  to the new place on first use (old file kept). Phone steps of run_all_checks were skipped for this release (test phone busy); desktop tests passed.
 - **Desktop 0.4.0 published 2026-11-17** with `publish_flatpak_repo.py --push` (site commit b5d8ff8, Pages build
   "built"); Flatpak commit dad3876d… (parent f2f0e173…, the 0.3.0 commit); a throwaway ostree remote with the public key
   pulled its metadata with signature checking on. Bundle `.artifacts/stack-desktop-20261117-v0.4.0/Stack-0.4.0-x86_64.flatpak`.

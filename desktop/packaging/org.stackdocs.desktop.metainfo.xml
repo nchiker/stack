@@ -19,6 +19,9 @@
   <provides><binary>stack</binary></provides>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.5.0" date="2026-11-22">
+      <description><p>Stack links between documents now sync with the phone. The saved backup key is kept in the app's own data folder and is carried over from the old place, and key handling no longer hangs when the computer's secret store is slow or locked.</p></description>
+    </release>
     <release version="0.4.0" date="2026-11-17">
       <description><p>Open a stack and see the other stacks that share its documents, for example Bills inside House. Tap one to show only the shared documents.</p></description>
     </release>
