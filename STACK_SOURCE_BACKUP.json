@@ -1,7 +1,7 @@
 {
   "format": "org.stackdocs.source-backup",
   "version": 1,
-  "source_base_commit": "b322927bd5095763f6cc15a69f93e32bfeea91b0",
+  "source_base_commit": "b4b9e7e0db85445096b6583e996bf1d9a7b5d35c",
   "qualification": "Source checkpoint including unfinished edits; not a verified release or personal document backup",
   "files_sha256": {
     ".gitattributes": "3383d326899ee0a8d15632c00b0f658292aa00127d9617fb83712853ef7250bb",
@@ -9,7 +9,7 @@
     "CLAUDE.md": "b8a12ac2eaf31529241e3adb7db5c149145793a7f0a676fe6ca2c3ba687aa2e8",
     "LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
     "Mockup/stack-cosmic-desktop-mockup.html": "94874cc6e4c838ae8edf0062ca48ff8c8f44f4cd1100a01fdf2c4addc4f6c481",
-    "README.md": "425aedf7b3efba85a619b53f79d76b91dbbe64550811e4b5d6550992691e16d4",
+    "README.md": "1a7736ce685fa2063c638d990400528ed9208cc3aff82e5a8bf47442728b071c",
     "Run Stack checks.desktop": "534b40f76fa0fe104d50c9bb6fbb302d7c9e303978b1cfdcd2be4df3e528dd3c",
     "app/README.md": "334ceb2a061109eacdde328d515433e3d8231e52ce84e0578a30ac5c184375f6",
     "app/build.gradle": "d4a71a34df164ed4b29059e1abb11ead484eb5e042d4a7e399f75c3ed84fbecc",
