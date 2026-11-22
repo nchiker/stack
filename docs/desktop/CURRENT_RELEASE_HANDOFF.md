@@ -13,6 +13,13 @@
   stack-core/stack-desktop pass. Desktop UI checked with the app's own window capture on a throwaway library (chip row,
   `İnvoices › Receipts` heading with the chip highlighted, Back button). `stack-transport` localhost tests are timing-sensitive (fixed 80 ms sleep before
   connecting) and failed twice when run alongside other heavy builds; they pass on a quiet machine.
+- **Desktop 0.5.1 published 2026-11-22** with `publish_flatpak_repo.py --push` (site commit 360e50b, Pages build "built";
+  Flatpak commit aac2ffdb8f7b6dfddf8488d448d2c353dfa8968ff521f68d0f160512fd03a6c3, parent 65511cc1, signed; throwaway ostree
+  remote with the public key: "Good signature"). Source commit 5d9e65e. Bundle
+  `.artifacts/stack-desktop-20261122-v0.5.1/Stack-0.5.1-x86_64.flatpak`, SHA-256
+  `3145d61a067a478fc96400e2098604b8b7ce182e610e3a3d779bbd1c98e401d0`. Contents: backup key can be saved where the portal has no secret
+  store (COSMIC) via the login keyring; Backup key tooltip shows the store; 0.5.0 keys still found. This computer updated to 0.5.1;
+  `key status`: saved yes, store host Secret Service. Phone steps skipped (test phone busy); desktop tests passed.
 - **Desktop 0.5.0 published 2026-11-22** with `publish_flatpak_repo.py --push` (site commit b093ba0, Pages build "built";
   Flatpak commit 65511cc1e15e920f95bd56a3b3baadaae737110007ad0b269958fe4f1634b37b, signed; a throwaway ostree remote with the public
   key pulled its metadata with signature checking on). Source commit 96c8790. Bundle

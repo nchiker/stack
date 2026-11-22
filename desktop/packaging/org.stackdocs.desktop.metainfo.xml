@@ -19,6 +19,9 @@
   <provides><binary>stack</binary></provides>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.5.1" date="2026-11-22">
+      <description><p>The backup key can now be saved on desktops whose portal has no secret store, such as COSMIC, using the login keyring. The Backup key tooltip shows where the key is stored. Keys saved by 0.5.0 are still found.</p></description>
+    </release>
     <release version="0.5.0" date="2026-11-22">
       <description><p>Stack links between documents now sync with the phone. The saved backup key is kept in the app's own data folder and is carried over from the old place, and key handling no longer hangs when the computer's secret store is slow or locked.</p></description>
     </release>

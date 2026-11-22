@@ -1,7 +1,7 @@
 {
   "format": "org.stackdocs.source-backup",
   "version": 1,
-  "source_base_commit": "d347efceaa5314db42c59787d16ef8b891c7a05d",
+  "source_base_commit": "0e5a13212bbe89ad3fb999b0fe8896ece8e1756b",
   "qualification": "Source checkpoint including unfinished edits; not a verified release or personal document backup",
   "files_sha256": {
     ".gitattributes": "3383d326899ee0a8d15632c00b0f658292aa00127d9617fb83712853ef7250bb",
@@ -344,7 +344,7 @@
     "desktop/notices/upstream/zune-jpeg-0.4.21-LICENSE.md": "c6dff146a9f31848ac296faa5a08a4253caf2c384c86f906dc99e7fc0a39cc8c",
     "desktop/packaging/README.md": "84dfa4832534c72afd2e8aadd8d08e4af1ee427faa11422a8a2e1fee631a1551",
     "desktop/packaging/org.stackdocs.desktop.desktop": "62190c42402eb7c179d423a52cbbfd211f7375bcd4d61aa6eff459a2b12e2e46",
-    "desktop/packaging/org.stackdocs.desktop.metainfo.xml": "a2d9d295d060721593100e8fa0df1bea1e4a6a1062ab86bca8c5e2ede824aec6",
+    "desktop/packaging/org.stackdocs.desktop.metainfo.xml": "9323356912cdaaf386a999b01d5c2aed4f7f16063665090c4b4396a6f9ad8da5",
     "desktop/packaging/org.stackdocs.desktop.yml": "e477a50a6a15a2ba78bdad36bb838c11195504e02a78cf1ee5221398c146c941",
     "desktop/packaging/stack": "178587cc92a54c777a58b6ac290d67b1ba4ece72f957e937f94dd507d6071f6d",
     "desktop/packaging/stack-cli": "a61948f7f2ad5300fc5b549ec5f2a33d2c8436c79d8ed2e133fa6227bc2c8366",
@@ -573,7 +573,7 @@
     "docs/STACK_LINK_SLICE6_DESIGN.md": "d0d4b7100c6e43911e775c0d31983ea709169f03e11e421db852d9e2b11bcf95",
     "docs/STACK_LINK_SLICE6_HANDOFF.md": "282899ca21c729fa5a9c3afea0d928cc25bd266b57f0c9d5fb914931f0cb8bc7",
     "docs/STACK_SOURCE_BACKUP.md": "ea34902a4e28e9f69aaa21b2bd432b7843c51026260bfec293083428b380ce10",
-    "docs/desktop/CURRENT_RELEASE_HANDOFF.md": "4a645721693e81437565b6dbbf303784aa6643348a040216aed96db3e8d6f0b6",
+    "docs/desktop/CURRENT_RELEASE_HANDOFF.md": "974ad01b2bf7a9a08cf1665711fd506d56338c9f7ba28bd2123447fa455a4c30",
     "docs/desktop/INTEROP_SYNC_PROTOCOL_V1.md": "ab64129f296c1ec520fe2f5d3ff9dc23bcb8d8c2e03123b2c2a3bc3b244168ca",
     "docs/desktop/PAIRED_TRANSPORT.md": "73ebd1ceb92ee7b5605304d4bf045c33d17e03a50ebf5212a0e2bb7dedbebb27",
     "gradle.properties": "89414877122a9251c4d1b1e306efc81667ef95c7e0a02cf3ca26351c9b7623e0",
