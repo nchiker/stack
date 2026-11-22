@@ -74,7 +74,7 @@ Done
   After Prepare `Active` holds no key (`Active.keyed` only); the worker drops it when its work ends.
 
 Left / not done
-- Real phone-made backup (2026-11-21, `Stack-2026-11-21-182252.stackbackup`, 218 MB from test phone, key-only envelope) was reviewed with the CLI (format 4, encrypted, 164 documents, 2 links, 0 skipped) and then, after the key-storage and guided-import work, imported end to end in the desktop test app by the user with the key copied from Key Vault ("it worked"). Not yet checked by hand: the new menu's width against the real sidebar (a fixed 224 px popup, never seen rendered), the real Secret Service and the Flatpak (the key store is `oo7`; only the in-memory fake is tested), and clipboard clearing on COSMIC/Wayland (see the Key Vault list below).
+- Real phone-made backup (2026-11-21, `Stack-2026-11-21-182252.stackbackup`, 218 MB from test phone, key-only envelope) was reviewed with the CLI (format 4, encrypted, 164 documents, 2 links, 0 skipped) and then, after the key-storage and guided-import work, imported end to end in the desktop test app by the user with the key copied from Key Vault ("it worked"). Not yet checked by hand: the real Secret Service and the Flatpak (the key store is `oo7`; only the in-memory fake is tested). (The Backup & restore menu looked fine in the real sidebar and the Key Vault clipboard test passed, per the user.)
 - The CLI needs `STACK_PDFIUM_LIBRARY` for any backup with link previews (the packaged app ships PDFium). `review` prints the full id mapping JSON (very long); consider a short form.
 - The desktop export (and any export) still writes format 3 without link records, so a desktop round trip drops linked documents. Sync of link records is slice 6.
 - Linked view shows page 1 of the preview only, and the first 20,000 characters of text. No stacks, tags, notes or delete for linked documents yet.
@@ -88,6 +88,6 @@ Left / not done
 - Two other ignored desktop tests (`ordinary_desktop_import_reads_text_offline_and_preserves_typed_draft`, `application_pdf_import_reorder_subset_and_output_use_saved_snapshot`) already fail without an OCR runtime; PDFium tests must be run one at a time (`PdfiumLibraryBindingsAlreadyInitialized` otherwise). New crates from the `oo7` work (oo7 0.6.0, ashpd 0.13.13, cbc, hkdf, md-5, num*, serde_bytes, zeroize_derive) were fetched with the user's approval; oo7 0.7.3 needs a newer tokio than the pinned 1.53.3.
 
 Next
-1. User hand checks listed above (menu width, Key Vault clipboard, real keyring/Flatpak) before any release; fix what they show.
+1. User hand checks listed above (Key Vault menus/tooltips and QR button, real keyring/Flatpak) before any release; fix what they show.
 2. Decide with the user: desktop export of linked documents (format 4, encrypted; needs an OS random source) vs leaving it to slice 6; link count in CLI Status JSON.
 3. A desktop release (Flatpak build and publish) only on the user's explicit go-ahead. Rule for all work: setup must live in the app, never in scripts or dev-machine paths (see `CLAUDE.md`).
