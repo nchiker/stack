@@ -211,7 +211,7 @@ Full design and implementation notes: `STACK_LINK_SLICE6_DESIGN.md`. Wire detail
 - **Setup.** Nothing to install or run: both apps announce links in the sync handshake and the next Sync does the rest.
   An older desktop still syncs documents. An older desktop build cannot open a library the new desktop has upgraded (schema 6).
 - **Status.** Both sides are built, tested and announce `links` (`ANNOUNCE_LINKS=true`, step D4b is live),
-  so link cells now travel once a side enables. Real-LAN test (T3) passed 2026-11-22 (50 links, first sync 42-49 s). The Flatpak launch test (6b) is still to do.
+  so link cells now travel once a side enables. Real-LAN test (T3) passed 2026-11-22 (50 links, first sync 42-49 s). The Flatpak launch test (6b) passed 2026-11-22 for option 1 (see Desktop Open, Results); only the open decision about files outside Stack's own folders remains.
 
 ## Work by project
 
@@ -326,6 +326,19 @@ on both: the partner publish and import (slice 7) and `Open` on desktop (slice 6
      if 1 and 2 cannot work, and only with the user's agreement.
 - How the partner's Linux machine gets files from Filen (the Filen desktop client's sync folder, or the web) is
   not known and decides option 2.
+
+**Results (2026-11-22).** Tested with the test Flatpak `org.stackdocs.desktop.test` (its own permissions only) and a
+synthetic .sam in its data folder, Ami Pro Linux 0.1.1+git90a5767 already running on the host.
+- Option 1 works with no new permission. From inside the sandbox, `org.freedesktop.portal.OpenURI.OpenFile`
+  (parent window `''`, an fd opened read-only on the file, options `{}`) returned OK; the host default handler for
+  `application/x-amipro-document` (Ami Pro Linux) was launched, handed the file to the running window through
+  `DbusActivation.ActivateAction("open", [path])`, and it opened as a tab there (no second window).
+- Ami Pro saw the real host path (`/home/<user>/.var/app/org.stackdocs.desktop.test/data/NAME.sam`), not a
+  `/run/user/1000/doc/...` copy, because the file is in the app's own data folder. Edit and Save changed the
+  ORIGINAL (hash changed); `NAME.sam.bak` was created next to it holding the pre-edit bytes; no loss-check dialog blocked.
+- Not tested, and the open point: a file outside Stack's own folders (for example a Filen sync folder) can only be
+  passed if Stack already holds an fd for it (file-chooser portal, which then gives a document-portal path).
+  Option 2 is therefore needed only for that, once, per folder; option 3 is not needed.
 
 ### Restore and setup (later, a separate project)
 After a new phone or computer, the records return but their locators are dead. Two parts:

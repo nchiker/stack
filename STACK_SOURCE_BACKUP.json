@@ -1,7 +1,7 @@
 {
   "format": "org.stackdocs.source-backup",
   "version": 1,
-  "source_base_commit": "0e5a13212bbe89ad3fb999b0fe8896ece8e1756b",
+  "source_base_commit": "a7760f308c827cf364806d16c63814d76de1a706",
   "qualification": "Source checkpoint including unfinished edits; not a verified release or personal document backup",
   "files_sha256": {
     ".gitattributes": "3383d326899ee0a8d15632c00b0f658292aa00127d9617fb83712853ef7250bb",
@@ -567,7 +567,7 @@
     "docs/STACK_ANDROID_SIGNING.md": "cf3529053d5b82e664bf300ec933a653bfafd304d89b3f90bed1909b21072188",
     "docs/STACK_ARCHIVE_FORMAT.md": "7d77b2a6d7095190c968726ebee49f4cae4aeebcfd65b5054eac5f5abb2955db",
     "docs/STACK_DESKTOP_PHONE_TRANSFER.md": "f55b1da01de4cef2af82315d6890a1def90a2a21e504ee49c7727a8a961e09d6",
-    "docs/STACK_LINK_CONTRACT.md": "576032460a4936cdc67c375011edc82ebd6388b9b2135e424e4971d6349c80c3",
+    "docs/STACK_LINK_CONTRACT.md": "88fb37795e0e398e1d38be8b552f58dfb1a8c742e7804523eccf5b530950d9ff",
     "docs/STACK_LINK_SLICE3_HANDOFF.md": "a3036627a5911c21b0f2e6dd50fb615067522d8643db764d21244c27eda3d152",
     "docs/STACK_LINK_SLICE4_HANDOFF.md": "d66419a23ac2fd577152f77fe602e1e73d49903c519370f04ad66127c054a18b",
     "docs/STACK_LINK_SLICE6_DESIGN.md": "d0d4b7100c6e43911e775c0d31983ea709169f03e11e421db852d9e2b11bcf95",
