@@ -19,6 +19,18 @@
   <provides><binary>stack</binary></provides>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.7.0" date="2026-11-22">
+      <description><p>Documents your partner shares with you now appear in search and the document list, marked "Shared by" their name. Opening the original still happens on the phone. Stack updates its library to a newer format the first time you open this version, so install it on every computer you use.</p></description>
+    </release>
+    <release version="0.6.3" date="2026-11-22">
+      <description><p>Installing Stack is now one step: the package sets up its own updates. Opening a linked document no longer warns when the file has the same name and was only edited since. A second start says Stack is already open.</p></description>
+    </release>
+    <release version="0.6.2" date="2026-11-22">
+      <description><p>The version number is now always visible in the window title, for example "Stack 0.6.2 — All documents". 0.6.1 only showed it inside the Backup &amp; restore menu.</p></description>
+    </release>
+    <release version="0.6.1" date="2026-11-22">
+      <description><p>The window now shows which version of Stack you have, next to the Backup key line.</p></description>
+    </release>
     <release version="0.6.0" date="2026-11-22">
       <description><p>Stack is now installed as a normal program (a .deb) and updates arrive through the system updater. Open in Ami Pro starts Ami Pro directly. The library, pairing and backup key are unchanged.</p></description>
     </release>

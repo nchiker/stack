@@ -52,6 +52,11 @@ pub struct LinkedDocument {
     pub preview: Option<PathBuf>,
     /// Where this computer last found the original file (a path from the file chooser portal). Local only.
     pub remembered_file: Option<String>,
+    /// A document the partner shares with this phone (slice 7): read-only here, opened only on the phone. Never has
+    /// a remembered file and is never offered to Ami Pro.
+    pub foreign: bool,
+    /// The partner's name for the "Shared by" badge; empty for the person's own links.
+    pub shared_by: String,
 }
 
 pub(crate) fn preview_file(row_id: &str) -> String {
@@ -85,8 +90,9 @@ impl Library {
         stack_archive::uuid(id)?;
         match path {
             Some(path) if !path.is_empty() => {
+                // A shared copy has no file on this computer to remember; only own links can have one.
                 let known: bool = self.db.query_row(
-                    "SELECT EXISTS(SELECT 1 FROM link_records WHERE row_id=?1)",
+                    "SELECT EXISTS(SELECT 1 FROM link_records WHERE row_id=?1 AND origin='own')",
                     [id],
                     |r| r.get(0),
                 )?;
@@ -111,7 +117,7 @@ impl Library {
         let row = self
             .db
             .query_row(
-                "SELECT owner,link_id,kind,title,mime,modified,added_at,state,hash,text,preview AND NOT preview_pending FROM link_records WHERE row_id=?1",
+                "SELECT owner,link_id,kind,title,mime,modified,added_at,state,hash,text,preview AND NOT preview_pending,origin,shared_by FROM link_records WHERE row_id=?1",
                 [id],
                 |r| {
                     Ok((
@@ -129,6 +135,8 @@ impl Library {
                             text: r.get(9)?,
                             preview: None,
                             remembered_file: None,
+                            foreign: r.get::<_, String>(11)? == "foreign",
+                            shared_by: r.get(12)?,
                         },
                         r.get::<_, i64>(10)? != 0,
                     ))
@@ -137,7 +145,9 @@ impl Library {
             .optional()?
             .ok_or(Error::Stale)?;
         let (mut link, has_preview) = row;
-        link.remembered_file = self.link_local_file(id)?;
+        if !link.foreign {
+            link.remembered_file = self.link_local_file(id)?;
+        }
         if has_preview {
             stack_archive::read_directory(&self.root.join("links"))?;
             let path = self.root.join(preview_file(id));
@@ -152,7 +162,7 @@ impl Library {
         expression: &str,
         sort: crate::Sort,
         limit: u32,
-    ) -> Result<Vec<(String, String, i64, String)>> {
+    ) -> Result<Vec<(String, String, i64, String, String)>> {
         let order = match sort {
             crate::Sort::Newest => "l.added_at DESC,l.row_id",
             crate::Sort::Name => "l.title COLLATE NOCASE,l.row_id",
@@ -160,19 +170,19 @@ impl Library {
         let mut out = Vec::new();
         if expression.is_empty() {
             let mut statement = self.db.prepare(&format!(
-                "SELECT l.row_id,l.title,l.added_at FROM link_records l WHERE l.state<>'trashed' ORDER BY {order} LIMIT ?1"
+                "SELECT l.row_id,l.title,l.added_at,CASE l.origin WHEN 'foreign' THEN l.shared_by ELSE '' END FROM link_records l WHERE l.state<>'trashed' ORDER BY {order} LIMIT ?1"
             ))?;
             for row in statement.query_map(params![limit], |r| {
-                Ok((r.get(0)?, r.get(1)?, r.get(2)?, String::new()))
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, String::new(), r.get(3)?))
             })? {
                 out.push(row?);
             }
         } else {
             let mut statement = self.db.prepare(&format!(
-                "SELECT l.row_id,l.title,l.added_at,snippet(link_search,2,'','','…',24) FROM link_search s JOIN link_records l ON l.row_id=s.row_id WHERE link_search MATCH ?1 AND l.state<>'trashed' ORDER BY {order} LIMIT ?2"
+                "SELECT l.row_id,l.title,l.added_at,snippet(link_search,2,'','','…',24),CASE l.origin WHEN 'foreign' THEN l.shared_by ELSE '' END FROM link_search s JOIN link_records l ON l.row_id=s.row_id WHERE link_search MATCH ?1 AND l.state<>'trashed' ORDER BY {order} LIMIT ?2"
             ))?;
             for row in statement.query_map(params![expression, limit], |r| {
-                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
             })? {
                 out.push(row?);
             }
@@ -216,6 +226,25 @@ mod tests {
         );
         library.set_link_local_file(ID, None).unwrap();
         assert_eq!(library.link_local_file(ID).unwrap(), None);
+    }
+
+    #[test]
+    fn a_shared_copy_never_gets_a_remembered_file_and_says_who_shared_it() {
+        let (_dir, library) = library();
+        library
+            .db
+            .execute(
+                "UPDATE link_records SET origin='foreign',shared_by='Sam'",
+                [],
+            )
+            .unwrap();
+        assert!(library.set_link_local_file(ID, Some("/x")).is_err());
+        let view = library.linked_document(ID).unwrap();
+        assert!(view.foreign);
+        assert_eq!(view.shared_by, "Sam");
+        assert_eq!(view.remembered_file, None);
+        let hits = library.link_hits("", crate::Sort::Name, 10).unwrap();
+        assert_eq!(hits[0].4, "Sam");
     }
 
     #[test]

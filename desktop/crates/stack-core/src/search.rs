@@ -16,6 +16,8 @@ pub struct SearchHit {
     pub page_id: Option<String>,
     /// A linked document (archive format 4): read-only, opened with `Library::linked_document`.
     pub linked: bool,
+    /// The partner's name when this linked document is one the partner shares ("Shared by <name>"); else empty.
+    pub shared_by: String,
 }
 
 /// Another stack that shares documents with a chosen stack.
@@ -121,6 +123,7 @@ impl Library {
                 snippet,
                 page_id,
                 linked: false,
+                shared_by: String::new(),
             });
         }
         // Linked documents have no stacks yet, so they join only unfiltered results.
@@ -128,7 +131,7 @@ impl Library {
             let links = self.link_hits(&expression, sort, limit)?;
             if !links.is_empty() {
                 let mut merged: Vec<(i64, SearchHit)> = keys.into_iter().zip(hits).collect();
-                merged.extend(links.into_iter().map(|(id, title, added, snippet)| {
+                merged.extend(links.into_iter().map(|(id, title, added, snippet, shared_by)| {
                     (
                         added,
                         SearchHit {
@@ -137,6 +140,7 @@ impl Library {
                             snippet,
                             page_id: None,
                             linked: true,
+                            shared_by,
                         },
                     )
                 }));

@@ -60,6 +60,21 @@ final class LinkLifecycleChecks {
 
     private static String ownerLocators() throws Exception { return new JSONArray().put(new JSONObject().put("type", "owner").put("token", "moved/2")).toString(); }
 
+    private static Bundle moved(String owner, String linkId, String uuid, String path) {
+        try {
+            String json = new JSONObject().put("contract", 1).put("owner", owner).put("link_id", linkId)
+                .put("locators", new JSONArray().put(new JSONObject().put("type", "filen").put("uuid", uuid).put("path", path))).toString();
+            return app.getContentResolver().call(Uri.parse("content://" + app.getPackageName() + ".link"), "moved", json, null);
+        } catch (Exception error) { throw new AssertionError(error); }
+    }
+
+    private static Bundle unshared(String owner, String linkId) {
+        try {
+            String json = new JSONObject().put("contract", 1).put("owner", owner).put("link_id", linkId).toString();
+            return app.getContentResolver().call(Uri.parse("content://" + app.getPackageName() + ".link"), "unshared", json, null);
+        } catch (Exception error) { throw new AssertionError(error); }
+    }
+
     private static Bundle removed(String owner, String linkId, String reason) {
         ContentResolver resolver = app.getContentResolver();
         try {
@@ -163,7 +178,7 @@ final class LinkLifecycleChecks {
             require("unsupported_contract".equals(app.getContentResolver().call(Uri.parse("content://" + me + ".link"), "removed", "{\"contract\":2,\"owner\":\"" + me + "\",\"link_id\":\"" + mine.linkId + "\",\"reason\":\"deleted\"}", null).getString("error")), "another contract number is refused");
             Bundle unknown = removed(me, UUID.randomUUID().toString(), "deleted");
             require(unknown.getBoolean("ok") && !unknown.getBoolean("changed") && unknown.getString("error") == null, "an unknown link id is a harmless no-op");
-            require("unknown_method".equals(app.getContentResolver().call(Uri.parse("content://" + me + ".link"), "moved", "{}", null).getString("error")), "moved is not accepted yet");
+            require("invalid".equals(app.getContentResolver().call(Uri.parse("content://" + me + ".link"), "moved", "{}", null).getString("error")), "an empty moved message is refused");
             Bundle ok = removed(me, mine.linkId, "trashed");
             require(ok.getBoolean("ok") && ok.getBoolean("changed") && LinkStore.TRASHED.equals(state(mine)), "removed moves the record to Recently deleted");
             require(io(() -> app.library.links.list("lifecycle")).stream().noneMatch(l -> l.id.equals(mine.id)) && io(() -> app.library.links.text(mine.id)).contains("lifecycle"), "a trashed record is out of the list but its text is kept");
@@ -173,6 +188,54 @@ final class LinkLifecycleChecks {
             io(() -> app.library.links.publish(LinkRecord.parse(record(me, mine.linkId, "Lifecycle removal", mine.hash)), "lifecycle check text", null));
             require(LinkStore.LIVE.equals(state(mine)), "a publish brings a trashed record back to live");
             mark.accept("Lifecycle: removed, trash, publish restores");
+
+            // Slice 5: moved and unshared (real provider; the caller is Stack itself).
+            final String uuid1 = UUID.randomUUID().toString(), uuid2 = UUID.randomUUID().toString();
+            String sharedRecord = new JSONObject(record(me, mine.linkId, "Lifecycle removal", mine.hash)).put("shared", true)
+                .put("locators", new JSONArray().put(new JSONObject().put("type", "filen").put("uuid", uuid1).put("path", "/Docs/a.sam"))).toString();
+            io(() -> app.library.links.publish(LinkRecord.parse(sharedRecord), "lifecycle check text", null));
+            require(io(() -> app.library.links.get(mine.id)).shared, "the record is shared");
+            io(() -> { app.library.links.rename(mine.id, "My own title"); return true; });
+            require("invalid".equals(moved("some.other.app", mine.linkId, uuid2, "/Docs/b.sam").getString("error")), "moved for another owner is refused");
+            require("invalid".equals(app.getContentResolver().call(Uri.parse("content://" + me + ".link"), "moved", new JSONObject().put("contract", 1).put("owner", me).put("link_id", mine.linkId).put("locators", new JSONArray()).toString(), null).getString("error")), "moved without locators is refused");
+            Bundle unknownMove = moved(me, UUID.randomUUID().toString(), uuid2, "/x");
+            require(unknownMove.getBoolean("ok") && !unknownMove.getBoolean("changed"), "moved for an unknown link is a harmless no-op");
+            Bundle move = moved(me, mine.linkId, uuid2, "/Docs/sub/b.sam");
+            LinkStore.Link movedLink = io(() -> app.library.links.get(mine.id));
+            require(move.getBoolean("ok") && move.getBoolean("changed") && movedLink.locators.contains(uuid2) && !movedLink.locators.contains(uuid1), "moved replaces the locators");
+            require("My own title".equals(movedLink.title) && LinkStore.LIVE.equals(movedLink.state) && movedLink.hash.equals(mine.hash), "moved changes nothing else");
+            require(!moved(me, mine.linkId, uuid2, "/Docs/sub/b.sam").getBoolean("changed"), "the same move again changes nothing");
+            removed(me, mine.linkId, "trashed");
+            require(LinkStore.TRASHED.equals(state(mine)), "the file went to Filen's trash");
+            require(moved(me, mine.linkId, uuid1, "/Docs/a.sam").getBoolean("changed") && LinkStore.LIVE.equals(state(mine)), "moved after trashed brings the record back to live");
+            removed(me, mine.linkId, "deleted");
+            moved(me, mine.linkId, uuid2, "/Docs/b.sam");
+            require(LinkStore.TRASHED.equals(state(mine)), "moved never revives a record the owner deleted");
+            io(() -> app.library.links.publish(LinkRecord.parse(sharedRecord), "lifecycle check text", null));
+            require("invalid".equals(unshared("some.other.app", mine.linkId).getString("error")), "unshared for another owner is refused");
+            Bundle unshare = unshared(me, mine.linkId);
+            require(unshare.getBoolean("ok") && unshare.getBoolean("changed") && !io(() -> app.library.links.get(mine.id)).shared && LinkStore.LIVE.equals(state(mine)), "unshared clears the shared flag and keeps the record live");
+            require(!unshared(me, mine.linkId).getBoolean("changed"), "unshared twice changes nothing");
+            mark.accept("Lifecycle: moved and unshared");
+            // Filen-origin events: matched by the Filen UUID, only from Filen Files (here the caller is Stack, so the provider refuses; the store is tested directly).
+            String filenMessage = new JSONObject().put("contract", 1).put("filen_uuid", uuid2).put("path", "/x").toString();
+            require("invalid".equals(app.getContentResolver().call(Uri.parse("content://" + me + ".link"), "moved", filenMessage, null).getString("error")), "a Filen-origin event from any other app is refused");
+            io(() -> app.library.links.publish(LinkRecord.parse(new JSONObject(sharedRecord).put("locators", new JSONArray()
+                .put(new JSONObject().put("type", "filen").put("uuid", uuid2).put("path", "/Docs/b.sam"))
+                .put(new JSONObject().put("type", "owner").put("token", "private/1"))).toString()), "lifecycle check text", null));
+            require(io(() -> app.library.links.filenMoved(uuid2, "/Docs/new/b.sam")) == 1, "a Filen move finds the record by UUID");
+            LinkStore.Link byUuid = io(() -> app.library.links.get(mine.id));
+            require(byUuid.locators.replace("\\/", "/").contains("/Docs/new/b.sam") && byUuid.locators.replace("\\/", "/").contains("private/1"), "a Filen move replaces only the filen locator");
+            require(io(() -> app.library.links.filenMoved(UUID.randomUUID().toString(), "/y")) == 0, "a Filen move of an unknown file changes nothing");
+            require(io(() -> app.library.links.filenRemoved(uuid2, "trashed")) == 1 && LinkStore.TRASHED.equals(state(mine)), "Filen trashing the file moves the record to Recently deleted");
+            require(io(() -> app.library.links.filenMoved(uuid2, "/Docs/back.sam")) == 1 && LinkStore.LIVE.equals(state(mine)), "restoring from Filen's trash brings it back");
+            io(() -> app.library.links.filenRemoved(uuid2, "trashed"));
+            require(io(() -> app.library.links.filenRemoved(uuid2, "deleted")) == 1, "deleting for good upgrades a record that sat in Filen's trash");
+            io(() -> app.library.links.filenMoved(uuid2, "/Docs/ghost.sam"));
+            require(LinkStore.TRASHED.equals(state(mine)), "a record deleted for good is never revived by a later move");
+            io(() -> app.library.links.publish(LinkRecord.parse(new JSONObject(sharedRecord).put("locators", new JSONArray().put(new JSONObject().put("type", "filen").put("uuid", uuid2).put("path", "/Docs/b.sam"))).toString()), "lifecycle check text", null));
+            require(io(() -> app.library.links.filenUnshared(uuid2)) == 1 && !io(() -> app.library.links.get(mine.id)).shared, "Filen ending the share clears shared");
+            mark.accept("Lifecycle: Filen-origin events");
 
             // User removal, restore, expiry.
             require(!io(() -> app.library.links.deleteTrashed(mine.id)) && io(() -> app.library.links.get(mine.id)) != null, "Delete for good never deletes a record that is not in Recently deleted");

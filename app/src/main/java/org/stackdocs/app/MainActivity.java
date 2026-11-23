@@ -773,7 +773,7 @@ public final class MainActivity extends LibraryActivity {
         name.setMaxLines(2); name.setEllipsize(TextUtils.TruncateAt.END);
         words.addView(name, new LinearLayout.LayoutParams(-1, -2));
         String owner = LinkOpener.ownerName(link.owner);
-        TextView badge = Ui.text(this, "Linked · " + owner + (link.isProtected ? " · protected" : "") + (LinkStore.MISSING.equals(link.state) ? " · missing" : LinkStore.UNREACHABLE.equals(link.state) ? " · can't reach" : ""), 12, false);
+        TextView badge = Ui.text(this, (link.foreign ? "Shared by " + link.sharedBy + " · " : "Linked · ") + owner + (link.isProtected ? " · protected" : "") + (LinkStore.MISSING.equals(link.state) ? " · missing" : LinkStore.UNREACHABLE.equals(link.state) ? " · can't reach" : ""), 12, false);
         badge.setTextColor(LinkStore.LIVE.equals(link.state) ? Ui.BLUE : LinkStore.MISSING.equals(link.state) ? 0xFFB3261E : Ui.MUTED); badge.setPadding(0, Ui.dp(this, 4), 0, 0);
         words.addView(badge);
         String excerpt = LinkPreview.displayText(link.excerpt, 300).trim();
@@ -784,7 +784,7 @@ public final class MainActivity extends LibraryActivity {
         }
         tile.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
         tile.setFocusable(true);
-        tile.setContentDescription(link.title + ", linked document from " + owner + (LinkStore.MISSING.equals(link.state) ? ", missing" : LinkStore.UNREACHABLE.equals(link.state) ? ", can't reach" : ""));
+        tile.setContentDescription(link.title + (link.foreign ? ", shared by " + link.sharedBy + ", document from " : ", linked document from ") + owner + (LinkStore.MISSING.equals(link.state) ? ", missing" : LinkStore.UNREACHABLE.equals(link.state) ? ", can't reach" : ""));
         tile.setOnClickListener(view -> { hideKeyboard(); startActivity(new Intent(this, LinkActivity.class).putExtra("link_id", link.id)); });
         return tile;
     }

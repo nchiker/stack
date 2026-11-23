@@ -454,12 +454,12 @@ impl Library {
         Ok((operation, cells, left_out))
     }
 
-    /// Every readable non-trashed row as a writer input. An unreadable or invalid row is left out (the writer
+    /// Every readable non-trashed OWN row as a writer input (a record the partner shares is never one of them). An unreadable or invalid row is left out (the writer
     /// self-check refuses it later); this never fails the session.
     fn desktop_link_inputs(&self) -> (Vec<LinkInput>, BTreeMap<String, String>) {
         let none = (Vec::new(), BTreeMap::new());
         let Ok(mut statement) = self.db.prepare(
-            "SELECT row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,title_user_edited,added_at,text,preview,preview_pending FROM link_records WHERE state<>'trashed' ORDER BY added_at,row_id",
+            "SELECT row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,title_user_edited,added_at,text,preview,preview_pending FROM link_records WHERE state<>'trashed' AND origin='own' ORDER BY added_at,row_id",
         ) else {
             return none;
         };
@@ -531,6 +531,8 @@ impl Library {
                 },
                 omit_text: false,
                 omit_preview: false,
+                // The partner's records are never sent from here: the phone is their only author.
+                foreign: None,
             });
         }
         (out, ids)
@@ -596,6 +598,9 @@ pub(crate) struct LinkApplied {
 
 struct OldRow {
     row_id: String,
+    origin: String,
+    shared_by: String,
+    foreign_generation: i64,
     state: String,
     state_since: i64,
     removed_reason: String,
@@ -789,8 +794,10 @@ impl Library {
             old_groups,
             mut report,
         } = plan;
+        // Only the person's own links count towards the 1000 an archive can hold: a record the partner shares is a
+        // mirror of the phone and never goes into an archive.
         let mut visible: i64 = tx.query_row(
-            "SELECT count(*) FROM link_records WHERE state<>'trashed'",
+            "SELECT count(*) FROM link_records WHERE state<>'trashed' AND origin='own'",
             [],
             |r| r.get(0),
         )?;
@@ -817,11 +824,14 @@ impl Library {
             let row = &item.row;
             let old = tx
                 .query_row(
-                    "SELECT row_id,state,state_since,removed_reason,title,mime,modified,hash,shared,protected,locators,title_user_edited,text,preview,preview_sha,preview_pending FROM link_records WHERE owner=?1 AND link_id=?2",
+                    "SELECT row_id,state,state_since,removed_reason,title,mime,modified,hash,shared,protected,locators,title_user_edited,text,preview,preview_sha,preview_pending,origin,shared_by,foreign_generation FROM link_records WHERE owner=?1 AND link_id=?2",
                     params![row.owner, row.link_id],
                     |r| {
                         Ok(OldRow {
                             row_id: r.get(0)?,
+                            origin: r.get(16)?,
+                            shared_by: r.get(17)?,
+                            foreign_generation: r.get(18)?,
                             state: r.get(1)?,
                             state_since: r.get(2)?,
                             removed_reason: r.get(3)?,
@@ -865,7 +875,8 @@ impl Library {
                         report.skipped += 1;
                         continue;
                     };
-                    if !trashed && visible >= VISIBLE_LIMIT {
+                    let foreign = content.foreign.as_ref();
+                    if foreign.is_none() && !trashed && visible >= VISIBLE_LIMIT {
                         report.not_shown += 1;
                         continue;
                     }
@@ -879,7 +890,7 @@ impl Library {
                         _ => None,
                     };
                     tx.execute(
-                        "INSERT INTO link_records(row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,title_user_edited,added_at,text,preview,state_since,removed_reason,preview_sha,preview_pending) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20)",
+                        "INSERT INTO link_records(row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,title_user_edited,added_at,text,preview,state_since,removed_reason,preview_sha,preview_pending,origin,shared_by,foreign_generation) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23)",
                         params![
                             row_id,
                             row.owner,
@@ -892,7 +903,14 @@ impl Library {
                             i64::from(content.shared),
                             i64::from(content.protected),
                             locators_with("[]", &item.filen),
-                            if trashed { "trashed" } else { "unreachable" },
+                            // A partner's record is not checked against any file here: it is simply live.
+                            if trashed {
+                                "trashed"
+                            } else if foreign.is_some() {
+                                "live"
+                            } else {
+                                "unreachable"
+                            },
                             i64::from(title.user_edited),
                             row.added_at,
                             text,
@@ -901,19 +919,44 @@ impl Library {
                             removed_reason,
                             preview.clone().unwrap_or_default(),
                             i64::from(preview.is_some()),
+                            if foreign.is_some() { "foreign" } else { "own" },
+                            foreign.map(|f| f.shared_by.as_str()).unwrap_or(""),
+                            foreign.map_or(0, |f| f.generation),
                         ],
                     )?;
                     tx.execute(
                         "INSERT INTO link_search VALUES(?1,?2,?3)",
                         params![row_id, title.title, text],
                     )?;
-                    if !trashed {
+                    if !trashed && foreign.is_none() {
                         visible += 1;
                     }
                 }
                 Some(old) => {
+                    // A row's origin never flips through sync: a content cell without `origin` cannot turn a shared copy into an own row, and a
+                    // cell with `origin` cannot turn an own row into a shared copy. Such a cell is skipped (counted), the row stays as it is.
+                    if let Some(c) = row.content.as_ref() {
+                        if c.foreign.is_some() != (old.origin == "foreign") {
+                            report.skipped += 1;
+                            continue;
+                        }
+                    }
                     let was_trashed = old.state == "trashed";
-                    if was_trashed && !trashed && visible >= VISIBLE_LIMIT {
+                    // Origin follows the phone's content cell (phone-authoritative); without one the row keeps its own.
+                    let (origin, shared_by, generation) = match row.content.as_ref() {
+                        Some(c) => match &c.foreign {
+                            Some(f) => ("foreign", f.shared_by.clone(), f.generation),
+                            None => ("own", String::new(), 0),
+                        },
+                        None => (
+                            if old.origin == "foreign" { "foreign" } else { "own" },
+                            old.shared_by.clone(),
+                            old.foreign_generation,
+                        ),
+                    };
+                    let was_counted = old.origin == "own" && !was_trashed;
+                    let now_counted = origin == "own" && !trashed;
+                    if now_counted && !was_counted && visible >= VISIBLE_LIMIT {
                         report.not_shown += 1;
                         continue;
                     }
@@ -980,7 +1023,11 @@ impl Library {
                         ("trashed".to_owned(), state_since, removed_reason)
                     } else if was_trashed {
                         // trashed -> live: a locally trashed row is visible again.
-                        ("unreachable".to_owned(), 0, String::new())
+                        (
+                            if origin == "foreign" { "live" } else { "unreachable" }.to_owned(),
+                            0,
+                            String::new(),
+                        )
                     } else {
                         (
                             old.state.clone(),
@@ -988,13 +1035,9 @@ impl Library {
                             old.removed_reason.clone(),
                         )
                     };
-                    if !was_trashed && trashed {
-                        visible -= 1;
-                    } else if was_trashed && !trashed {
-                        visible += 1;
-                    }
+                    visible += i64::from(now_counted) - i64::from(was_counted);
                     tx.execute(
-                        "UPDATE link_records SET title=?1,mime=?2,modified=?3,hash=?4,shared=?5,protected=?6,locators=?7,state=?8,title_user_edited=?9,text=?10,preview=?11,state_since=?12,removed_reason=?13,preview_sha=?14,preview_pending=?15 WHERE row_id=?16",
+                        "UPDATE link_records SET title=?1,mime=?2,modified=?3,hash=?4,shared=?5,protected=?6,locators=?7,state=?8,title_user_edited=?9,text=?10,preview=?11,state_since=?12,removed_reason=?13,preview_sha=?14,preview_pending=?15,origin=?17,shared_by=?18,foreign_generation=?19 WHERE row_id=?16",
                         params![
                             title,
                             mime,
@@ -1012,8 +1055,15 @@ impl Library {
                             sha,
                             pending,
                             old.row_id,
+                            origin,
+                            shared_by,
+                            generation,
                         ],
                     )?;
+                    if origin == "foreign" {
+                        // A shared copy has no file on this computer to remember.
+                        tx.execute("DELETE FROM link_local_files WHERE row_id=?1", [&old.row_id])?;
+                    }
                     tx.execute("DELETE FROM link_search WHERE row_id=?1", [&old.row_id])?;
                     tx.execute(
                         "INSERT INTO link_search VALUES(?1,?2,?3)",

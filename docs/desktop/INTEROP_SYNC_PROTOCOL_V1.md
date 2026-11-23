@@ -167,3 +167,44 @@ A pre-slice-6 device that adopts or receives a history containing `link_records/
 "unknown graph table". It cannot happen through the hello gate; it can happen through a copied backup or a re-pairing with
 an old app after a connection reset on the new side. There is no silent fallback. An older desktop build refuses a
 schema-6 library.
+
+## Link records, slice 7 (S7-4): the partner's shared records on the computer
+
+Status: built on both sides (phone schema 16, desktop schema 8). Wire version, graph model and archive format are unchanged
+(1, 2, 4). A record the partner shares with this phone reaches the partner's computer through this same phone-to-computer
+sync. The computer never reads the share archive, never receives the sharing key (no key material is in any cell, log or
+history), and never needs a Filen client. Design: `../STACK_LINK_SLICE7_DESIGN.md` (item 6).
+
+- **Hello.** The computer announces a second feature, `"features":["links","link_foreign"]`. The phone writes the partner's
+  records into link cells only after the computer's hello said so (it remembers that in `sync_meta` until a connection
+  reset). A computer that does not announce it (any build before this one) never receives them and keeps syncing documents
+  and the phone's own links exactly as before. The phone does not announce `link_foreign` itself (the computer never writes
+  these records). `link_foreign` counts only next to `links`; unknown names stay ignored.
+- **Cells.** No new suffix. A shared record is an ordinary link (identity, `/title`, `/filen`, `/text`, `/preview`,
+  `/presence`) whose `/content` cell has three more fields, all or none:
+  `{hash, mime, modified, shared, protected, origin:"foreign", shared_by, foreign_generation}`. `origin` is the string
+  `foreign`; `shared_by` is the partner's display name (1 to 100 UTF-16 units on the wire, `LinkRecord.free` rules; the phone
+  cleans it to 40); `foreign_generation` is the share archive's generation (0..2^53-1). Receivers check only the shape (five
+  fields or eight; types; range; `shared_by` at most 100 units); an unknown `origin`, an empty or control-character name make the
+  link skipped and counted at projection (never a rejected bundle). Own records keep the five-field cell. A protected shared
+  record is metadata only like any protected link. Shared records count towards the 1000 links of the phone; on the computer
+  they do not count towards the 1000 an archive can hold (archives never contain them).
+- **Authority.** The phone is the only author. The computer's one enable operation lists only its own rows (never an
+  `origin='foreign'` row), it never edits, resolves, deletes or sends them back, and the phone never applies a computer cell
+  to a shared record. If a computer-only link has the same identity as a record the phone says is shared, the phone's cells win
+  (the existing resolution rule) and the computer's row becomes a shared copy (it forgets any remembered file).
+- **Presence.** Unshared by the partner (Recently deleted, reason `unshared` on the phone) travels as `trashed` with reason
+  `deleted` (no new wire reason); a record the person removed travels as `trashed`/`user`; both are hidden on the computer, and a
+  restore on the phone brings it back `live`. Deleting the copy on the phone for good (or its 30 days) is `gone`, with
+  content, text, preview, title and filen null; only `gone` deletes the computer's row, its search entry and preview.
+- **Computer storage.** Schema 8 adds `link_records.origin` (`own` default), `shared_by` and `foreign_generation`
+  (additive; every existing row stays own). As with every schema bump an older desktop build refuses a library the new one
+  opened (`version > VERSION`); no row or file is removed by the migration. A shared record is read-only: no Open, no
+  "Open in Ami Pro", no remembered file. The list and search show "Shared by <name>"; the detail view shows the saved text
+  and preview and says "Opening needs your phone: it opens through Filen Files." Shared records are excluded from archive
+  exports (as on the phone).
+- **Tests.** `desktop/protocol/golden-v1.json` `graph_cases` (receiver_rejects, receiver_accepts_skips, writer_refuses) hold
+  the foreign shapes for Rust and Java; `tools/test_link_cross_java.py` round-trips shared records Java writer -> Rust kernel
+  and Rust kernel -> Java projection (live, unshared, gone, protected, rename); `stack-core/tests/sync_links.rs` covers
+  apply, update, unshare, gone, the computer never writing them and archive exclusion; `HelloGateHost` the feature.
+

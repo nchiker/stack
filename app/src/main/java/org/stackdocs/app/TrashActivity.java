@@ -64,7 +64,7 @@ public final class TrashActivity extends LibraryActivity {
         for (LinkStore.Trashed item : links) {
             long ageDays = Math.max(0, (now - item.deletedAt) / (24L * 60 * 60 * 1000));
             long leftDays = Math.max(0, (LinkStore.KEEP_MILLIS - (now - item.deletedAt) + 24L * 60 * 60 * 1000 - 1) / (24L * 60 * 60 * 1000));
-            String why = "user".equals(item.reason) ? "Removed from Stack" : "trashed".equals(item.reason) ? "In " + LinkOpener.ownerName(item.owner) + "'s trash" : "deleted".equals(item.reason) ? "Deleted in " + LinkOpener.ownerName(item.owner) : "Missing for 30 days";
+            String why = item.noLongerShared() ? "No longer shared" : "user".equals(item.reason) ? "Removed from Stack" : "trashed".equals(item.reason) ? "In " + LinkOpener.ownerName(item.owner) + "'s trash" : "deleted".equals(item.reason) ? "Deleted in " + LinkOpener.ownerName(item.owner) : "Missing for 30 days";
             String when = why + (ageDays == 0 ? " today" : ageDays == 1 ? " yesterday" : " " + ageDays + " days ago");
             String left = leftDays <= 1 ? "Deleted for good within a day" : leftDays + " days left";
             body.addView(Ui.actionRow(this, Icons.Symbol.DOCUMENT, item.title, "Linked · " + when + " · " + left, 0xFFF0E3EF, () -> linkOptions(item)));
@@ -74,7 +74,7 @@ public final class TrashActivity extends LibraryActivity {
 
     private void linkOptions(LinkStore.Trashed item) {
         new AlertDialog.Builder(this).setTitle(item.title)
-                .setMessage("Restore it to your library, or delete Stack's saved copy for good. The document itself is never touched.")
+                .setMessage(item.noLongerShared() ? item.sharedBy + " no longer shares this document. You can keep the saved copy here or delete it for good. The document itself is never touched." : "Restore it to your library, or delete Stack's saved copy for good. The document itself is never touched.")
                 .setPositiveButton("Restore", (d, w) -> work(() -> { app().library.links.restore(item.id); return true; }, ok -> { app().notifySyncChanged(); app().notifyLibraryChanged(); }))
                 .setNeutralButton("Delete for good", (d, w) -> work(() -> { app().library.links.deleteTrashed(item.id); return true; }, ok -> app().notifyLibraryChanged()))
                 .setNegativeButton("Cancel", null).show();

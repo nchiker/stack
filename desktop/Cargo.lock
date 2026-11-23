@@ -5175,6 +5175,7 @@ dependencies = [
 name = "stack-cli"
 version = "0.1.0-dev"
 dependencies = [
+ "rusqlite",
  "rustix 1.1.5",
  "serde",
  "serde_json",

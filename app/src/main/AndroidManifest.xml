@@ -15,6 +15,11 @@
     <queries>
         <!-- Filen Files hands Stack a backup folder in Filen Drive (FilenFolder). -->
         <intent><action android:name="app.filenfiles.action.GRANT_BACKUP_FOLDER" /></intent>
+        <intent><action android:name="app.filenfiles.action.GRANT_SHARE_FOLDER" /></intent>
+        <intent><action android:name="app.filenfiles.action.GRANT_RECEIVED_FOLDER" /></intent>
+        <intent><action android:name="app.filenfiles.action.OPEN_SHARED" /></intent>
+        <!-- The Filen Files pairing account call (FilenFolder.ownerEmail). -->
+        <provider android:authorities="app.filenfiles.stacklink" />
         <package android:name="app.amipro.editor"/>
     </queries>
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
@@ -48,6 +53,8 @@
         <activity android:name=".SyncActivity" android:exported="false" />
         <activity android:name=".DocumentActivity" android:exported="false" />
         <activity android:name=".LinkActivity" android:exported="false" />
+        <activity android:name=".PartnerShareActivity" android:exported="false" />
+        <activity android:name=".PairPartnerActivity" android:exported="false" />
         <activity android:name=".ScanActivity" android:exported="false" />
         <activity android:name=".PageEditorActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true"
@@ -79,5 +86,12 @@
             android:exported="false"
             android:grantUriPermissions="true" />
         <receiver android:name=".InstallResultReceiver" android:exported="false" />
+        <!-- Filen Files sends SHARED_CHANGED as an explicit broadcast to this package. A manifest receiver was chosen over a dynamic one because an
+             explicit broadcast is not limited by the Android 8+ implicit-broadcast rules or Android 14 context-registered rules, and it still reaches
+             Stack when its process is not running. It only asks for the same debounced import as every other trigger, so a spoofed broadcast can do
+             nothing more than a re-check (see PartnerChangeReceiver). -->
+        <receiver android:name=".PartnerChangeReceiver" android:exported="true">
+            <intent-filter><action android:name="app.filenfiles.action.SHARED_CHANGED" /></intent-filter>
+        </receiver>
     </application>
 </manifest>

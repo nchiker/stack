@@ -20,6 +20,10 @@ final class LinkCallers {
         // The AmiPro debug build and the other apps are added here when they implement the contract.
     };
 
+    /** Filen Files: pinned ONLY for Filen-origin events ({@link LinkProvider}'s filen_uuid messages) and for Stack's own calls to Filen Files. Never an owner app. */
+    static final String FILEN_PACKAGE = "app.filenfiles";
+    static final String[][] FILEN = {{FILEN_PACKAGE, "59ccca4c8c1126ec48257a8f3051c6be5eccdd5888df82215560ce2ff8b580bf"}};
+
     private LinkCallers() {}
 
     /** The caller's package for a Binder uid, or null when the uid is shared by several packages or has none. */
@@ -56,12 +60,60 @@ final class LinkCallers {
         return false;
     }
 
+    /** The pinned list plus, in a checks build only, the one extra `package:sha256` pin given at build time. */
+    static String[][] pinnedFor(Context context) {
+        String extra = context.getString(R.string.stack_extra_pin).trim().toLowerCase(java.util.Locale.ROOT);
+        int colon = extra.indexOf(':');
+        if (colon <= 0 || !extra.substring(colon + 1).matches("[0-9a-f]{64}")) return PINNED;
+        String[][] all = java.util.Arrays.copyOf(PINNED, PINNED.length + 1);
+        all[PINNED.length] = new String[]{extra.substring(0, colon), extra.substring(colon + 1)};
+        return all;
+    }
+
     /** The calling package if the Binder uid is allowed, else null. */
     static String allowedCaller(Context context, int uid) {
         String callerPackage = packageOf(context, uid);
         if (callerPackage == null) return null;
         String own = certificateOf(context, context.getPackageName());
-        return decide(callerPackage, certificateOf(context, callerPackage), own, PINNED) ? callerPackage : null;
+        if (FILEN_PACKAGE.equals(callerPackage)) return null;   // Filen Files is not an owner app: see allowedFilenCaller
+        return decide(callerPackage, certificateOf(context, callerPackage), own, pinnedFor(context)) ? callerPackage : null;
+    }
+
+    /** The Filen pin, plus (checks builds only) the extra pin when it names Filen Files' package. */
+    static String[][] filenPins(Context context) {
+        for (String[] pin : pinnedFor(context)) if (FILEN_PACKAGE.equals(pin[0])) return new String[][]{pin, FILEN[0]};
+        return FILEN;
+    }
+
+    /** The calling package if the Binder uid is Filen Files with the pinned certificate, else null. Only for Filen-origin events. */
+    static String allowedFilenCaller(Context context, int uid) {
+        String callerPackage = packageOf(context, uid);
+        if (!FILEN_PACKAGE.equals(callerPackage)) return null;
+        return decide(callerPackage, certificateOf(context, callerPackage), certificateOf(context, context.getPackageName()), filenPins(context)) ? callerPackage : null;
+    }
+
+    /** True when the installed app.filenfiles carries the pinned certificate. Stack checks this before it sends anything to Filen Files or trusts what it returns. */
+    static boolean filenInstalledAndPinned(Context context) {
+        String cert = certificateOf(context, FILEN_PACKAGE);
+        if (cert == null) return false;
+        for (String[] pin : filenPins(context)) if (pin[0].equals(FILEN_PACKAGE) && pin[1].equals(cert)) return true;
+        return false;
+    }
+
+    /** True when `intent` resolves to an activity of the pinned Filen Files. */
+    static boolean filenActivity(Context context, android.content.Intent intent) {
+        try {
+            android.content.pm.ResolveInfo info = context.getPackageManager().resolveActivity(intent, 0);
+            return info != null && info.activityInfo != null && FILEN_PACKAGE.equals(info.activityInfo.packageName) && filenInstalledAndPinned(context);
+        } catch (RuntimeException error) { return false; }
+    }
+
+    /** True when the content authority is served by the pinned Filen Files. */
+    static boolean filenAuthority(Context context, String authority) {
+        try {
+            android.content.pm.ProviderInfo info = authority == null ? null : context.getPackageManager().resolveContentProvider(authority, 0);
+            return info != null && FILEN_PACKAGE.equals(info.packageName) && filenInstalledAndPinned(context);
+        } catch (RuntimeException error) { return false; }
     }
 
     /**
@@ -72,7 +124,7 @@ final class LinkCallers {
         try {
             android.content.pm.ProviderInfo info = context.getPackageManager().resolveContentProvider(owner + ".stacklink", 0);
             if (info == null || !owner.equals(info.packageName)) return false;
-            return decide(owner, certificateOf(context, owner), certificateOf(context, context.getPackageName()), PINNED);
+            return decide(owner, certificateOf(context, owner), certificateOf(context, context.getPackageName()), pinnedFor(context));
         } catch (RuntimeException error) { return false; }
     }
 

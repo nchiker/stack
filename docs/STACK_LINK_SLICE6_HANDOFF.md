@@ -38,5 +38,18 @@ they asked for fewer details and plain asks.
 
 ## Update 2026-11-22 (late)
 P2, D6 (with Opus review fixes), T1 (desktop SIGKILL tests), T2 (`phone-link-sync` in the one-button runner), docs (contract, interop protocol) are committed and pushed (GitHub 368dda9). One-button run: 9 passed, 0 failed, 1 skipped.
-T3 (real LAN, test phone, announcing flipped in a throwaway build) PASSED: 50 links incl. 5 x 20 MiB previews first sync 42-49 s (limit 180 s), trash/delete/edit, conflicts resolved in the same session, old-protocol fallback, no-change sync clean. Not run: tie review over LAN, 1000 links, release timing, phone kill tests. The T3 test code (LinkLanChecks, link_lan_make, test_android_link_lan.py) plus the flip is only in a patch in the old scratchpad (not in the repo).
+T3 (real LAN, test phone, announcing flipped in a throwaway build) PASSED: 50 links incl. 5 x 20 MiB previews first sync 42-49 s (limit 180 s), trash/delete/edit, conflicts resolved in the same session, old-protocol fallback, no-change sync clean. Not run: tie review over LAN, 1000 links, release timing, phone kill tests. The T3 test code was lost with the scratch patch and has been REBUILT in the repo, parameterised (see "Real LAN run" below; written without a device, not yet run on one). The flip is no longer needed: `ANNOUNCE_LINKS` is on.
 Left: hand checks (Flatpak key save on COSMIC, Key Vault menus/QR), Opus review of `stack-cli key`.
+
+
+## Real LAN run (`phone-link-lan`)
+Run on the TEST phone `0A121JEC203530` only (the script refuses any other serial, above all the production phone). Needs the checks build (app + androidTest) already installed on it, as for the other phone steps; the script never installs, clears or opens an activity.
+
+How to run (one command, nothing else to set up; the script finds this computer's LAN address itself):
+- `python3 desktop/tools/test_android_link_lan.py --scenario all --build` (or `first_sync`, `tie_review`, `delete_edit`, `kill`), or `python3 desktop/tools/run_all_checks.py --lan` (adds the step `phone-link-lan`; SKIPPED without `--lan`, so the default one-button run is unchanged).
+- Parameters: `--links N` (1..1000, default 50), `--previews P` (each is a 20 MiB preview, default 5), `--tie T`, `--desktop-links D`, `--kills K` (0..5), `--edits/--trashes/--deletes`, `--keep`. `--dry-run` lists what would run and touches nothing; `--selftest` (also a runner step, `link-lan-selftest`, always on) checks the guards and comparisons on the host.
+- Pieces: androidTest `LinkLanChecks` (`-e linkLan true`, phases seed / sync / inspect / resolve / edit, synthetic records only, through `LinkStore.publish`), desktop helper `stack-cli` example `link_lan` (make / dump), the existing `stack-transport` listener and the existing pairing phases.
+
+What it measures and checks (summary in `<output>/summary.json`, counts and seconds only, no keys or hashes): seed time, first sync seconds (must stay under 180 s), second (no-change) sync, per-link counts, titles, text and preview hashes phone vs computer. `tie_review`: one review per tied link, decided per link (alternating phone / computer), both sides then hold the chosen version. `delete_edit`: rename, trash and delete on the phone reach the computer and stay. `kill`: force-stop after seed, then at 0.3 / 3 / 8 s ... after `sync-start` inside a running sync (phase markers in `link-lan-phase`), inspect after each kill (nothing lost, no duplicates), then a final sync must converge.
+
+Limits: the computer side is changed only by the synthetic archive it starts from (the desktop has no link editing), so deletes and edits travel phone to computer only. Kills are timed from the phone's `sync-start` marker, not at the exact probe points (those are the T1 desktop tests). The 1000-link run needs `--previews` small (disk and time). Not run on a device yet.

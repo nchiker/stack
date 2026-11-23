@@ -114,6 +114,10 @@ public final class SyncCrossHost {
                 .put("text", text).put("preview", JSONObject.NULL)
                 .put("presence", new JSONObject().put("state", "live").put("reason", "").put("since", 0));
     }
+    /** The row as the phone's link sync reads a record the partner shares (origin, name on the badge, archive generation). */
+    static JSONObject foreign(JSONObject row, String sharedBy, long generation) throws Exception {
+        return row.put("shared", 1).put("origin", "foreign").put("shared_by", sharedBy).put("foreign_generation", generation);
+    }
     static JSONObject presence(JSONObject row, String state, String reason, long since) throws Exception {
         return row.put("presence", new JSONObject().put("state", state).put("reason", reason).put("since", since));
     }
@@ -158,6 +162,12 @@ public final class SyncCrossHost {
         write(first, notes, "no-filen", row(12, "No filen", "words").put("filen", JSONObject.NULL), captured++);
         write(first, notes, "protected-with-preview", row(13, "Secret preview", "s").put("protected", 1)
                 .put("preview", new JSONObject().put("sha256", repeat("d", 64)).put("length", 10)), captured++);
+        // Slice 7 (S7-4): the partner's shared records. 15 live with text; 16 unshared (trashed); 17 removed for good later.
+        write(first, notes, "foreign-live", foreign(row(15, "Shared budget", "shared giraffe words"), "Sam", 3), captured++);
+        write(first, notes, "foreign-unshared-trashed", presence(foreign(row(16, "Shared old", "old shared words"), "Sam", 2), "trashed", "deleted", 1700000000004L), captured++);
+        write(first, notes, "foreign-to-be-gone", foreign(row(17, "Shared short-lived", "short words"), "Sam", 1), captured++);
+        write(first, notes, "foreign-protected", foreign(row(18, "Shared secret", "never copied").put("protected", 1), "Sam", 1), captured++);
+        write(first, notes, "foreign-empty-name-refused", foreign(row(19, "Nameless", "x"), "", 1), 0);
         operations.add(phone.local(PHONE, first, new JSONObject().put("kind", "links.enable")).json);
 
         // Operation 2: a later capture. The trashed row goes gone (null cells), the plain row is edited, a new row is added.
@@ -167,6 +177,8 @@ public final class SyncCrossHost {
         write(second, later, "plain-edited", row(1, "Budget 2", "quarterly zebra budget revised").put("hash", repeat("e", 64)).put("title_user_edited", 1)
                 .put("preview", new JSONObject().put("sha256", repeat("b", 64)).put("length", 4096)), 0);
         write(second, later, "new-row", row(14, "Added later", "later words"), captured++);
+        write(second, later, "foreign-updated", foreign(row(15, "Shared budget v2", "shared giraffe words revised").put("hash", repeat("f", 64)), "Samantha", 4), 0);
+        write(second, later, "foreign-now-gone", presence(foreign(row(17, "Shared short-lived", "short words"), "Sam", 1), "gone", "deleted", 1700000000005L), 0);
         operations.add(phone.local(PHONE, second, new JSONObject().put("kind", "link.capture")).json);
         for (int i = 0; i < later.length(); i++) notes.put(later.get(i));
 

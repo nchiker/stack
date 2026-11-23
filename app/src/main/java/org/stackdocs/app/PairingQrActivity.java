@@ -26,10 +26,10 @@ public final class PairingQrActivity extends LibraryActivity {
     private CameraController camera;private SurfaceView preview;private TextView status;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private final ExecutorService decoder=Executors.newSingleThreadExecutor();
-    private boolean active,decoding,keyMode;private int generation;private Runnable removeBack;
+    private boolean active,decoding,keyMode,shareMode;private int generation;private Runnable removeBack;
     @Override public void onCreate(Bundle state){super.onCreate(state);
-        LinearLayout root=Ui.column(this);LinearLayout toolbar=Ui.toolbar(this);toolbar.addView(Ui.iconButton(this,Icons.Symbol.BACK,"Back",this::finish));keyMode=getIntent().getBooleanExtra("key_mode",false);if(keyMode)getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);toolbar.addView(Ui.text(this,keyMode?"Scan recovery key":"Scan computer QR code",18,false));root.addView(toolbar);
-        status=Ui.text(this,keyMode?"Point the camera at the QR code in the Key Vault window on your computer. Hold the phone about 20 to 30 cm away and keep it steady.":"Point the camera at the QR code in Stack on your computer.",16,false);status.setPadding(Ui.dp(this,24),Ui.dp(this,16),Ui.dp(this,24),Ui.dp(this,16));root.addView(status);
+        LinearLayout root=Ui.column(this);LinearLayout toolbar=Ui.toolbar(this);toolbar.addView(Ui.iconButton(this,Icons.Symbol.BACK,"Back",this::finish));shareMode=getIntent().getBooleanExtra("share_mode",false);keyMode=shareMode||getIntent().getBooleanExtra("key_mode",false);if(keyMode)getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);toolbar.addView(Ui.text(this,shareMode?"Scan partner code":keyMode?"Scan recovery key":"Scan computer QR code",18,false));root.addView(toolbar);
+        status=Ui.text(this,shareMode?"Point the camera at the pairing code on your partner's phone. Hold the phone about 20 to 30 cm away and keep it steady.":keyMode?"Point the camera at the QR code in the Key Vault window on your computer. Hold the phone about 20 to 30 cm away and keep it steady.":"Point the camera at the QR code in Stack on your computer.",16,false);status.setPadding(Ui.dp(this,24),Ui.dp(this,16),Ui.dp(this,24),Ui.dp(this,16));root.addView(status);
         preview=new SurfaceView(this);root.addView(preview,new LinearLayout.LayoutParams(-1,0,1));root.addView(Ui.button(this,"Retry camera",this::open));Ui.install(this,root);removeBack=Ui.backHandler(this,this::finish);
         camera=new CameraController(this,preview,new CameraController.Listener(){
             public void ready(boolean flash){capture();}
@@ -48,6 +48,8 @@ public final class PairingQrActivity extends LibraryActivity {
         String result=null;try{BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(jpeg,0,jpeg.length,options);int sample=1;while(Math.max(options.outWidth,options.outHeight)/sample>1600)sample*=2;options.inJustDecodeBounds=false;options.inSampleSize=sample;Bitmap bitmap=BitmapFactory.decodeByteArray(jpeg,0,jpeg.length,options);if(bitmap!=null)try{result=decodeBitmap(bitmap);if(!keyMode)NearbyPairing.qr(result);}finally{bitmap.recycle();}}catch(Exception ignored){}
         String found=result;handler.post(()->{decoding=false;if(!active||ticket!=generation)return;if(found!=null&&keyMode){
             // Only a Key Vault key code is accepted; anything else is ignored and the camera keeps looking.
+            if(shareMode){PartnerQr.Parsed code=PartnerQr.parse(found);if(code!=null){Intent out=new Intent().putExtra("share_key",code.keyHex);if(code.email!=null)out.putExtra("owner_email",code.email);if(code.nonce!=null)out.putExtra("pair_nonce",code.nonce);setResult(RESULT_OK,out);finish();return;}
+                status.setText("That QR code is not a Stack partner code. Use the one on your partner's phone under Pair with partner.");handler.postDelayed(this::capture,500);return;}
             if(found.matches("stackkey1:[0-9a-fA-F]{64}")){setResult(RESULT_OK,new Intent().putExtra("stack_key",found.substring(10)));finish();return;}
             status.setText("That QR code is not a Stack recovery key. Use the one from keyvault.");handler.postDelayed(this::capture,500);return;
         }

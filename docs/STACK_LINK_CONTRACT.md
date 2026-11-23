@@ -1,6 +1,6 @@
 # Stack Link contract — draft 2 (2026-11-21)
 
-Status: **proposal, nothing implemented.** Kept deliberately small: two people sharing and finding documents. Agreement needed from Stack, AmiPro, Filen Files and any later
+Status: **slices 1-4 and 6 built and tested, slice 5 built on the Stack side (2026-11-22), slice 7 in progress.** See `RUNBOOK.md` for what is left. Kept deliberately small: two people sharing and finding documents. Agreement needed from Stack, AmiPro, Filen Files and any later
 notes or spreadsheet app before code is written.
 
 ## Purpose
@@ -192,12 +192,20 @@ Slice 3 handoff (archive format 4 and encrypted exports): `docs/STACK_LINK_SLICE
 
 `stat`/`refresh` calls (`LinkChecker`: owner identity checked first, 5 s limit, own thread pool, one call per owner, compare-and-set write; only a well-formed `exists:false` makes `missing`), provider `removed` (`{ok:true, changed:bool}`; unknown id is a no-op; `moved`/`unshared`/`delete` answer `unknown_method`), states `live|unreachable|missing|trashed` with `state_since` (missing for 30 days becomes trashed; trashed for 30 days is deleted), Recently deleted for links, "Check linked documents", detail-screen messages and an "Update saved copy" button when the hash changed. Checks: `LinkLifecycleChecks`.
 
+## Slice 5, Stack side: built (2026-11-22)
+
+Provider methods `moved` and `unshared` now exist beside `removed`. Two senders:
+- **The owner app** sends `{contract:1, owner, link_id, locators:[...]}` (`moved`), `{contract:1, owner, link_id}` (`unshared`) or `removed` as before. `owner` must be the caller. `moved` replaces the locator list and changes nothing else (stacks, tags, notes and the user's title stay); it also brings a record back to live if it was missing, unreachable, or in Recently deleted only because the file sat in Filen's trash (`removed` reason `trashed`). A record reported `deleted` or removed by the user is never revived by `moved`. `unshared` clears `shared`.
+- **Filen Files** (pinned package `app.filenfiles`, release certificate `59ccca4c...80bf`) does not know the owner's `link_id`, so it names the file by its UUID: `moved {contract:1, filen_uuid, path}`, `removed {contract:1, filen_uuid, reason: deleted|trashed}`, `unshared {contract:1, filen_uuid}`. Stack finds every record whose `filen` locator has that UUID; a Filen move replaces only the `filen` locator (the owner's `saf`/`owner` entries stay). Only Filen's package may send the `filen_uuid` form. Answers: `{ok:true, changed:bool, count:n}`.
+- The detail screen says "Shared", and adds that the partner cannot open it when the document has no `filen` locator.
+- Checks: `LinkLifecycleChecks` group "moved and unshared" and "Filen-origin events" (13 groups pass on the test phone).
+
 ## Slice 6, sync of link records (built and announced)
 
 Full design and implementation notes: `STACK_LINK_SLICE6_DESIGN.md`. Wire details: `desktop/INTEROP_SYNC_PROTOCOL_V1.md`.
 
 - **What syncs.** Phone to desktop (and desktop-only links to the phone): title, locator `filen`, hash, mime, modified, shared,
-  protected, text, preview, presence. The desktop is a read-only mirror: it never edits, deletes or opens links.
+  protected, text, preview, presence. The desktop is a read-only mirror of the records: it never edits or deletes them. It can open the original file in Ami Pro Linux ("Open in Ami Pro"), which edits the file, not the record.
   Not synced: `saf`/`owner` locators, `unreachable`/`missing`, `checked_at`, `state_since`, `revision`, stacks/tags/notes for links.
 - **Protected links** sync metadata only (identity, content, title, filen, presence). No text, no preview, no blob.
 - **Limits.** At most 1000 links, text 1 MiB (UTF-8 bytes), preview 32 MiB, title 200, 2 GiB of link blobs per device.
@@ -212,6 +220,20 @@ Full design and implementation notes: `STACK_LINK_SLICE6_DESIGN.md`. Wire detail
   An older desktop still syncs documents. An older desktop build cannot open a library the new desktop has upgraded (schema 6).
 - **Status.** Both sides are built, tested and announce `links` (`ANNOUNCE_LINKS=true`, step D4b is live),
   so link cells now travel once a side enables. Real-LAN test (T3) passed 2026-11-22 (50 links, first sync 42-49 s). The Flatpak launch test (6b) passed 2026-11-22 for option 1 (see Desktop Open, Results); only the open decision about files outside Stack's own folders remains.
+
+## Slice 7, desktop (S7-4)
+
+The partner's computer gets the partner's shared documents through the normal phone-to-computer link sync, with nothing to set
+up: the phone writes them as link records with `origin: foreign`, the partner's name (`shared_by`) and the share archive's
+generation, but only for a computer that announced it can show them (hello feature `link_foreign`); an older computer keeps
+syncing documents and the phone's own links exactly as before. The sharing key never goes to the computer and the computer
+never reads the share archive. Shared records are read-only on the computer: they show in the Linked list and in search with
+"Shared by <name>", the detail view shows the saved text and preview and says "Opening needs your phone: it opens through
+Filen Files.", and there is no Open button, no "Open in Ami Pro" and no remembered file. The computer never edits, deletes or
+sends them back; the phone is the only author. Unshared (Recently deleted) is hidden on the computer, restoring brings it
+back, and removing the phone's copy for good deletes the computer's copy. Shared records are not in backups or archive
+exports. Desktop schema 8 and phone schema 16; an older desktop build cannot open a library the new one has upgraded. Wire
+details: `desktop/INTEROP_SYNC_PROTOCOL_V1.md` ("Link records, slice 7").
 
 ## Work by project
 

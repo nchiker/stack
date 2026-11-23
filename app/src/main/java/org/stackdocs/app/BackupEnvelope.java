@@ -92,6 +92,21 @@ final class BackupEnvelope {
         } catch(GeneralSecurityException error){throw new IOException("Encryption is unavailable.",error);}
     }
 
+    /** Partner (sharing) envelope: exactly one slot, type 3, whose key is the 32-byte sharing key itself (no KDF is run on it). */
+    static Writer encryptPartner(OutputStream out,byte[] salt,int iterations,byte[] sharingKey,Rand random) throws IOException {
+        if(salt.length!=SALT||iterations<MIN_ITERATIONS||iterations>MAX_ITERATIONS)throw new IllegalArgumentException("Bad envelope parameters.");
+        if(sharingKey==null||sharingKey.length!=32)throw new IllegalArgumentException("The sharing key must be 32 bytes.");
+        try {
+            byte[] dataKey=new byte[32];random.fill(dataKey);
+            ByteArrayOutputStream header=new ByteArrayOutputStream();
+            header.write(MAGIC);header.write(KDF_PBKDF2);header.write(ByteBuffer.allocate(4).putInt(iterations).array());header.write(salt);
+            header.write(1);slot(header,SLOT_PARTNER,sharingKey,dataKey,salt,iterations,random);
+            byte[] h=header.toByteArray(),hash=MessageDigest.getInstance("SHA-256").digest(h);
+            out.write(h);out.write(hash);
+            return new Writer(out,dataKey,hash);
+        } catch(GeneralSecurityException error){throw new IOException("Encryption is unavailable.",error);}
+    }
+
     private static byte[] slotAad(int type,byte[] salt,int iterations) {
         return ByteBuffer.allocate(MAGIC.length+1+4+SALT+1).put(MAGIC).put((byte)KDF_PBKDF2).putInt(iterations).put(salt).put((byte)type).array();
     }
@@ -148,6 +163,22 @@ final class BackupEnvelope {
 
     /** Exactly one of passphrase or recoveryKey is used. */
     static Reader decrypt(InputStream raw,String passphrase,byte[] recoveryKey) throws IOException {
+        boolean pass=passphrase!=null;
+        return open(raw,pass?SLOT_PASSPHRASE:SLOT_RECOVERY,
+            "This backup has no key for that "+(pass?"passphrase.":"recovery key."),
+            "Wrong passphrase or recovery key, or the backup is damaged.",
+            (salt,iterations)->pass?passphraseSlotKey(passphrase,salt,iterations):recoverySlotKey(recoveryKey,salt));
+    }
+
+    /** Opens a partner (sharing) envelope with the 32-byte sharing key, which is the slot key itself. */
+    static Reader decryptPartner(InputStream raw,byte[] sharingKey) throws IOException {
+        if(sharingKey==null||sharingKey.length!=32)throw new IllegalArgumentException("The sharing key must be 32 bytes.");
+        return open(raw,SLOT_PARTNER,"This file is not shared with this key.","Wrong sharing key, or the shared file is damaged.",(salt,iterations)->sharingKey.clone());
+    }
+
+    private interface SlotKey { byte[] get(byte[] salt,int iterations) throws GeneralSecurityException; }
+
+    private static Reader open(InputStream raw,int wantedType,String noSlot,String wrongKey,SlotKey keyFor) throws IOException {
         try {
             DigestingIn in=new DigestingIn(raw);
             byte[] magic=in.exactly(MAGIC.length);
@@ -164,16 +195,16 @@ final class BackupEnvelope {
             }
             byte[] expected=in.digest();byte[] stored=in.exactlyRaw(32);
             if(!MessageDigest.isEqual(expected,stored))throw new Damaged("The backup header is damaged.");
-            int wantedType=passphrase!=null?SLOT_PASSPHRASE:SLOT_RECOVERY;int slot=-1;
+            int slot=-1;
             for(int i=0;i<count;i++)if(types[i]==wantedType)slot=i;
-            if(slot<0)throw new NoKey("This backup has no key for that "+(passphrase!=null?"passphrase.":"recovery key."));
-            byte[] key=passphrase!=null?passphraseSlotKey(passphrase,salt,iterations):recoverySlotKey(recoveryKey,salt);
+            if(slot<0)throw new NoKey(noSlot);
+            byte[] key=keyFor.get(salt,iterations);
             byte[] dataKey;
             try {
                 Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding");
                 cipher.init(Cipher.DECRYPT_MODE,new SecretKeySpec(key,"AES"),new GCMParameterSpec(128,nonces[slot]));
                 cipher.updateAAD(slotAad(types[slot],salt,iterations));dataKey=cipher.doFinal(wrapped[slot]);
-            } catch(GeneralSecurityException wrong){throw new NoKey("Wrong passphrase or recovery key, or the backup is damaged.");}
+            } catch(GeneralSecurityException wrong){throw new NoKey(wrongKey);}
             return new Reader(raw,dataKey,stored);
         } catch(GeneralSecurityException error){throw new IOException("Decryption is unavailable.",error);}
     }

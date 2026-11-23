@@ -337,12 +337,13 @@ final class FeatureChecks {
             db.execSQL("DROP TABLE trash");
             db.execSQL("DROP TABLE link_search");
             db.execSQL("DROP TABLE link_records");
+            db.execSQL("DROP TABLE partner_share_log");
             db.setVersion(9);
         } finally { first.close(); }
         LibraryDatabase second = new LibraryDatabase(isolated);
         try {
             android.database.sqlite.SQLiteDatabase db = second.getWritableDatabase();
-            require(db.getVersion() == 13, "library upgrades from version 9 to 13");
+            require(db.getVersion() == 16, "library upgrades from version 9 to 16");
             try (android.database.Cursor c = db.rawQuery("SELECT title FROM documents WHERE id=?", new String[]{id})) { require(c.moveToFirst() && c.getString(0).equals("Upgrade specimen"), "documents survive the upgrade"); }
             db.execSQL("INSERT INTO trash(document_id,deleted_at) VALUES(?,1)", new Object[]{id});
             db.execSQL("DELETE FROM documents WHERE id=?", new Object[]{id});

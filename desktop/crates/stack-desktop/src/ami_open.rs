@@ -70,6 +70,14 @@ pub fn button_state(state: &str, remembered: bool) -> Button {
     }
 }
 
+/// True when the file's name (without the extension) is the document's title, ignoring case and surrounding spaces.
+pub fn name_matches(title: &str, path: &Path) -> bool {
+    let stem = path.file_stem().map(|s| s.to_string_lossy().trim().to_lowercase()).unwrap_or_default();
+    let title = title.trim();
+    let title = title.rsplit_once('.').filter(|(_, ext)| ext.len() <= 5).map_or(title, |(name, _)| name);
+    !stem.is_empty() && stem == title.trim().to_lowercase()
+}
+
 /// Compare the record's content hash (hex SHA-256, any case) with the hash of the chosen file.
 pub fn compare(known: &str, actual: &str) -> Verdict {
     let known = known.trim();
@@ -218,13 +226,15 @@ async fn choose_file(
 
 impl Stack {
     pub fn ami_button_state(&self) -> Option<Button> {
+        // A document the partner shares has no file on this computer: no Open, no remembered file.
         self.linked
             .as_ref()
+            .filter(|l| !l.foreign)
             .map(|l| button_state(&l.state, l.remembered_file.is_some()))
     }
 
     pub fn ami_action(&mut self, event: Event) -> app::Task<Message> {
-        let Some(linked) = &self.linked else {
+        let Some(linked) = self.linked.as_ref().filter(|l| !l.foreign) else {
             return app::Task::none();
         };
         let id = linked.id.clone();
@@ -268,11 +278,16 @@ impl Stack {
                 }
                 Ok(Some(path)) => {
                     let known = linked.hash.clone();
+                    let title = linked.title.clone();
                     cosmic::task::future(async move {
                         let checked = path.clone();
                         let verdict = tokio::task::spawn_blocking(move || {
                             sha256_file(&checked)
-                                .map(|actual| compare(&known, &actual))
+                                .map(|actual| match compare(&known, &actual) {
+                                    // A different hash with the same document name is the normal "edited since the saved copy" case.
+                                    Verdict::Differs if name_matches(&title, &checked) => Verdict::Same,
+                                    other => other,
+                                })
                                 .map_err(|e| e.to_string())
                         })
                         .await
@@ -290,7 +305,7 @@ impl Stack {
             Event::Checked(path, Ok(Verdict::Differs)) => {
                 self.ami.busy = false;
                 self.ami.status = Some(
-                    "This file is not the same as the saved copy of the document. It may be a different document, or it was edited after the copy was saved.".into(),
+                    "This file has a different name and content than the saved copy. It may be a different document.".into(),
                 );
                 self.ami.differs = Some(path);
                 app::Task::none()
@@ -368,6 +383,14 @@ impl Stack {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn same_name_means_the_same_document() {
+        assert!(name_matches("Letter", Path::new("/home/a/Filen/Letter.sam")));
+        assert!(name_matches("letter.sam", Path::new("/x/LETTER.SAM")));
+        assert!(!name_matches("Letter", Path::new("/x/Invoice.sam")));
+        assert!(!name_matches("", Path::new("/x/.sam")));
+    }
 
     #[test]
     fn hash_compare_is_case_blind_and_unknown_when_not_a_sha256() {

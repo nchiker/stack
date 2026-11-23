@@ -94,7 +94,7 @@ final class LinkUiChecks {
         WorkflowRepositoryChecks.require(!LinkOpener.valid(new Intent(good).setPackage("com.evil"), "app.amipro.editor"), "an intent with a different package is refused");
         Intent clipped = new Intent(good); clipped.setClipData(android.content.ClipData.newPlainText("x", "y"));
         WorkflowRepositoryChecks.require(!LinkOpener.valid(clipped, "app.amipro.editor"), "an intent with clip data is refused");
-        LinkStore.Link missing = new LinkStore.Link(UUID.randomUUID().toString(), "no.such.owner", UUID.randomUUID().toString(), "doc", "Gone", "application/x-amipro-document", "8".repeat(64), "[]", "live", "", 1L, 1L, false, false, false);
+        LinkStore.Link missing = new LinkStore.Link(UUID.randomUUID().toString(), "no.such.owner", UUID.randomUUID().toString(), "doc", "Gone", "application/x-amipro-document", "8".repeat(64), "[]", "live", "", 1L, 1L, false, false, false, 0);
         try { LinkOpener.request(context, missing, "edit"); throw new AssertionError("Opening through a missing owner must fail"); }
         catch (LinkOpener.Failure failure) { WorkflowRepositoryChecks.require(failure.getMessage().contains("isn't installed"), "a missing owner app gives a plain message: " + failure.getMessage()); }
         WorkflowRepositoryChecks.require(LinkOpener.ownerName("app.amipro.editor").equals("Ami Pro") && LinkOpener.ownerName("org.example.notes").equals("notes"), "owner names are readable");

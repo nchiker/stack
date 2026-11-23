@@ -263,7 +263,11 @@ final class PairingTransport {
     /** L3: both sides must announce: the phone only enables links for a peer when it announces them too (`weAnnounce`; tests pass true). */
     void onPeerHello(HelloGate.Peer peer,boolean weAnnounce)throws Exception {
         if(!weAnnounce||peer==null||!peer.announcesLinks)return;
-        if(new SyncStore(context,store.repository).enableLinks())enabledLinksInHello=true;
+        // S7-4: the partner's shared records go into link cells only for a computer that announced `link_foreign` (an older one never gets them).
+        SyncStore links=new SyncStore(context,store.repository);
+        boolean foreignJustOn=links.peerShowsSharedRecords(peer.announcesLinkForeign);
+        if(links.enableLinks())enabledLinksInHello=true;
+        if(foreignJustOn){links.capture();enabledLinksInHello=true;}   // the frontier may have moved: never end this session as "equal"
     }
     private volatile HelloGate.Peer lastPeerHello;
     /** The last accepted peer hello (null before one); package-private for P1. */

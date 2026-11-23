@@ -248,6 +248,10 @@ fn writer_input(row: &Value) -> stack_sync::links::LinkInput {
         },
         omit_text: false,
         omit_preview: false,
+        foreign: (row["origin"] == "foreign").then(|| stack_sync::links::LinkForeign {
+            shared_by: row["shared_by"].as_str().unwrap().to_owned(),
+            generation: int(row, "foreign_generation"),
+        }),
     }
 }
 

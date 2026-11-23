@@ -193,6 +193,10 @@ impl Stack {
                 None => widget::text::body("Backup key: checking…").into(),
             };
             let actions = actions.push(key_row);
+            let actions = actions.push(widget::text::body(format!(
+                "Version {}",
+                env!("STACK_APP_VERSION")
+            )));
             let actions = actions.push(
                 self.button("Reset or rebuild library…").on_press_maybe(
                     (!self.transfers.busy() && !self.sync.busy && !self.saving)
@@ -239,5 +243,16 @@ impl Stack {
             )
             .push(add)
             .into()
+    }
+}
+
+#[cfg(test)]
+mod version_tests {
+    #[test]
+    fn displayed_version_matches_metainfo() {
+        let xml = include_str!("../../../packaging/org.stackdocs.desktop.metainfo.xml");
+        let rest = &xml[xml.find("<release version=\"").unwrap() + 18..];
+        let newest = &rest[..rest.find('"').unwrap()];
+        assert_eq!(env!("STACK_APP_VERSION"), newest);
     }
 }

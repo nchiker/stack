@@ -39,6 +39,7 @@ public final class LinkBudgetHost {
         check(java.util.Arrays.equals(LinkBudget.presence("unreachable", "", 9), new String[]{"live", "", "0"}), "unreachable is live");
         check(java.util.Arrays.equals(LinkBudget.presence("missing", "", 9), new String[]{"live", "", "0"}), "missing is live");
         check(java.util.Arrays.equals(LinkBudget.presence("trashed", "user", 9), new String[]{"trashed", "user", "9"}), "trashed keeps reason and since");
+        check(java.util.Arrays.equals(LinkBudget.presence("trashed", "unshared", 9), new String[]{"trashed", "deleted", "9"}), "an unshared partner record travels as trashed/deleted (no new wire reason)");
         // H1: what a saved text becomes is decided from its UTF-8 byte length alone (no body is read for the decision).
         check(LinkBudget.textSize(-1) == LinkBudget.TextSize.ABSENT && LinkBudget.textSize(0) == LinkBudget.TextSize.EMPTY, "no row and an empty text");
         check(LinkBudget.textSize(1) == LinkBudget.TextSize.READ && LinkBudget.textSize(1_048_576) == LinkBudget.TextSize.READ, "up to 1 MiB is read");

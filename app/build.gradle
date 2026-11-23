@@ -23,11 +23,17 @@ android {
     defaultConfig {
         applicationId checksBuild ? 'org.stackdocs.app.checks' + (checksNamespace.isEmpty() ? '' : '.' + checksNamespace) : 'org.stackdocs.app'
         manifestPlaceholders = [appLabel: checksBuild ? ('TEST Stack' + (checksNamespace.isEmpty() ? '' : ' ' + checksNamespace)) : '@string/app_name']
+        // Checks builds only: one extra pinned caller as package:sha256 (for example a debug-signed owner app under test). Empty in every other build.
+        resValue 'string', 'stack_extra_pin', checksBuild ? providers.gradleProperty('stackExtraPin').orElse('').get() : ''
         minSdk 24
         targetSdk 36
-        versionCode 35
-        versionName '0.18.0'
+        versionCode 36
+        versionName '0.19.0'
         testInstrumentationRunner providers.gradleProperty('preservationProbe').isPresent() ? 'org.stackdocs.app.PreservationRunner' : 'org.stackdocs.app.ScannerChecks'
+    }
+
+    buildFeatures {
+        resValues true
     }
 
     compileOptions {

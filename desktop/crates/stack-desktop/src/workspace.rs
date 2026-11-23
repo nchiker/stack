@@ -3,6 +3,18 @@ use crate::{Message, RESULTS_PER_PAGE, Stack, editor, transfers_ui};
 use cosmic::{Element, iced, widget};
 use stack_core::{SearchHit, Sort};
 
+/// What the detail view says for a document the partner shares: there is no Open on a computer.
+pub(crate) const FOREIGN_NOTICE: &str = "Opening needs your phone: it opens through Filen Files.";
+
+/// The small line under a linked document's name in the list and search: "Shared by <name>" for the partner's.
+pub(crate) fn linked_caption(shared_by: &str) -> String {
+    if shared_by.is_empty() {
+        "Linked document".to_owned()
+    } else {
+        format!("Shared by {shared_by}")
+    }
+}
+
 impl Stack {
     pub fn library_sidebar(&self) -> Option<Element<'_, cosmic::Action<Message>>> {
         if !self.core.nav_bar_active() {
@@ -316,7 +328,7 @@ impl Stack {
                 )),
         );
         if hit.linked {
-            text = text.push(widget::text::caption("Linked document"));
+            text = text.push(widget::text::caption(linked_caption(&hit.shared_by)));
         } else if let Some(tile) = self.tiles.metadata.get(&hit.document_id) {
             let names: Vec<_> = tile
                 .memberships
@@ -411,10 +423,18 @@ impl Stack {
             .push(self.body(linked.title.clone()))
             .push(widget::text::caption("Made in"))
             .push(self.body(linked.owner.clone()))
-            .push(widget::text::caption("Status"))
-            .push(self.body("Saved copy shown here. Open in Ami Pro edits the original file."))
-            .push(self.ami_controls())
-            .push(widget::text::caption("Saved text"));
+            .push(widget::text::caption("Status"));
+        if linked.foreign {
+            // The partner's document: saved text and preview only. It opens through Filen Files on the phone.
+            info = info
+                .push(widget::text::caption(linked_caption(&linked.shared_by)))
+                .push(self.body(FOREIGN_NOTICE));
+        } else {
+            info = info
+                .push(self.body("Saved copy shown here. Open in Ami Pro edits the original file."))
+                .push(self.ami_controls());
+        }
+        info = info.push(widget::text::caption("Saved text"));
         let text: String = linked.text.chars().take(SHOWN).collect();
         info = info.push(
             widget::container(self.body(if text.is_empty() {

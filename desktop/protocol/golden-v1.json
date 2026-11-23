@@ -2551,6 +2551,349 @@
           }
         },
         "why": "wrong JSON type"
+      },
+      {
+        "name": "foreign-content-origin-only-missing-fields",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "origin": "foreign"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "slice 7: the three foreign fields come all together or not at all"
+      },
+      {
+        "name": "foreign-content-missing-generation",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "origin": "foreign",
+            "shared_by": "Sam"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "slice 7: all three foreign fields are required with origin"
+      },
+      {
+        "name": "foreign-content-generation-negative",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "origin": "foreign",
+            "shared_by": "Sam",
+            "foreign_generation": -1
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "slice 7: foreign_generation is 0..2^53-1"
+      },
+      {
+        "name": "foreign-content-generation-2^53",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "origin": "foreign",
+            "shared_by": "Sam",
+            "foreign_generation": 9007199254740992
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "slice 7: foreign_generation is 0..2^53-1"
+      },
+      {
+        "name": "foreign-content-shared-by-number",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "origin": "foreign",
+            "shared_by": 5,
+            "foreign_generation": 3
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "slice 7: shared_by is a string"
+      },
+      {
+        "name": "foreign-content-shared-by-over-100-units",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "origin": "foreign",
+            "shared_by": {
+              "repeat": "a",
+              "count": 101
+            },
+            "foreign_generation": 3
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "slice 7: shared_by memory bound"
+      },
+      {
+        "name": "foreign-content-origin-number",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "origin": 1,
+            "shared_by": "Sam",
+            "foreign_generation": 3
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "slice 7: origin is a string"
+      },
+      {
+        "name": "foreign-content-fields-without-origin",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "shared_by": "Sam",
+            "foreign_generation": 3
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "why": "slice 7: shared_by without origin is an unknown field set"
       }
     ],
     "receiver_accepts_skips": [
@@ -3751,6 +4094,387 @@
         },
         "projection": "applied",
         "why": "trashed with reason user"
+      },
+      {
+        "name": "foreign-link-applied",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "origin": "foreign",
+            "shared_by": "Sam",
+            "foreign_generation": 3
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "slice 7: the partner's record, all seven cells plus the three foreign fields"
+      },
+      {
+        "name": "foreign-generation-0-and-2^53-1",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "origin": "foreign",
+            "shared_by": "Sam",
+            "foreign_generation": 9007199254740991
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "slice 7: range edge"
+      },
+      {
+        "name": "foreign-shared-by-100-units",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "origin": "foreign",
+            "shared_by": {
+              "repeat": "a",
+              "count": 100
+            },
+            "foreign_generation": 3
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied",
+        "why": "slice 7: writer limit equals the wire limit"
+      },
+      {
+        "name": "foreign-origin-unknown-value-skipped",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "origin": "partner",
+            "shared_by": "Sam",
+            "foreign_generation": 3
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "skipped",
+        "skip_count": 1,
+        "why": "slice 7: valid shape, but only 'foreign' is understood; skipped and counted"
+      },
+      {
+        "name": "foreign-shared-by-empty-skipped",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "origin": "foreign",
+            "shared_by": "",
+            "foreign_generation": 3
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "skipped",
+        "skip_count": 1,
+        "why": "slice 7: the badge needs a name"
+      },
+      {
+        "name": "foreign-shared-by-control-char-skipped",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "origin": "foreign",
+            "shared_by": "Sa\u0007m",
+            "foreign_generation": 3
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "skipped",
+        "skip_count": 1,
+        "why": "slice 7: same free-text rule as titles"
+      },
+      {
+        "name": "foreign-protected-metadata-only",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 1,
+            "origin": "foreign",
+            "shared_by": "Sam",
+            "foreign_generation": 3
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "live",
+            "reason": "",
+            "since": 0
+          }
+        },
+        "projection": "applied_metadata_only",
+        "why": "slice 7: a protected shared record is metadata only on the computer too"
+      },
+      {
+        "name": "foreign-unshared-trashed",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": {
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "origin": "foreign",
+            "shared_by": "Sam",
+            "foreign_generation": 3
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": {
+            "sha256": "bf2cb58a68f684d95a3b78ef8f661c9a4e5b09e82cc8f9cc88cce90528caeb27",
+            "length": 10
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": {
+            "sha256": "efbe42620ff99f5929a6316de76740a3a55aa641f6e69538c83995156933d7d0",
+            "length": 20
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": {
+            "title": "A title",
+            "title_user_edited": 0
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": {
+            "uuid": "40000000-0000-0000-0000-000000000001",
+            "path": "/Docs/a.pdf"
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "trashed",
+            "reason": "deleted",
+            "since": 1700000002000
+          }
+        },
+        "projection": "applied",
+        "why": "slice 7: unshare on the phone = trashed; the computer hides it"
+      },
+      {
+        "name": "foreign-gone",
+        "changes": {
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000
+          },
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/text": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/preview": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/title": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/filen": null,
+          "link_records/[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/presence": {
+            "state": "gone",
+            "reason": "deleted",
+            "since": 1700000003000
+          }
+        },
+        "projection": "gone",
+        "why": "slice 7: removed on the phone for good (30-day sweep or Delete for good): the computer deletes its copy"
       }
     ],
     "writer_refuses": [
@@ -4641,6 +5365,272 @@
           }
         },
         "why": "several filen locators: the first in locator order is used"
+      },
+      {
+        "name": "foreign-row-emits-three-extra-content-fields",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 1,
+            "protected": 0,
+            "title": "Shared budget",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            },
+            "origin": "foreign",
+            "shared_by": "Sam",
+            "foreign_generation": 4
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "/content": {
+              "hash": "abababababababababababababababababababababababababababababababab",
+              "mime": "application/pdf",
+              "modified": 1700000001000,
+              "shared": 1,
+              "protected": 0,
+              "origin": "foreign",
+              "shared_by": "Sam",
+              "foreign_generation": 4
+            }
+          }
+        },
+        "why": "slice 7: origin, shared_by and foreign_generation ride in the content cell"
+      },
+      {
+        "name": "own-row-never-emits-foreign-fields",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "Shared budget",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            }
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "/content": {
+              "hash": "abababababababababababababababababababababababababababababababab",
+              "mime": "application/pdf",
+              "modified": 1700000001000,
+              "shared": 0,
+              "protected": 0
+            }
+          }
+        },
+        "why": "slice 7: an own row keeps the five-field content cell"
+      },
+      {
+        "name": "foreign-shared-by-empty-refuses-row",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "Shared budget",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            },
+            "origin": "foreign",
+            "shared_by": "",
+            "foreign_generation": 1
+          }
+        },
+        "expect": {
+          "outcome": "row_refused"
+        },
+        "why": "slice 7: the badge needs a name"
+      },
+      {
+        "name": "foreign-shared-by-101-units-refuses-row",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "Shared budget",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            },
+            "origin": "foreign",
+            "shared_by": {
+              "repeat": "a",
+              "count": 101
+            },
+            "foreign_generation": 1
+          }
+        },
+        "expect": {
+          "outcome": "row_refused"
+        },
+        "why": "slice 7: wire limit 100"
+      },
+      {
+        "name": "foreign-generation-2^53-refuses-row",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "Shared budget",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "live",
+              "reason": "",
+              "since": 0
+            },
+            "origin": "foreign",
+            "shared_by": "Sam",
+            "foreign_generation": 9007199254740992
+          }
+        },
+        "expect": {
+          "outcome": "row_refused"
+        },
+        "why": "slice 7: safe integer range"
+      },
+      {
+        "name": "foreign-unshared-trashed-emitted",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "Shared budget",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "trashed",
+              "reason": "deleted",
+              "since": 1700000002000
+            },
+            "origin": "foreign",
+            "shared_by": "Sam",
+            "foreign_generation": 4
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "/presence": {
+              "state": "trashed",
+              "reason": "deleted",
+              "since": 1700000002000
+            }
+          }
+        },
+        "why": "slice 7: unshare is a trashed presence (reason deleted)"
+      },
+      {
+        "name": "foreign-gone-emits-null-content",
+        "input": {
+          "row": {
+            "owner": "org.stackdocs.test",
+            "link_id": "30000000-0000-0000-0000-000000000001",
+            "kind": "pdf",
+            "added_at": 1700000000000,
+            "hash": "abababababababababababababababababababababababababababababababab",
+            "mime": "application/pdf",
+            "modified": 1700000001000,
+            "shared": 0,
+            "protected": 0,
+            "title": "Shared budget",
+            "title_user_edited": 0,
+            "filen": null,
+            "text": null,
+            "preview": null,
+            "presence": {
+              "state": "gone",
+              "reason": "deleted",
+              "since": 1700000003000
+            },
+            "origin": "foreign",
+            "shared_by": "Sam",
+            "foreign_generation": 4
+          }
+        },
+        "expect": {
+          "outcome": "emitted",
+          "cells": {
+            "/content": null,
+            "/title": null
+          },
+          "absent": [
+            "/content"
+          ]
+        },
+        "why": "slice 7: a deleted shared record is gone: no foreign fields, nothing else"
       }
     ],
     "enable_ops": [

@@ -151,6 +151,10 @@ struct Hello {
 /// D4b switch (slice 6, section 5): this build announces `features: ["links"]` and the real `enabled`.
 /// Flipped last, once links can be applied, kept, resolved and purged (D5, P1, P2, D6 all shipped).
 const ANNOUNCE_LINKS: bool = true;
+/// Slice 7 (S7-4): a computer that can show the partner's shared records read-only announces this second feature.
+/// A phone writes those records into the link cells only for a peer that announced it, so an older computer never
+/// receives them and keeps syncing documents and the phone's own links exactly as before.
+pub const FEATURE_LINK_FOREIGN: &str = "link_foreign";
 /// How long a refused ladder level is remembered for one peer.
 const REFUSAL_MEMORY: Duration = Duration::from_secs(15 * 60);
 
@@ -167,6 +171,12 @@ impl PeerHello {
         self.features
             .as_ref()
             .is_some_and(|f| f.iter().any(|x| x == "links"))
+    }
+    /// True when the peer announced `link_foreign` (it can show the partner's shared records read-only).
+    pub fn announces_link_foreign(&self) -> bool {
+        self.features
+            .as_ref()
+            .is_some_and(|f| f.iter().any(|x| x == FEATURE_LINK_FOREIGN))
     }
     /// The peer's reported `enabled` flag; `None` when it did not report one.
     pub fn links_enabled(&self) -> Option<bool> {
@@ -599,7 +609,8 @@ fn check_group(library: &Library, policy: &Policy) -> Result<Hello> {
         group: policy.group.clone(),
         replica,
         frontier: Some(serde_json::from_value(status["frontier"].clone())?),
-        features: ANNOUNCE_LINKS.then(|| vec!["links".to_owned()]),
+        features: ANNOUNCE_LINKS
+            .then(|| vec!["links".to_owned(), FEATURE_LINK_FOREIGN.to_owned()]),
         enabled: if ANNOUNCE_LINKS {
             Some(library.sync_links_enabled()?)
         } else {
@@ -1215,12 +1226,15 @@ mod tests {
         let (policy, cert, key, roots) = credentials(&a).unwrap();
         let mut local = check_group(&Library::open(&a).unwrap(), &policy).unwrap();
         // D4b is live: the local hello announces links with the real (here still disabled) state.
-        assert_eq!(local.features.as_deref(), Some(&["links".to_owned()][..]));
+        assert_eq!(
+            local.features.as_deref(),
+            Some(&["links".to_owned(), "link_foreign".to_owned()][..])
+        );
         assert_eq!(local.enabled, Some(false));
         assert!(
             String::from_utf8(serde_json::to_vec(&local).unwrap())
                 .unwrap()
-                .contains("\"features\":[\"links\"],\"enabled\":false")
+                .contains("\"features\":[\"links\",\"link_foreign\"],\"enabled\":false")
         );
         local.frontier = None;
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -1383,6 +1397,12 @@ mod tests {
         assert!(parsed.announces_links());
         assert_eq!(parsed.links_enabled(), Some(true));
         assert_eq!(parsed.features(), ["links"]);
+        assert!(!parsed.announces_link_foreign(), "an older computer or phone does not announce it");
+        let newer = parse_peer_hello(
+            br#"{"version":1,"group":"g","replica":"p","features":["links","link_foreign"],"enabled":false}"#,
+        )
+        .unwrap();
+        assert!(newer.announces_links() && newer.announces_link_foreign());
         assert!(
             parse_peer_hello(br#"{"version":1,"group":"g","replica":"p","features":[]}"#).is_ok()
         );

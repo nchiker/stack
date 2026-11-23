@@ -1,7 +1,7 @@
 use crate::library::{Error, Result};
 use rusqlite::Connection;
 
-pub const VERSION: i64 = 7;
+pub const VERSION: i64 = 8;
 const APPLICATION_ID: i64 = 0x53544b44;
 
 pub const V1: &str = "
@@ -53,6 +53,17 @@ CREATE TABLE link_projection(key TEXT PRIMARY KEY,value TEXT NOT NULL);
 /// archive format 4 and link sync are unchanged. No foreign key: a row may outlive or precede its link row harmlessly.
 const V7: &str = "
 CREATE TABLE link_local_files(row_id TEXT PRIMARY KEY,path TEXT NOT NULL);
+";
+
+/// Slice 7, desktop (S7-4): a record the partner shares reaches this computer through the phone's link sync as
+/// `origin='foreign'`, with the partner's display name in `shared_by` and the share archive's generation in
+/// `foreign_generation`. Own rows keep `'own'`, `''` and 0, so every existing row and every archive restore is
+/// unchanged. Additive only. Like any schema bump, an older desktop build refuses a library the new one opened
+/// (`version > VERSION`), so there is no way back to a build that does not know the column.
+const V8: &str = "
+ALTER TABLE link_records ADD COLUMN origin TEXT NOT NULL DEFAULT 'own';
+ALTER TABLE link_records ADD COLUMN shared_by TEXT NOT NULL DEFAULT '';
+ALTER TABLE link_records ADD COLUMN foreign_generation INTEGER NOT NULL DEFAULT 0;
 ";
 
 pub fn migrate(db: &mut Connection) -> Result<()> {
@@ -116,6 +127,9 @@ pub fn migrate(db: &mut Connection) -> Result<()> {
     if version >= 7 {
         db.prepare("SELECT row_id,path FROM link_local_files LIMIT 0")?;
     }
+    if version >= 8 {
+        db.prepare("SELECT origin,shared_by,foreign_generation FROM link_records LIMIT 0")?;
+    }
     if version < VERSION {
         let tx = db.transaction()?;
         if version < 1 {
@@ -138,6 +152,9 @@ pub fn migrate(db: &mut Connection) -> Result<()> {
         }
         if version < 7 {
             tx.execute_batch(V7)?;
+        }
+        if version < 8 {
+            tx.execute_batch(V8)?;
         }
         tx.pragma_update(None, "application_id", APPLICATION_ID)?;
         tx.pragma_update(None, "user_version", VERSION)?;
@@ -193,7 +210,7 @@ mod tests {
     }
 
     #[test]
-    fn schema_5_library_with_links_migrates_to_7_additively() {
+    fn schema_5_library_with_links_migrates_to_8_additively() {
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path().join("library");
         drop(Library::open(&root).unwrap());
@@ -227,7 +244,7 @@ mod tests {
         .unwrap();
         drop(db);
         let library = Library::open(&root).unwrap();
-        assert_eq!(library.status().unwrap().schema, 7);
+        assert_eq!(library.status().unwrap().schema, 8);
         assert_eq!(library.link_count().unwrap(), 1);
         let row: (String, i64, String, i64, i64, i64, String) = library
             .db
@@ -258,12 +275,58 @@ mod tests {
             .db
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 7);
+        assert_eq!(version, 8);
         drop(library);
         // Reopening is a no-op, and the previous release (VERSION 5) would refuse this library because
         // `version > VERSION` is an error (see `rejects_future_foreign_and_partial_schema...`).
         let library = Library::open(&root).unwrap();
         assert_eq!(library.link_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn schema_7_library_gains_the_foreign_columns_and_old_rows_stay_own() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().join("library");
+        drop(Library::open(&root).unwrap());
+        std::fs::remove_file(root.join("library.sqlite3")).unwrap();
+        let db = Connection::open(root.join("library.sqlite3")).unwrap();
+        for sql in [V1, V2, V3, V5, V6, V7] {
+            db.execute_batch(sql).unwrap();
+        }
+        db.execute_batch("CREATE TABLE sync_state(singleton INTEGER PRIMARY KEY CHECK(singleton=1),state TEXT NOT NULL,projection TEXT NOT NULL,baseline TEXT NOT NULL);CREATE TABLE sync_receipts(peer TEXT PRIMARY KEY,frontier TEXT NOT NULL);").unwrap();
+        db.pragma_update(None, "application_id", APPLICATION_ID)
+            .unwrap();
+        db.pragma_update(None, "user_version", 7).unwrap();
+        for (key, value) in [("library_id", "lib"), ("replica_id", "rep")] {
+            db.execute("INSERT INTO meta VALUES(?1,?2)", params![key, value])
+                .unwrap();
+        }
+        db.execute(
+            "INSERT INTO link_records(row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,title_user_edited,added_at,text,preview) VALUES('11111111-1111-4111-8111-111111111111','org.example.amipro','22222222-2222-4222-8222-222222222222','doc','Mine','application/pdf',1,?1,0,0,'[]','unreachable',0,5,'t',0)",
+            ["a".repeat(64)],
+        )
+        .unwrap();
+        db.execute(
+            "INSERT INTO link_search VALUES('11111111-1111-4111-8111-111111111111','Mine','t')",
+            [],
+        )
+        .unwrap();
+        drop(db);
+        let library = Library::open(&root).unwrap();
+        assert_eq!(library.status().unwrap().schema, 8);
+        let row: (String, String, i64) = library
+            .db
+            .query_row(
+                "SELECT origin,shared_by,foreign_generation FROM link_records",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(row, ("own".into(), String::new(), 0));
+        assert!(!library.linked_document("11111111-1111-4111-8111-111111111111").unwrap().foreign);
+        drop(library);
+        // Reopening is a no-op. A build that stops at 7 refuses the library (version > VERSION), see the next test.
+        Library::open(&root).unwrap();
     }
 
     #[test]

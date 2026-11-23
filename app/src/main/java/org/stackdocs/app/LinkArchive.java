@@ -18,11 +18,14 @@ final class LinkArchive {
 
     static String previewPath(String id) { return "previews/" + id + ".pdf"; }
 
-    /** All link rows except those in Recently deleted, with their text, in id order. Runs inside the snapshot transaction. */
+    /**
+     * All of this phone's OWN link rows except those in Recently deleted, with their text, in id order. Runs inside the snapshot transaction.
+     * Documents the partner shares with us (origin 'foreign') are not part of our library and stay out of backups (S7-3, unchanged by S7-4: they reach the computer through the link sync, not a backup).
+     */
     static JSONArray capture(SQLiteDatabase db) throws JSONException {
         JSONArray out = new JSONArray();
         try (Cursor c = db.rawQuery("SELECT r.id,r.owner,r.link_id,r.kind,r.title,r.mime,r.modified,r.hash,r.shared,r.protected,r.locators,r.state,"
-                + "r.title_user_edited,r.added_at,COALESCE((SELECT body FROM link_search WHERE record_id=r.id),'') FROM link_records r WHERE r.state<>'trashed' ORDER BY r.id", null)) {
+                + "r.title_user_edited,r.added_at,COALESCE((SELECT body FROM link_search WHERE record_id=r.id),'') FROM link_records r WHERE r.state<>'trashed' AND r.origin='own' ORDER BY r.id", null)) {
             while (c.moveToNext()) {
                 JSONObject row = new JSONObject();
                 for (int i = 0; i < FIELDS.length; i++) {

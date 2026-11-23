@@ -481,7 +481,7 @@ impl cosmic::Application for Stack {
             drafts: Default::default(),
             save_status: None,
         };
-        app.set_header_title("Stack — All documents".to_owned());
+        app.set_header_title(format!("Stack {} — All documents", env!("STACK_APP_VERSION")));
         let window_title = app
             .flags
             .smoke_title
@@ -641,7 +641,7 @@ impl cosmic::Application for Stack {
                     self.library_location()
                 }
             });
-        let title = format!("Stack — {context}");
+        let title = format!("Stack {} — {context}", env!("STACK_APP_VERSION"));
         if title != self.context_title {
             self.context_title = title.clone();
             self.set_header_title(title.clone());

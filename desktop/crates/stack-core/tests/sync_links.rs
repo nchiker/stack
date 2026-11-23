@@ -255,6 +255,7 @@ fn input(n: u128, title: &str, text: &str, preview: Option<LinkBlob>) -> LinkInp
         },
         omit_text: false,
         omit_preview: false,
+        foreign: None,
     }
 }
 
@@ -1562,8 +1563,16 @@ fn cross_expectation(state: &State) -> Value {
                 "kind": r.kind, "added_at": r.added_at,
                 "outcome": if r.metadata_only { "applied_metadata_only" } else { "applied" },
                 "state": r.presence.state.as_str(), "reason": r.presence.reason, "since": r.presence.since,
-                "content": r.content.as_ref().map(|c| json!({"hash": c.hash, "mime": c.mime, "modified": c.modified,
-                    "shared": flag(c.shared), "protected": flag(c.protected)})).unwrap_or(Value::Null),
+                "content": r.content.as_ref().map(|c| {
+                    let mut content = json!({"hash": c.hash, "mime": c.mime, "modified": c.modified,
+                        "shared": flag(c.shared), "protected": flag(c.protected)});
+                    if let Some(f) = &c.foreign {
+                        content["origin"] = json!("foreign");
+                        content["shared_by"] = json!(f.shared_by);
+                        content["foreign_generation"] = json!(f.generation);
+                    }
+                    content
+                }).unwrap_or(Value::Null),
                 "title": r.title.as_ref().map(|t| json!({"title": t.title, "title_user_edited": flag(t.user_edited)})).unwrap_or(Value::Null),
                 "filen": r.filen.as_ref().map(|f| json!({"uuid": f.uuid, "path": f.path})).unwrap_or(Value::Null),
                 "text": r.text.as_ref().map(|b| json!({"sha256": b.sha256, "length": b.length})).unwrap_or(Value::Null),
@@ -1714,7 +1723,12 @@ fn cross_a_real_desktop_enable_shapes_for_the_java_kernel() {
             reason: "forgotten".into(),
             since: 1_700_000_000_003,
         };
-        phone.publish(&[l11, l12, l13, l14, l15], true);
+        // Slice 7: two of the partner's records ride in the same phone operation (one live with text and preview,
+        // one unshared = trashed). The computer never puts them into its own enable operation.
+        let l16 = foreign_input(16, "Shared live", "shared giraffe words", Some(phone.put(PDF)));
+        let mut l17 = foreign_input(17, "Shared unshared", "unshared words", None);
+        l17.presence = trashed("deleted", 1_700_000_000_004);
+        phone.publish(&[l11, l12, l13, l14, l15, l16, l17], true);
         phone.send(&mut a);
         finish_a(&mut a, &mut phone);
         let expect = assert_enable_shape(&phone.state, &phone.replica, &phone.peer);
@@ -1748,6 +1762,16 @@ fn cross_a_real_desktop_enable_shapes_for_the_java_kernel() {
         assert_eq!(outcomes[&synthetic::id(7012)], "applied_metadata_only");
         assert_eq!(outcomes[&synthetic::id(7015)], "gone");
         assert_eq!(outcomes[&synthetic::id(7011)], "applied");
+        assert_eq!(outcomes[&synthetic::id(7016)], "applied");
+        assert!(!has(16, "") && !has(17, ""), "the computer never writes the partner's records");
+        let shared = expect["links"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|l| l["link_id"] == synthetic::id(7016))
+            .unwrap();
+        assert_eq!(shared["content"]["origin"], "foreign");
+        assert_eq!(shared["content"]["shared_by"], "Sam");
         assert_eq!(expect["skipped"], 0, "{expect}");
         scenarios.push((
             "enable-after-receive",
@@ -2055,4 +2079,192 @@ fn an_unwritable_blob_folder_falls_back_to_the_marker_alone_and_the_session_goes
     assert_eq!(link_keys(&header), vec![wire::marker_key(&phone.peer)]);
     assert!(projection(&a).is_empty());
     assert!(!a.sync_links_on_hello(true).unwrap(), "enabled once");
+}
+
+// ---------------------------------------------------------------------------
+// Slice 7 (S7-4): the partner's shared records
+// ---------------------------------------------------------------------------
+
+fn foreign_input(n: u128, title: &str, text: &str, preview: Option<LinkBlob>) -> LinkInput {
+    let mut row = input(n, title, text, preview);
+    row.shared = true;
+    row.foreign = Some(wire::LinkForeign {
+        shared_by: "Sam".into(),
+        generation: 1,
+    });
+    row
+}
+
+fn origin_of(library: &Library, n: u128) -> (String, String, i64) {
+    db(library)
+        .query_row(
+            "SELECT origin,shared_by,foreign_generation FROM link_records WHERE link_id=?1",
+            [synthetic::id(7000 + n)],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .unwrap()
+}
+
+#[test]
+fn a_shared_record_arrives_read_only_with_its_badge_text_and_preview() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut a = library_with(dir.path(), "a", vec![]);
+    let mut phone = join(&mut a, dir.path());
+    let f1 = foreign_input(1, "Shared budget", "quarterly zebra budget", Some(phone.put(PDF)));
+    let own = input(2, "My own", "an own giraffe", None);
+    phone.publish(&[f1.clone(), own], true);
+    let out = phone.send(&mut a);
+    assert_eq!(out["links"]["applied"], 2, "{out}");
+    assert_eq!(origin_of(&a, 1), ("foreign".into(), "Sam".into(), 1));
+    assert_eq!(origin_of(&a, 2), ("own".into(), String::new(), 0));
+    // A partner's record is live (no file here to check), has text and preview, and is found by search.
+    let r1 = row_of(&a, 1);
+    assert_eq!(r1.state, "live");
+    assert_eq!((r1.pending, r1.preview), (0, 1));
+    assert_eq!(fs::read(preview_file(&a, &r1)).unwrap(), PDF);
+    let hits = a.search("zebra", None, Sort::Newest, 10).unwrap();
+    assert_eq!((hits.len(), hits[0].shared_by.as_str()), (1, "Sam"));
+    let own_hit = &a.search("giraffe", None, Sort::Newest, 10).unwrap()[0];
+    assert_eq!(own_hit.shared_by, "");
+    let view = a.linked_document(&hits[0].document_id).unwrap();
+    assert!(view.foreign);
+    assert_eq!((view.shared_by.as_str(), view.text.as_str()), ("Sam", "quarterly zebra budget"));
+    assert!(view.preview.is_some());
+    // No remembered file for a shared copy, ever.
+    assert!(a.set_link_local_file(&view.id, Some("/home/x/a.sam")).is_err());
+    assert_eq!(view.remembered_file, None);
+    // Backups hold only the person's own links: the partner's record never goes into an archive.
+    assert_eq!(a.link_count().unwrap(), 2);
+    let file = dir.path().join("own-only.stackbackup");
+    a.export_archive(&file, &Control::default()).unwrap();
+    let mut b = Library::open(&dir.path().join("restored")).unwrap();
+    restore(&mut b, &fs::read(&file).unwrap());
+    let restored = rows(&b);
+    assert_eq!(restored.len(), 1);
+    assert_eq!(restored[0].title, "My own");
+}
+
+#[test]
+fn a_shared_record_updates_unshares_comes_back_and_is_deleted_only_by_gone() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut a = library_with(dir.path(), "a", vec![]);
+    let mut phone = join(&mut a, dir.path());
+    let mut f = foreign_input(1, "Shared", "first words", Some(phone.put(PDF)));
+    phone.publish(std::slice::from_ref(&f), true);
+    phone.send(&mut a);
+    let id = row_of(&a, 1).row_id;
+    // A newer generation updates in place: same row, new badge name, new text.
+    f.title = "Shared v2".into();
+    f.text = Some("second giraffe words".into());
+    f.foreign = Some(wire::LinkForeign {
+        shared_by: "Samantha".into(),
+        generation: 2,
+    });
+    phone.publish(std::slice::from_ref(&f), false);
+    phone.send(&mut a);
+    assert_eq!(row_of(&a, 1).row_id, id);
+    assert_eq!(origin_of(&a, 1), ("foreign".into(), "Samantha".into(), 2));
+    assert_eq!(a.search("giraffe", None, Sort::Newest, 10).unwrap().len(), 1);
+    // Unshare on the phone (Recently deleted, 'unshared'): a trashed presence; the computer hides it everywhere.
+    f.presence = trashed("deleted", 7);
+    phone.publish(std::slice::from_ref(&f), false);
+    phone.send(&mut a);
+    assert_eq!(row_of(&a, 1).state, "trashed");
+    assert!(a.search("giraffe", None, Sort::Newest, 10).unwrap().is_empty());
+    assert_eq!(a.link_count().unwrap(), 0);
+    // Shared again: live again, and still a shared copy.
+    f.presence = LinkPresence {
+        state: LinkState::Live,
+        reason: String::new(),
+        since: 0,
+    };
+    phone.publish(std::slice::from_ref(&f), false);
+    phone.send(&mut a);
+    assert_eq!(row_of(&a, 1).state, "live");
+    assert_eq!(origin_of(&a, 1).0, "foreign");
+    // The phone removes its copy for good (or its 30 days pass): `gone`, and only that deletes.
+    let file = preview_file(&a, &row_of(&a, 1));
+    assert!(file.exists());
+    f.presence = LinkPresence {
+        state: LinkState::Gone,
+        reason: "deleted".into(),
+        since: 9,
+    };
+    phone.publish(std::slice::from_ref(&f), false);
+    let out = phone.send(&mut a);
+    assert_eq!(out["links"]["deleted"], 1, "{out}");
+    assert!(rows(&a).is_empty());
+    assert!(!file.exists());
+}
+
+#[test]
+fn the_computer_never_writes_or_sends_back_a_shared_record() {
+    let dir = tempfile::tempdir().unwrap();
+    // The computer has one own link; the phone's first operation carries a shared record and its enable marker.
+    let mut a = library_with(dir.path(), "a", vec![archive_link(1, "own words", 0)]);
+    let mut phone = join(&mut a, dir.path());
+    let shared = foreign_input(5, "Partner doc", "partner words", None);
+    phone.publish(std::slice::from_ref(&shared), true);
+    phone.send(&mut a);
+    assert!(a.sync_links_enabled().unwrap());
+    assert_eq!(origin_of(&a, 5).0, "foreign");
+    // Everything the computer sends to the phone: no operation of the computer mentions the shared identity.
+    let header = phone.receive(&a);
+    let shared_key = shared.key();
+    for op in header.operations.iter().filter(|op| op.id.replica == a.status().unwrap().replica_id) {
+        assert!(
+            op.changes.keys().all(|k| !k.starts_with(&shared_key)),
+            "the computer must not write the partner's record: {:?}",
+            op.changes.keys().collect::<Vec<_>>()
+        );
+    }
+    assert!(phone.state.conflicts().is_empty());
+    // Even a shared row that exists locally before the computer enables is left out of its enable operation.
+    let dir2 = tempfile::tempdir().unwrap();
+    let mut b = library_with(dir2.path(), "b", vec![archive_link(1, "own words", 0)]);
+    {
+        let conn = Connection::open(b.root().join("library.sqlite3")).unwrap();
+        conn.execute(
+            "INSERT INTO link_records(row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,title_user_edited,added_at,text,preview,origin,shared_by,foreign_generation) VALUES(?1,?2,?3,'doc','Shared copy','application/pdf',1,?4,1,0,'[]','live',0,6,'shared text',0,'foreign','Sam',1)",
+            rusqlite::params![uuid::Uuid::new_v4().to_string(), OWNER, synthetic::id(7009), "d".repeat(64)],
+        )
+        .unwrap();
+    }
+    let mut phone_b = join(&mut b, dir2.path());
+    assert!(b.sync_links_on_hello(true).unwrap());
+    let seen = phone_b.receive(&b);
+    let keys = link_keys(&seen);
+    assert!(keys.iter().any(|k| k.contains(&synthetic::id(7001))));
+    assert!(keys.iter().all(|k| !k.contains(&synthetic::id(7009))), "{keys:?}");
+}
+
+#[test]
+fn a_cell_cannot_flip_a_rows_origin_in_either_direction() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut a = library_with(dir.path(), "a", vec![archive_link(1, "own words", 0)]);
+    let mut phone = join(&mut a, dir.path());
+    let row = row_of(&a, 1);
+    a.set_link_local_file(&row.row_id, Some("/home/x/a.sam")).unwrap();
+    assert!(a.sync_links_on_hello(true).unwrap());
+    phone.receive(&a);
+    // An own row stays own and keeps its remembered file when a cell says "shared by".
+    let mut f = foreign_input(1, "Now shared", "now shared words", None);
+    f.hash = "c".repeat(64);
+    phone.publish(std::slice::from_ref(&f), true);
+    phone.send(&mut a);
+    assert_eq!(origin_of(&a, 1).0, "own");
+    assert_eq!(a.link_local_file(&row.row_id).unwrap(), Some("/home/x/a.sam".into()));
+    // A shared copy stays shared when a later cell has no origin.
+    let dir_b = tempfile::tempdir().unwrap();
+    let mut b = library_with(dir_b.path(), "b", vec![]);
+    let mut phone_b = join(&mut b, dir_b.path());
+    let shared = foreign_input(5, "Partner doc", "partner words", None);
+    phone_b.publish(std::slice::from_ref(&shared), true);
+    phone_b.send(&mut b);
+    assert_eq!(origin_of(&b, 5).0, "foreign");
+    let mut plain = input(5, "Partner doc", "partner words changed", None);
+    plain.hash = "d".repeat(64);
+    phone_b.publish(std::slice::from_ref(&plain), true);
+    phone_b.send(&mut b);
+    assert_eq!(origin_of(&b, 5).0, "foreign", "a cell without origin never makes a shared copy an own row");
 }

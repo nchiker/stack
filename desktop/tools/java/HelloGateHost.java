@@ -25,6 +25,13 @@ public final class HelloGateHost {
         HelloGate.Peer off = HelloGate.parse(base().put("frontier", frontier).put("features", new JSONArray().put("links")).put("enabled", false));
         check(off.announcesLinks && !off.linksEnabled() && Boolean.FALSE.equals(off.enabled), "links disabled parsed");
         check(!HelloGate.parse(base().put("features", new JSONArray())).announcesLinks, "empty features");
+        // Slice 7 (S7-4): `link_foreign` is a second feature; it counts only next to `links`, and this phone never announces it itself.
+        HelloGate.Peer both = HelloGate.parse(base().put("features", new JSONArray().put("links").put("link_foreign")).put("enabled", false));
+        check(both.announcesLinks && both.announcesLinkForeign, "links + link_foreign parsed");
+        check(!on.announcesLinkForeign && !off.announcesLinkForeign && !old.announcesLinkForeign && !plain.announcesLinkForeign, "an older computer does not announce link_foreign");
+        check(!HelloGate.parse(base().put("features", new JSONArray().put("link_foreign"))).announcesLinkForeign, "link_foreign alone is not enough");
+        check(HelloGate.parse(base().put("features", new JSONArray().put("link_foreign").put("links").put("future"))).announcesLinkForeign, "order and unknown names do not matter");
+        check(rejects(base().put("features", new JSONArray().put("link_foreign").put("link_foreign"))), "duplicate link_foreign");
         check(!HelloGate.parse(base().put("features", new JSONArray().put("other"))).announcesLinks, "unknown feature ignored");
         check(!HelloGate.parse(base().put("enabled", true)).linksEnabled(), "enabled without features is not links");
         // malformed

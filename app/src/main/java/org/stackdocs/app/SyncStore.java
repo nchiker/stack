@@ -206,6 +206,8 @@ final class SyncStore {
             linkSync().purge(state,replica,peerAcknowledgement(state,replica));
         } catch(IOException|JSONException|RuntimeException ignored) { /* retried by the next pass */ }
     }
+    /** Records whether the computer's hello announced `link_foreign`. True when the flag was just switched on: the shared records are then captured. */
+    boolean peerShowsSharedRecords(boolean announced) {return LinkSync.setForeignPeer(db,announced);}
     LinkSync linkSync(){return new LinkSync(db,context.getFilesDir(),control);}
     /** What the single peer of the frozen two-member group has acknowledged of our operations; empty if it never did. */
     private TreeMap<String,Long> peerAcknowledgement(SyncProtocol.State state,String replica)throws IOException,JSONException {

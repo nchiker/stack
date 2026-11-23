@@ -149,6 +149,8 @@ final class LinkProviderChecks {
             String foreign = LinkCallers.certificateOf(context, "android");
             WorkflowRepositoryChecks.require(foreign != null && !foreign.equals(own) && !LinkCallers.decide("android", foreign, own, pins), "a real package with a different certificate is refused");
             WorkflowRepositoryChecks.require(LinkCallers.certificateOf(context, "no.such.package.here") == null, "an unknown package has no certificate");
+            for (String[] pin : pins) WorkflowRepositoryChecks.require(!"app.filenfiles".equals(pin[0]), "Filen Files is not in the owner-app pin list");
+            WorkflowRepositoryChecks.require(LinkCallers.decide("app.filenfiles", LinkCallers.FILEN[0][1], own, LinkCallers.FILEN) && !LinkCallers.decide("app.filenfiles", LinkCallers.FILEN[0][1], own, pins), "Filen Files is accepted by the separate Filen pin only");
         } finally {
             for (String id : made) { try { onIo(() -> { app.library.links.delete(id); return null; }); } catch (Exception ignored) {} }
         }

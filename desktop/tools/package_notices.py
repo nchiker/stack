@@ -12,7 +12,8 @@ import tempfile
 PREFIXES = ('LICENSE', 'COPYING', 'NOTICE', 'COPYRIGHT')
 
 
-def package(root, output, metadata):
+def package(root, output, metadata, archive_dir=None, source_url=None):
+    """archive_dir/source_url: write SOURCE.tar.gz there instead of into output, and point the notices at source_url."""
     notices = output / 'notices'
     notices.mkdir()
     shutil.copy2(root.parent / 'LICENSE', notices / 'Stack-Apache-2.0.txt')
@@ -60,7 +61,8 @@ def package(root, output, metadata):
     (notices / 'dependencies.json').write_text(json.dumps(inventory, indent=2) + '\n')
     (notices / 'README.txt').write_text(
         'This conservative dependency inventory includes build-time dependencies and some cfg-disabled platform code.\n'
-        'Complete Rust and application desktop source is in SOURCE.tar.gz, including embedded attribution.\n'
+        + ('Complete Rust and application desktop source is in SOURCE.tar.gz, including embedded attribution.\n' if source_url is None else
+           'Complete Rust and application desktop source (SOURCE.tar.gz, including embedded attribution) is published at:\n' + source_url + '\n') +
         'Upstream notice URLs/revisions/hashes are in upstream/PROVENANCE.json.\n'
         'Some published crates omit standalone license files: declarations retain upstream authors and standard SPDX supplements are labeled.\n'
         'Native PDFium/OCR notices and engine provenance are in runtime/.\n'
@@ -73,7 +75,7 @@ def package(root, output, metadata):
         config = subprocess.check_output(['cargo', 'vendor', '--offline', '--locked', '--respect-source-config', '--versioned-dirs',
                                           '--manifest-path', str(root / 'Cargo.toml'), str(vendor)], text=True)
         config = config.replace(str(vendor), 'vendor')
-        archive = output / 'SOURCE.tar.gz'
+        archive = (archive_dir or output) / 'SOURCE.tar.gz'
         with archive.open('wb') as raw, gzip.GzipFile(filename='', mode='wb', fileobj=raw, mtime=0) as compressed, tarfile.open(fileobj=compressed, mode='w|') as tar:
             def add(file, name):
                 if file.is_symlink():

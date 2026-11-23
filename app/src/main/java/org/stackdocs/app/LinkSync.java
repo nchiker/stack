@@ -38,6 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * - P2 conflicts: the one merge rule per link (`LinkResolve`) in `resolveDecided`, the tie review per link in `resolveTie`, and the
  *   open ties for the conflict screen in `linkConflicts`. Conflicted links are never applied until resolved.
  * Only the application's IO executor calls it, inside the transaction of its caller (SyncStore). Nothing here commits.
+ * - S7-4: the partner's shared records (origin 'foreign') become cells only while `foreignPeer` (the computer announced `link_foreign`); until then their projection cells are carried unchanged.
  * - D6 purge: `purge` deletes retained link blobs that nothing references any more (see its comment and LinkPurge).
  */
 final class LinkSync {
@@ -86,6 +87,21 @@ final class LinkSync {
         if (on) db.execSQL("INSERT OR REPLACE INTO sync_meta(key,value) VALUES(?, '1')", new Object[]{DEFERRED});
         else db.execSQL("DELETE FROM sync_meta WHERE key=?", new Object[]{DEFERRED});
     }
+    /**
+     * Slice 7 (S7-4): `sync_meta` flag, true while the paired computer's last hello announced `link_foreign`. Only then are the partner's shared
+     * records (origin 'foreign') written into link cells, so a computer that does not know them never receives them. History keeps what was
+     * written; a connection reset clears `sync_meta` and with it the flag. Never set by anything but a received hello.
+     */
+    static final String FOREIGN_PEER = "link_foreign_peer";
+    static boolean foreignPeer(SQLiteDatabase db) { try (Cursor c = db.rawQuery("SELECT 1 FROM sync_meta WHERE key=?", new String[]{FOREIGN_PEER})) { return c.moveToFirst(); } }
+    /** Records what the computer's hello said. Returns true when the flag was just switched ON (the shared records are then captured). */
+    static boolean setForeignPeer(SQLiteDatabase db, boolean on) {
+        boolean was = foreignPeer(db);
+        if (on == was) return false;
+        if (on) { db.execSQL("INSERT OR REPLACE INTO sync_meta(key,value) VALUES(?, '1')", new Object[]{FOREIGN_PEER}); markDirty(db); }
+        else db.execSQL("DELETE FROM sync_meta WHERE key=?", new Object[]{FOREIGN_PEER});
+        return on;
+    }
     static boolean dirty(SQLiteDatabase db) { try (Cursor c = db.rawQuery("SELECT 1 FROM sync_meta WHERE key=?", new String[]{DIRTY})) { return c.moveToFirst(); } }
     static void markDirty(SQLiteDatabase db) { db.execSQL("INSERT OR REPLACE INTO sync_meta(key,value) VALUES(?, '1')", new Object[]{DIRTY}); }
     static void clearDirty(SQLiteDatabase db) { db.execSQL("DELETE FROM sync_meta WHERE key=?", new Object[]{DIRTY}); }
@@ -131,22 +147,38 @@ final class LinkSync {
     // ---- reading rows -------------------------------------------------------------------------------------------------
 
     private static final class Row {
-        String id, owner, linkId, kind, title, mime, hash, locators, state, removedReason, previewFile, textSha, previewSha;
+        String id, owner, linkId, kind, title, mime, hash, locators, state, removedReason, previewFile, textSha, previewSha, origin, sharedBy;
+        long foreignGeneration;
         long modified, addedAt, stateSince, shared, isProtected, titleEdited, textLen, previewLen, previewPending, previewMtime;
     }
 
-    private List<Row> rows() {
+    /**
+     * The rows that become cells. Own rows always. Documents the partner shares with us (origin 'foreign', S7-3) only when `withForeign`
+     * (S7-4: the computer announced `link_foreign`); they are phone-authoritative, and the computer never writes them back.
+     */
+    private List<Row> rows(boolean withForeign) {
         List<Row> out = new ArrayList<>();
         try (Cursor c = db.rawQuery("SELECT id,owner,link_id,kind,title,mime,hash,locators,state,removed_reason,preview_file,text_sha,preview_sha,"
-                + "modified,added_at,state_since,shared,protected,title_user_edited,text_len,preview_len,preview_pending,preview_mtime FROM link_records ORDER BY added_at,id", null)) {
+                + "modified,added_at,state_since,shared,protected,title_user_edited,text_len,preview_len,preview_pending,preview_mtime,origin,shared_by,foreign_generation"
+                + " FROM link_records" + (withForeign ? "" : " WHERE origin='own'") + " ORDER BY added_at,id", null)) {
             while (c.moveToNext()) {
                 Row r = new Row();
                 r.id = c.getString(0); r.owner = c.getString(1); r.linkId = c.getString(2); r.kind = c.getString(3); r.title = c.getString(4); r.mime = c.getString(5);
                 r.hash = c.getString(6); r.locators = c.getString(7); r.state = c.getString(8); r.removedReason = c.getString(9); r.previewFile = c.getString(10);
                 r.textSha = c.getString(11); r.previewSha = c.getString(12); r.modified = c.getLong(13); r.addedAt = c.getLong(14); r.stateSince = c.getLong(15);
                 r.shared = c.getLong(16); r.isProtected = c.getLong(17); r.titleEdited = c.getLong(18); r.textLen = c.getLong(19); r.previewLen = c.getLong(20); r.previewPending = c.getLong(21); r.previewMtime = c.getLong(22);
+                r.origin = c.getString(23); r.sharedBy = c.getString(24); r.foreignGeneration = c.getLong(25);
                 out.add(r);
             }
+        }
+        return out;
+    }
+
+    /** Identity-only view of the partner's rows (for keeping their cells while the computer cannot take them). */
+    private List<Row> foreignRows() {
+        List<Row> out = new ArrayList<>();
+        try (Cursor c = db.rawQuery("SELECT owner,link_id FROM link_records WHERE origin='foreign'", null)) {
+            while (c.moveToNext()) { Row r = new Row(); r.owner = c.getString(0); r.linkId = c.getString(1); out.add(r); }
         }
         return out;
     }
@@ -169,6 +201,7 @@ final class LinkSync {
             .put("title", r.title).put("title_user_edited", r.titleEdited);
         JSONObject filen = firstFilen(r.locators);
         if (filen != null) input.put("filen", filen);
+        if ("foreign".equals(r.origin)) input.put("origin", "foreign").put("shared_by", r.sharedBy).put("foreign_generation", r.foreignGeneration);
         String[] p = LinkBudget.presence(r.state, r.removedReason, r.stateSince);
         return input.put("presence", new JSONObject().put("state", p[0]).put("reason", p[1]).put("since", Long.parseLong(p[2])));
     }
@@ -206,7 +239,12 @@ final class LinkSync {
      */
     Plan plan(SyncProtocol.State state, String replica, TreeMap<String, Long> acknowledged, boolean withBlobs) throws IOException, JSONException {
         JSONObject projection = projection();
-        List<Row> rows = rows();
+        // S7-4: the partner's records are written only for a computer that announced it can show them. While it has not, they are left
+        // exactly as the projection has them (never turned into `gone` just because they are not read here).
+        boolean foreignOn = foreignPeer(db);
+        List<Row> rows = rows(foreignOn);
+        Set<String> held = new HashSet<>();
+        if (!foreignOn) for (Row r : foreignRows()) { String base = baseKey(r); if (base != null) held.add(base); }
         long[] added = new long[rows.size()]; boolean[] synced = new boolean[rows.size()]; String[] ids = new String[rows.size()];
         for (int i = 0; i < rows.size(); i++) {
             Row r = rows.get(i); added[i] = r.addedAt; ids[i] = r.id;
@@ -242,7 +280,7 @@ final class LinkSync {
         long now = Clock.now();
         for (String key : SyncProtocol.keys(projection)) {
             if (key.indexOf(']') != key.length() - 1) continue;   // identity keys only
-            if (present.contains(key)) continue;
+            if (present.contains(key) || held.contains(key)) continue;
             JSONObject presence = projection.optJSONObject(key + "/presence");
             if (presence != null && "gone".equals(presence.optString("state"))) { carry(projection, key, target); continue; }
             JSONObject identity = projection.getJSONObject(key);
@@ -252,6 +290,7 @@ final class LinkSync {
             JSONObject cells = gone.getJSONObject("cells");
             for (String suffix : SyncProtocol.keys(cells)) if (!cells.isNull(suffix)) target.put(key + suffix, cells.get(suffix));
         }
+        for (String base : held) carry(projection, base, target);
         // Carried cells (refused rows, deferred blobs) were copied into `target` above; now only the difference is written.
         Plan plan = new Plan(SyncProtocol.copy(projection));
         JSONObject changes = SyncGraph.diff(projection, target);

@@ -49,6 +49,7 @@ final class LinkSyncChecks {
         resolution(test, mark);
         resolutionReview(test, mark);
         purge(test, mark);
+        foreignRecords(test, mark);
     }
 
     // ---- fixtures ----------------------------------------------------------------------------------------------------
@@ -172,13 +173,13 @@ final class LinkSyncChecks {
             // Make it a real version 12 library: no digest columns, no projection table, no link triggers.
             String v12 = "id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,preview_file,added_at,received_at,title_user_edited,state_since,checked_at,revision,removed_reason";
             db.execSQL("CREATE TABLE link_old AS SELECT " + v12 + " FROM link_records");
-            db.execSQL("DROP TABLE link_records"); db.execSQL("ALTER TABLE link_old RENAME TO link_records"); db.execSQL("DROP TABLE sync_link_projection");
+            db.execSQL("DROP TABLE link_records"); db.execSQL("ALTER TABLE link_old RENAME TO link_records"); db.execSQL("DROP TABLE sync_link_projection"); db.execSQL("DROP TABLE partner_share_log");
             db.setVersion(12);
         } finally { first.close(); }
         LibraryDatabase second = new LibraryDatabase(isolated, name);
         try {
             SQLiteDatabase db = second.getWritableDatabase();
-            require(db.getVersion() == 13, "a version 12 library upgrades to 13");
+            require(db.getVersion() == 16, "a version 12 library upgrades to 16");
             try (Cursor c = db.rawQuery("SELECT title,text_sha,text_len,preview_sha,preview_len,preview_pending FROM link_records WHERE id=?", new String[]{id})) {
                 require(c.moveToFirst() && c.getString(0).equals("Old row") && c.getString(1).isEmpty() && c.getLong(2) == 0 && c.getString(3).isEmpty() && c.getLong(4) == 0 && c.getLong(5) == 0, "the row survives with empty digests and preview_pending 0");
             }
@@ -918,5 +919,61 @@ final class LinkSyncChecks {
             require(!part, "leftover .pdf.part files are removed");
         } finally { p.close(); }
         mark.accept("Link sync review: placePreviews fsyncs, restores the applying flag, removes leftovers and stale previews");
+    }
+
+    // ---- slice 7, S7-4: the partner's shared records travel to a computer that announced link_foreign, and only to that one -------
+
+    private static void foreignRecords(Instrumentation test, Consumer<String> mark) throws Exception {
+        Phone p = new Phone(test, "ls-foreign");
+        try {
+            PairingTransport transport = new PairingTransport(p.context, p.repo, "stack-checks-" + UUID.randomUUID());
+            String ownLink = UUID.randomUUID().toString(), partnerLink = UUID.randomUUID().toString(), id = UUID.randomUUID().toString();
+            p.publish(ownLink, "Mine", hash('7'), "my own words", null, false);
+            // The partner's record, stored the way the import stores it (origin foreign, name, generation, text in the search table).
+            android.content.ContentValues v = new android.content.ContentValues();
+            v.put("id", id); v.put("owner", OWNER); v.put("link_id", partnerLink); v.put("kind", "doc"); v.put("title", "Shared budget"); v.put("mime", MIME);
+            v.put("modified", 1_800_000_000_000L); v.put("hash", hash('8')); v.put("shared", 1); v.put("protected", 0);
+            v.put("locators", new JSONArray().put(new JSONObject().put("type", "filen").put("uuid", UUID.randomUUID().toString()).put("path", "/Shared/budget.sam")).toString());
+            v.put("state", "live"); v.put("state_since", 5); v.put("removed_reason", ""); v.put("added_at", 6); v.put("received_at", 6); v.put("checked_at", 0); v.put("revision", 1);
+            v.put("origin", "foreign"); v.put("shared_by", "Sam"); v.put("foreign_generation", 3); v.put("preview_file", "");
+            String partnerKey = key(partnerLink);
+            // A computer that announces links but NOT link_foreign (an older build): it never gets the record, however often we capture.
+            transport.onPeerHello(new HelloGate.Peer(true, true, false, false), true);
+            p.db.insertOrThrow("link_records", null, v);
+            p.db.execSQL("INSERT INTO link_search(record_id,title,body) VALUES(?,?,?)", new Object[]{id, "Shared budget", "partner giraffe words"});
+            require(LinkSync.dirty(p.db), "importing a shared record raises the link dirty flag (the triggers cover foreign rows)");
+            p.store.capture(); p.store.capture();
+            for (SyncProtocol.Operation op : p.state().history.values()) for (String k : SyncProtocol.keys(op.changes)) require(!k.startsWith(partnerKey), "an older computer never receives the partner's record");
+            require(!LinkSync.foreignPeer(p.db), "no flag without the announcement");
+            // The computer now announces link_foreign: the record is captured, with its three extra content fields and text.
+            transport.onPeerHello(new HelloGate.Peer(true, true, false, true), true);
+            require(LinkSync.foreignPeer(p.db), "the announcement is remembered");
+            SyncProtocol.State state = p.state();
+            JSONObject values = state.values();
+            JSONObject content = values.optJSONObject(partnerKey + "/content");
+            require(content != null && "foreign".equals(content.optString("origin")) && "Sam".equals(content.optString("shared_by")) && content.optLong("foreign_generation") == 3 && content.optInt("shared") == 1, "the content cell carries origin, shared_by and foreign_generation");
+            require(values.optJSONObject(partnerKey + "/text") != null && values.optJSONObject(partnerKey + "/title") != null, "text and title travel");
+            JSONObject mine = values.optJSONObject(key(ownLink) + "/content");
+            require(mine != null && !mine.has("origin"), "an own record keeps the five-field content cell");
+            // Unshare (Recently deleted, 'unshared') = a trashed presence the computer hides; restoring it brings it back.
+            p.links.trash(id, LinkStore.UNSHARED);
+            p.store.capture();
+            JSONObject presence = p.state().values().optJSONObject(partnerKey + "/presence");
+            require(presence != null && "trashed".equals(presence.optString("state")) && "deleted".equals(presence.optString("reason")), "unshare travels as trashed/deleted");
+            p.links.restore(id);
+            p.store.capture();
+            presence = p.state().values().optJSONObject(partnerKey + "/presence");
+            require(presence != null && "live".equals(presence.optString("state")), "restoring brings it back live");
+            // Delete for good (or the 30-day sweep) = gone, with the foreign fields nulled out.
+            p.db.execSQL("DELETE FROM link_records WHERE id=?", new Object[]{id});
+            p.store.capture();
+            values = p.state().values();
+            presence = values.optJSONObject(partnerKey + "/presence");
+            require(presence != null && "gone".equals(presence.optString("state")) && values.isNull(partnerKey + "/content"), "removing the copy for good is gone");
+            // Nothing ever travels back: a received bundle cannot change a shared record (it is phone-authoritative).
+            // (LinkStore.applyOne skips foreign rows; the 'foreign skipped' check is in PartnerImportChecks.)
+            for (SyncProtocol.Operation op : p.state().history.values()) if (!op.replica.equals(p.replica())) for (String k : SyncProtocol.keys(op.changes)) require(!k.startsWith(partnerKey), "the computer wrote nothing about the partner's record");
+        } finally { p.close(); }
+        mark.accept("Link sync (S7-4): the partner's shared records reach only a computer that announced link_foreign; unshare = trashed, delete = gone; nothing comes back");
     }
 }

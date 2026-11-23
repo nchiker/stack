@@ -74,6 +74,69 @@ fn sync_settings_exposes_only_connection_and_everyday_actions() {
         });
 }
 
+fn linked_for_view(foreign: bool) -> stack_core::LinkedDocument {
+    stack_core::LinkedDocument {
+        id: stack_archive::synthetic::id(5001),
+        owner: "org.example.amipro".into(),
+        link_id: stack_archive::synthetic::id(7001),
+        kind: "doc".into(),
+        title: "Shared budget".into(),
+        mime: "application/pdf".into(),
+        modified: 1,
+        added_at: 5,
+        state: if foreign { "live" } else { "unreachable" }.into(),
+        hash: "a".repeat(64),
+        text: "quarterly zebra budget".into(),
+        preview: None,
+        remembered_file: None,
+        foreign,
+        shared_by: if foreign { "Sam".into() } else { String::new() },
+    }
+}
+
+/// A document the partner shares: the saved text with a "Shared by" line and the phone-only notice, and no Open of
+/// any kind. The person's own linked document still offers "Open in Ami Pro".
+#[test]
+fn a_shared_linked_document_shows_who_shared_it_and_offers_no_open() {
+    let _serial = CONTROLLERS.lock().unwrap();
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            let root = tempfile::tempdir().unwrap();
+            let mut driver = Driver::new(root.path().join("library"));
+            driver.settle().await;
+            let size = iced::Size::new(1080., 780.);
+            driver.app.linked = Some(linked_for_view(true));
+            let labels = workspace_labels(&driver.app, size);
+            assert!(labels.iter().any(|l| l == "Shared by Sam"), "{labels:?}");
+            assert!(
+                labels
+                    .iter()
+                    .any(|l| l == "Opening needs your phone: it opens through Filen Files."),
+                "{labels:?}"
+            );
+            assert!(labels.iter().any(|l| l.contains("quarterly zebra budget")));
+            assert!(
+                !labels
+                    .iter()
+                    .any(|l| l.contains("Open in Ami Pro") || l == "Open"),
+                "{labels:?}"
+            );
+            assert!(driver.app.ami_button_state().is_none());
+            driver.app.linked = Some(linked_for_view(false));
+            let labels = workspace_labels(&driver.app, size);
+            assert!(labels.iter().any(|l| l == "Open in Ami Pro"), "{labels:?}");
+            assert!(!labels.iter().any(|l| l.contains("Shared by")));
+            assert_eq!(
+                crate::workspace::linked_caption("Sam"),
+                "Shared by Sam"
+            );
+            assert_eq!(crate::workspace::linked_caption(""), "Linked document");
+        });
+}
+
 /// A synthetic encrypted backup in `root` (key bytes 1..=32), with one linked document when asked.
 /// Returns the file and the key as 64 hex characters.
 fn encrypted_backup(root: &Path, with_link: bool) -> (PathBuf, String) {

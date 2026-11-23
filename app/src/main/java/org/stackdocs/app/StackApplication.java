@@ -23,13 +23,17 @@ public final class StackApplication extends Application {
     void addLibraryListener(Runnable listener) { listeners.add(listener); }
     void removeLibraryListener(Runnable listener) { listeners.remove(listener); }
     void notifyLibraryChanged() { SyncJob.changed(this); notifySyncChanged(); }
-    void notifySyncChanged() { ui.post(() -> { for (Runnable listener : listeners) listener.run(); }); }
+    void notifySyncChanged() { PartnerShare.changed(this); refreshListeners(); }
+    /** Tells open screens to redraw, without asking for a partner-share publish (the publisher itself uses this, so it cannot loop). */
+    void refreshListeners() { ui.post(() -> { for (Runnable listener : listeners) listener.run(); }); }
     private android.app.Activity foreground;
     private final java.util.concurrent.atomic.AtomicBoolean finding=new java.util.concurrent.atomic.AtomicBoolean();
     private final Runnable automaticSync=new Runnable(){public void run(){
         if(foreground!=null&&access.allowed()&&!resetRequested){
             if(!SyncJob.preferences(StackApplication.this).getString("sync_peer_name","").isEmpty())SyncJob.kick(StackApplication.this,null);
             AutoBackup.kickIfDue(StackApplication.this);
+            PartnerShare.retryIfNeeded(StackApplication.this);
+            PartnerImport.daily(StackApplication.this);
             UpdateCheck.checkIfDue(StackApplication.this);
             if(foreground instanceof LibraryActivity&&finding.compareAndSet(false,true)){
                 android.app.Activity owner=foreground;
@@ -43,11 +47,12 @@ public final class StackApplication extends Application {
     @Override public void onCreate() {
         super.onCreate();
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks(){
-            public void onActivityResumed(android.app.Activity activity){if(activity instanceof LibraryActivity&&!activity.getClass().getSimpleName().equals("IsolatedCheckActivity")){foreground=activity;ui.removeCallbacks(automaticSync);ui.post(automaticSync);}}
+            public void onActivityResumed(android.app.Activity activity){if(activity instanceof LibraryActivity&&!activity.getClass().getSimpleName().equals("IsolatedCheckActivity")){foreground=activity;ui.removeCallbacks(automaticSync);ui.post(automaticSync);PartnerImport.onForeground(StackApplication.this);}}
             public void onActivityPaused(android.app.Activity activity){if(foreground==activity)foreground=null;}
             public void onActivityCreated(android.app.Activity a,android.os.Bundle b){}public void onActivityStarted(android.app.Activity a){}public void onActivityStopped(android.app.Activity a){}public void onActivitySaveInstanceState(android.app.Activity a,android.os.Bundle b){}public void onActivityDestroyed(android.app.Activity a){}
         });
         access=new AccessPolicy(this);
+        PartnerImport.watch(this);
         library = new LibraryRepository(this);
         photos=new PhotoMonitor(this);
         metadata=new MetadataWorker(this);

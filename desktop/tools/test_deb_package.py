@@ -131,6 +131,55 @@ def static_checks(deb, work):
     pins = json.loads((DESKTOP / 'runtime/pdfium/ENGINE.json').read_text())['files']
     bad = [r for r, d in pins.items() if hashlib.sha256((stage / 'usr/lib/stack-docs/runtime/pdfium' / r).read_bytes()).hexdigest() != d]
     report('FAIL' if bad else 'PASS', 'pdfium-runtime-pinned', ', '.join(bad) if bad else 'hashes match ENGINE.json')
+    # Self-configuring updates: the keyring ships, and postinst adds the source once, without touching an existing one.
+    keyring = stage / 'usr/share/keyrings/stack-docs-archive-keyring.gpg'
+    report('PASS' if keyring.is_file() and keyring.stat().st_size > 100 else 'FAIL', 'update-keyring', 'public key shipped' if keyring.is_file() else 'missing')
+    # The key shipped is the key in packaging/: same fingerprint(s) in the armored source file and in the installed keyring.
+    def fingerprints(data):
+        home = work / 'gnupg-show'
+        home.mkdir(mode=0o700, exist_ok=True)
+        out = subprocess.run(['gpg', '--batch', '--show-keys', '--with-colons', '--fingerprint', '-'], input=data, capture_output=True,
+                             env={**os.environ, 'GNUPGHOME': str(home)}).stdout.decode()
+        return sorted(l.split(':')[9] for l in out.splitlines() if l.startswith('fpr:'))
+    shipped = fingerprints(keyring.read_bytes()) if keyring.is_file() else []
+    packaged = fingerprints((DESKTOP / 'packaging/stack-apt-public.asc').read_bytes())
+    report('PASS' if shipped and shipped == packaged else 'FAIL', 'update-key-fingerprint', 'shipped key matches packaging/stack-apt-public.asc' if shipped and shipped == packaged else 'the shipped key differs from packaging/stack-apt-public.asc')
+    control = work / 'control'
+    run(['dpkg-deb', '-e', deb, control])
+    scripts_ok = all((control / n).is_file() and run(['sh', '-n', control / n])[0] == 0 for n in ('postinst', 'postrm'))
+    report('PASS' if scripts_ok else 'FAIL', 'maintainer-scripts', 'postinst and postrm parse')
+    sandbox = work / 'sandbox'
+    (sandbox / 'etc/apt/sources.list.d').mkdir(parents=True)
+    def patched(name):
+        text = (control / name).read_text().replace('/etc/apt', str(sandbox / 'etc/apt')).replace('/var/lib/dpkg/info', str(sandbox / 'info'))
+        path = sandbox / name
+        path.write_text(text)
+        return path
+    source = sandbox / 'etc/apt/sources.list.d/stack-docs.sources'
+    run(['sh', patched('postinst'), 'configure'])
+    first = source.read_text() if source.is_file() else ''
+    ok = 'URIs: https://nchiker.github.io/stack-flatpak/apt/' in first and 'Signed-By: /usr/share/keyrings/stack-docs-archive-keyring.gpg' in first
+    source.write_text('# edited by the user\n' + first)
+    run(['sh', patched('postinst'), 'configure'])
+    ok = ok and source.read_text().startswith('# edited by the user')
+    run(['sh', patched('postrm'), 'upgrade'])
+    ok = ok and source.exists()
+    run(['sh', patched('postrm'), 'remove'])
+    ok = ok and not source.exists()
+    source.write_text(first)
+    run(['sh', patched('postrm'), 'purge'])
+    ok = ok and not source.exists()
+    (sandbox / 'info').mkdir(exist_ok=True)
+    (sandbox / 'info/stack-docs-apt-source.list').write_text('')
+    source.write_text(first)
+    run(['sh', patched('postrm'), 'remove'])
+    ok = ok and source.exists()
+    (sandbox / 'info/stack-docs-apt-source.list').unlink()
+    source.unlink(missing_ok=True)
+    (sandbox / 'etc/apt/sources.list.d/other.sources').write_text('URIs: https://nchiker.github.io/stack-flatpak/apt/\n')
+    run(['sh', patched('postinst'), 'configure'])
+    ok = ok and not source.exists()
+    report('PASS' if ok else 'FAIL', 'update-source-postinst', 'adds the source once and leaves an existing one alone')
     # Dependency simulation against this machine's package lists (no root, nothing installed).
     rc, out = run(['apt-get', '-s', 'install', str(deb)], timeout=300)
     inst = [l for l in out.splitlines() if l.startswith('Inst ')]

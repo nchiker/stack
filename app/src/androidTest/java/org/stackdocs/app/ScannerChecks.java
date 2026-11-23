@@ -43,7 +43,8 @@ public final class ScannerChecks extends Instrumentation {
     private boolean features,backupLayout,navigationOnly,backupUi,archivePerformance,archiveOnly,archivePrepare,archiveResume;
     private String archiveBoundary;
     private Bundle syncArguments;
-    private boolean longWorkflow,workflowOnly,providerWorkflow,workflowUi,namingOnly,linkContract,linkSync,linkE2e,linkSeed,linkUnseed;
+    private String filenSeed,filenShow,filenLocate,filenLookup;
+    private boolean longWorkflow,workflowOnly,providerWorkflow,workflowUi,namingOnly,shareArchive,partnerPublish,partnerImport,partnerFilen,linkContract,linkSync,linkLan,linkE2e,linkSeed,linkUnseed;
     private boolean suggestionPrepare,suggestionResume, suggestionUi, suggestionCorpus, suggestionsOnly, baseline, qualityOnly, ocrOnly, preserveOnly, restartPrepare, restartResume, corpusOnly;
 
     @Override public void onCreate(Bundle arguments) {
@@ -66,10 +67,16 @@ public final class ScannerChecks extends Instrumentation {
         providerWorkflow=arguments!=null && "true".equals(arguments.getString("providerWorkflow"));
         workflowUi=arguments!=null && "true".equals(arguments.getString("workflowUi"));
         namingOnly=arguments!=null && "true".equals(arguments.getString("namingOnly"));
+        shareArchive=arguments!=null && "true".equals(arguments.getString("shareArchive"));
+        partnerPublish=arguments!=null && "true".equals(arguments.getString("partnerPublish"));
+        partnerImport=arguments!=null && "true".equals(arguments.getString("partnerImport"));
+        partnerFilen=arguments!=null && "true".equals(arguments.getString("partnerFilen"));
         linkContract=arguments!=null && "true".equals(arguments.getString("linkContract"));
         linkSync=arguments!=null && "true".equals(arguments.getString("linkSync"));
+        linkLan=arguments!=null && "true".equals(arguments.getString("linkLan"));
         linkE2e=arguments!=null && "true".equals(arguments.getString("linkE2e"));
         linkSeed=arguments!=null && "true".equals(arguments.getString("linkSeed"));
+        filenSeed=arguments==null?null:arguments.getString("filenSeed");filenShow=arguments==null?null:arguments.getString("filenShow");filenLocate=arguments==null?null:arguments.getString("filenLocate");filenLookup=arguments==null?null:arguments.getString("filenLookup");
         linkUnseed=arguments!=null && "true".equals(arguments.getString("linkUnseed"));
         suggestionCorpusAsset=arguments==null ? "suggestions-corpus.json" : arguments.getString("suggestionCorpusAsset","suggestions-corpus.json");
         if(!suggestionCorpusAsset.equals("suggestions-corpus.json") && !suggestionCorpusAsset.equals("naming-followup-corpus.json") && !suggestionCorpusAsset.equals("p0-final-corpus.json")) throw new IllegalArgumentException("Unknown authored corpus");
@@ -164,8 +171,17 @@ public final class ScannerChecks extends Instrumentation {
             else if(workflowUi) WorkflowUiChecks.run(this,new IsolatedContext(getTargetContext()),this::mark);
             else if(namingOnly) NamingChecks.run(this::mark);
             else if(linkSync) LinkSyncChecks.run(this,this::mark);
+            else if(linkLan) LinkLanChecks.run(this,syncArguments,this::mark);
             else if(linkE2e) LinkLifecycleChecks.endToEnd(getTargetContext(),this::mark);
+            else if(shareArchive) {ShareArchiveChecks.runEnvelope(this::mark);ShareArchiveChecks.run(this::mark);}
+            else if(partnerPublish) PartnerPublishChecks.run(getTargetContext(),this::mark);
+            else if(partnerImport) PartnerImportChecks.run(getTargetContext(),this::mark);
+            else if(partnerFilen) PartnerFilenChecks.run(this::mark);
             else if(linkContract) {LinkContractChecks.run(this::mark);LinkStoreChecks.run(new IsolatedContext(getTargetContext()),this::mark);LinkProviderChecks.run(getTargetContext(),this::mark);LinkLifecycleChecks.run(getTargetContext(),getContext().getPackageName(),this::mark);LinkUiChecks.run(getTargetContext(),new IsolatedContext(getTargetContext()),this::mark);}
+            else if(filenSeed!=null) {mark("Seeded: "+FilenSeedChecks.seed(getTargetContext(),filenSeed.split(",")[0],filenSeed.split(",")[1]).trim());}
+            else if(filenLocate!=null) {mark(FilenSeedChecks.call(getTargetContext(),"locate",filenLocate).trim());}
+            else if(filenLookup!=null) {mark(FilenSeedChecks.call(getTargetContext(),"lookup",filenLookup).trim());}
+            else if(filenShow!=null) {mark("Now: "+FilenSeedChecks.show(getTargetContext(),filenShow).trim());}
             else if(linkSeed) {LinkUiChecks.seed(getTargetContext());mark("Seeded two linked documents");}
             else if(linkUnseed) {LinkUiChecks.unseed(getTargetContext(),(StackApplication)getTargetContext().getApplicationContext());mark("Removed seeded linked documents");}
             else if (restartPrepare || restartResume) OcrRestartChecks.run(new IsolatedContext(getTargetContext(),"ocr-restart-"+restartKey),restartPrepare,this::mark);

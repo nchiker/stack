@@ -28,6 +28,17 @@ BINARIES = ('stack-desktop', 'stack-cli', 'stack-transport')
 # Libraries the graphics/UI toolkit opens at run time (so the linker scan cannot see them).
 RUNTIME_DEPENDS = ['libwayland-client0', 'libegl1', 'libvulkan1', 'libx11-6', 'libx11-xcb1', 'libxkbcommon0']
 RECOMMENDS = ['xdg-desktop-portal', 'xdg-desktop-portal-cosmic | xdg-desktop-portal-gtk', 'gnome-keyring | libsecret-1-0']
+# The 138 MB source archive is too big for GitHub Pages: it is built next to the deb and published as a release asset.
+SOURCE_URL = 'https://github.com/nchiker/stack/releases/tag/desktop-v{version}'
+KEYRING = '/usr/share/keyrings/stack-docs-archive-keyring.gpg'
+SOURCES_FILE = '/etc/apt/sources.list.d/stack-docs.sources'
+SOURCES_TEXT = f'''Types: deb
+URIs: https://nchiker.github.io/stack-flatpak/apt/
+Suites: stable
+Components: main
+Architectures: amd64
+Signed-By: {KEYRING}
+'''
 MAINTAINER = 'Stack contributors <https://github.com/nchiker/stack>'
 
 
@@ -123,11 +134,16 @@ def main():
     metadata = json.loads(subprocess.check_output(
         ['cargo', 'metadata', '--manifest-path', str(ROOT / 'Cargo.toml'), '--locked', '--offline', '--format-version', '1',
          '--filter-platform', 'x86_64-unknown-linux-gnu'], text=True, env={**os.environ}))
-    package_notices(ROOT, doc, metadata)
+    package_notices(ROOT, doc, metadata, archive_dir=output, source_url=SOURCE_URL.format(version=version))
     (doc / 'copyright').write_text(
         'Stack is licensed under the Apache License 2.0 (notices/Stack-Apache-2.0.txt).\n'
         'Bundled third-party components (PDFium, Tesseract, Leptonica, Rust crates) and their licenses are listed under\n'
         f'/usr/share/doc/{PACKAGE}/notices/ and /usr/lib/{PACKAGE}/runtime/*/notices.\n')
+    # Self-configuring updates: the package carries the PUBLIC signing key and adds the apt source on install (Chrome-style), so
+    # one downloaded package is the whole first install and the system updater offers every later version.
+    keyring = subprocess.check_output(['gpg', '--dearmor'], input=(ROOT / 'packaging/stack-apt-public.asc').read_bytes())
+    (tree / KEYRING[1:]).parent.mkdir(parents=True, exist_ok=True)
+    (tree / KEYRING[1:]).write_bytes(keyring)
     normalise(tree)
     # Dependencies: the linker scan of the programs and bundled engines, plus the toolkit's run-time libraries.
     lib_dirs = [tree / LIB / 'runtime/ocr/lib', tree / LIB / 'runtime/pdfium/lib']
@@ -150,6 +166,22 @@ def main():
         ' Import documents, organize them into stacks, search printed English text\n'
         ' offline and keep saved changes in sync with an approved nearby Android phone.\n'
         ' PDF preview and offline text reading are bundled; nothing is downloaded.\n')
+    postinst = (
+        '#!/bin/sh\nset -e\n'
+        f'SRC={SOURCES_FILE}\n'
+        '# Add the update source unless an earlier package (stack-docs-apt-source) or the user already has one.\n'
+        'if [ "$1" = configure ] && [ ! -e "$SRC" ] && ! grep -rqs "nchiker.github.io/stack-flatpak/apt" /etc/apt/sources.list.d /etc/apt/sources.list 2>/dev/null; then\n'
+        '  cat > "$SRC" <<EOF\n' + SOURCES_TEXT + 'EOF\n'
+        '  chmod 644 "$SRC"\n'
+        'fi\nexit 0\n')
+    postrm = (
+        '#!/bin/sh\nset -e\n'
+        f'# Remove the update source with the program (not on upgrade), unless stack-docs-apt-source still owns it. The keyring file belongs to the\n'
+        f'# package, so dpkg handles it; nothing here touches it on remove.\n'
+        f'if {{ [ "$1" = remove ] || [ "$1" = purge ]; }} && [ ! -e /var/lib/dpkg/info/stack-docs-apt-source.list ]; then rm -f {SOURCES_FILE}; fi\nexit 0\n')
+    for name, text in (('postinst', postinst), ('postrm', postrm)):
+        (debian / name).write_text(text)
+        (debian / name).chmod(0o755)
     (debian / 'md5sums').write_text(''.join(f'{hashlib.md5(p.read_bytes()).hexdigest()}  {p.relative_to(tree)}\n' for p in files))
     deb = output / f'{PACKAGE}_{version}_amd64.deb'
     subprocess.run(['dpkg-deb', '--root-owner-group', '-Zxz', '--build', str(tree), str(deb)], check=True, stdout=subprocess.DEVNULL)

@@ -2,7 +2,8 @@
 """Run every automatable Stack check and print a short PASS/FAIL summary.
 
 Start it with no arguments:  python3 desktop/tools/run_all_checks.py
-(or double-click "Run Stack checks.desktop" in the repo root).  Optional: --large adds the slow size-and-limits step.
+(or double-click "Run Stack checks.desktop" in the repo root).  Optional: --large adds the slow size-and-limits step;
+--lan adds the real-LAN link sync run (phone-link-lan: needs the test phone, takes several minutes, skipped otherwise).
 
 Dev-only tool, standard library only. It reuses the existing checks and never installs anything on the phone.
 Synthetic public test key only; logs are scrubbed of key-like text and kept in a fresh folder under /tmp.
@@ -277,9 +278,29 @@ def deb_package_checks(cargo_env):
         shutil.rmtree(out.parent, ignore_errors=True)
 
 
+def apt_repo_checks():
+    """Publish a fake package into a temp apt repository with a throwaway key and check signatures and
+    `apt-get -s` in a private apt root (tools/test_apt_repo.py). No network, nothing installed or pushed."""
+    name = 'apt-repo'
+    begin(name)
+    try:
+        t = subprocess.run([sys.executable, str(TOOLS / 'test_apt_repo.py')], capture_output=True, timeout=900)
+        text = t.stdout.decode(errors='replace') + t.stderr.decode(errors='replace')
+        save_log(name, text)
+        bad = [l for l in text.splitlines() if l.startswith('FAIL')]
+        if t.returncode or bad:
+            report('FAIL', name, scrub(bad[0])[:140] if bad else last_line(text))
+        else:
+            report('PASS', name, f'{sum(l.startswith("PASS") for l in text.splitlines())} checks')
+    except (OSError, subprocess.SubprocessError) as e:
+        report('FAIL', name, f'{type(e).__name__}: {e}')
+        save_log(name, str(e))
+
+
 def main():
     global logdir
     large = '--large' in sys.argv[1:]
+    lan = '--lan' in sys.argv[1:]
     stamp = datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
     logdir = Path('/tmp') / f'stack-checks-{stamp}'
     logdir.mkdir(mode=0o700)
@@ -292,12 +313,14 @@ def main():
     run_step('desktop-unit-tests', ['cargo', 'test', '--offline', '-p', 'stack-archive', '-p', 'stack-core', '-p', 'stack-cli', '-p', 'stack-desktop'],
              cwd=REPO / 'desktop', env=cargo_env)
     run_step('safety-guards-selftest', [py, '-I', TOOLS / 'test_android_archive_interop.py', '--selftest'])
+    run_step('link-lan-selftest', [py, '-I', TOOLS / 'test_android_link_lan.py', '--selftest'])
     run_step('java-vs-rust', [py, '-I', TOOLS / 'test_archive_envelope_host.py'])
     desk = [py, '-I', TOOLS / 'test_android_archive_interop.py', '--desktop-only', '--output', logdir / 'interop-desktop']
     run_step('desktop-interop', desk + (['--large'] if large else []))
 
     flatpak_key_store(cargo_env)
     deb_package_checks(cargo_env)
+    apt_repo_checks()
 
     adb, why = phone_state()
     if adb is None:
@@ -312,6 +335,14 @@ def main():
         run_step('phone-interop', full, timeout=3600 if not large else 7200)
         for name, option in (('phone-link-contract', 'linkContract'), ('phone-archive', 'archiveOnly'), ('phone-features', 'features'), ('phone-link-sync', 'linkSync')):
             phone_suite(adb, name, option)
+
+    if not lan:
+        report('SKIP', 'phone-link-lan', 'opt-in: run with --lan')
+    elif adb is None:
+        report('SKIP', 'phone-link-lan', 'no test phone: ' + why)
+    else:
+        run_step('phone-link-lan', [py, '-I', TOOLS / 'test_android_link_lan.py', '--scenario', 'all', '--build', '--adb', ADB, '--adb-port', ADB_PORT,
+                                    '--output', logdir / 'link-lan'], env=cargo_env, timeout=7200)
 
     counts = {s: sum(1 for r in results if r[0] == s) for s in ('PASS', 'FAIL', 'SKIP')}
     minutes = (time.time() - started) / 60

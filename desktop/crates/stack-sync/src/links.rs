@@ -23,6 +23,8 @@ pub const MAX_SAFE: i64 = 9_007_199_254_740_991;
 pub const MAX_LINKS: usize = 1000;
 pub const MAX_TITLE_UNITS: usize = 200;
 pub const MAX_OWNER_UNITS: usize = 200;
+/// The partner's name on the "Shared by" badge (the phone cleans it to 40; the wire allows a little more).
+pub const MAX_SHARED_BY_UNITS: usize = 100;
 pub const MAX_FILEN_UNITS: usize = 1024;
 pub const MAX_TEXT_BYTES: u64 = 1_048_576;
 pub const MAX_PREVIEW_BYTES: u64 = 33_554_432;
@@ -172,7 +174,19 @@ pub fn validate_cell(rest: &str, value: &Value) -> Result<()> {
             }
         }
         "/content" => {
-            validation::keys(value, "hash,mime,modified,shared,protected")?;
+            // Slice 7 (S7-4): a record the partner shares carries three more fields, all or none. Only a writer that
+            // saw the peer announce `link_foreign` writes them; an older reader refuses the shape, which is why.
+            if value.get("origin").is_some() {
+                validation::keys(
+                    value,
+                    "hash,mime,modified,shared,protected,origin,shared_by,foreign_generation",
+                )?;
+                bounded(&value["origin"], RECV_KIND_UNITS)?;
+                bounded(&value["shared_by"], MAX_SHARED_BY_UNITS)?;
+                int(&value["foreign_generation"], 0, MAX_SAFE)?;
+            } else {
+                validation::keys(value, "hash,mime,modified,shared,protected")?;
+            }
             bounded(&value["hash"], RECV_SHORT_UNITS)?;
             bounded(&value["mime"], RECV_MIME_UNITS)?;
             int(&value["modified"], 0, MAX_SAFE)?;
@@ -349,6 +363,15 @@ pub struct LinkFilen {
     pub path: String,
 }
 
+/// Slice 7: the partner's record on this phone. Phone-authoritative; the computer only mirrors it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LinkForeign {
+    /// The partner's display name chosen at pairing ("Shared by <name>").
+    pub shared_by: String,
+    /// The generation number of the share archive the record came from.
+    pub generation: i64,
+}
+
 /// One local link row as the writer sees it (phone `link_records` + `link_search`,
 /// or a desktop row). `text` is the searchable text itself; `preview` is the
 /// digest of the preview file (already hashed by the caller).
@@ -374,6 +397,8 @@ pub struct LinkInput {
     /// null) so a previously synced blob cell is left alone.
     pub omit_text: bool,
     pub omit_preview: bool,
+    /// `Some` for a record the partner shares (origin `foreign`). Never set on the computer's own rows.
+    pub foreign: Option<LinkForeign>,
 }
 
 impl LinkInput {
@@ -477,11 +502,20 @@ pub fn writer_self_check(row: &LinkInput, captured_before: usize) -> WriterResul
     if !valid_free(&row.title, MAX_TITLE_UNITS) {
         return WriterResult::refused("title");
     }
-    cells.insert(
-        "/content".to_owned(),
-        json!({"hash": row.hash, "mime": row.mime, "modified": row.modified,
-               "shared": u8::from(row.shared), "protected": u8::from(row.protected)}),
-    );
+    let mut content = json!({"hash": row.hash, "mime": row.mime, "modified": row.modified,
+               "shared": u8::from(row.shared), "protected": u8::from(row.protected)});
+    if let Some(foreign) = &row.foreign {
+        if !valid_free(&foreign.shared_by, MAX_SHARED_BY_UNITS) {
+            return WriterResult::refused("shared_by");
+        }
+        if !range.contains(&foreign.generation) {
+            return WriterResult::refused("foreign_generation");
+        }
+        content["origin"] = json!("foreign");
+        content["shared_by"] = json!(foreign.shared_by);
+        content["foreign_generation"] = json!(foreign.generation);
+    }
+    cells.insert("/content".to_owned(), content);
     cells.insert(
         "/title".to_owned(),
         json!({"title": row.title, "title_user_edited": u8::from(row.title_user_edited)}),
@@ -710,6 +744,8 @@ pub struct LinkContent {
     pub modified: i64,
     pub shared: bool,
     pub protected: bool,
+    /// `Some` when the phone says the record is the partner's (read-only on the computer).
+    pub foreign: Option<LinkForeign>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -810,7 +846,25 @@ fn parse_link(
             let modified = c["modified"]
                 .as_i64()
                 .filter(|n| (0..=MAX_SAFE).contains(n))?;
+            let foreign = match c.get("origin") {
+                None => None,
+                Some(origin) => {
+                    if origin != "foreign" {
+                        return None;
+                    }
+                    Some(LinkForeign {
+                        shared_by: c["shared_by"]
+                            .as_str()
+                            .filter(|n| valid_free(n, MAX_SHARED_BY_UNITS))?
+                            .to_owned(),
+                        generation: c["foreign_generation"]
+                            .as_i64()
+                            .filter(|n| (0..=MAX_SAFE).contains(n))?,
+                    })
+                }
+            };
             Some(LinkContent {
+                foreign,
                 hash: hash.to_owned(),
                 mime: mime.to_owned(),
                 modified,
@@ -955,6 +1009,7 @@ mod tests {
             },
             omit_text: false,
             omit_preview: false,
+            foreign: None,
         }
     }
 
@@ -1135,6 +1190,82 @@ mod tests {
         let key = link_key(OWNER, &upper);
         let cell = json!({"owner": OWNER, "link_id": upper, "kind": "pdf", "added_at": 1});
         assert!(crate::graph::validate_changes(&Cells::from([(key, cell)])).is_err());
+    }
+
+    fn foreign_row(n: u32) -> LinkInput {
+        let mut r = row(n);
+        r.shared = true;
+        r.foreign = Some(LinkForeign {
+            shared_by: "Sam".into(),
+            generation: 3,
+        });
+        r
+    }
+
+    #[test]
+    fn foreign_fields_travel_in_the_content_cell_and_come_back_out() {
+        let built = link_cells(&[foreign_row(1)]);
+        assert!(built.refused.is_empty());
+        let content = &built.cells[&format!("{}/content", foreign_row(1).key())];
+        assert_eq!(content["origin"], "foreign");
+        assert_eq!(content["shared_by"], "Sam");
+        assert_eq!(content["foreign_generation"], 3);
+        crate::graph::validate_changes(&built.cells).unwrap();
+        let projected = project_links(&built.cells, &BTreeSet::new());
+        assert_eq!(projected.skipped, 0);
+        let foreign = projected.rows[0].content.as_ref().unwrap().foreign.clone();
+        assert_eq!(
+            foreign,
+            Some(LinkForeign {
+                shared_by: "Sam".into(),
+                generation: 3
+            })
+        );
+        // An own row keeps the five-field cell and projects with no foreign part.
+        let own = link_cells(&[row(2)]);
+        assert!(
+            own.cells[&format!("{}/content", row(2).key())]
+                .get("origin")
+                .is_none()
+        );
+        let projected = project_links(&own.cells, &BTreeSet::new());
+        assert_eq!(projected.rows[0].content.as_ref().unwrap().foreign, None);
+    }
+
+    #[test]
+    fn foreign_writer_refuses_a_bad_name_or_generation_and_never_marks_gone_rows() {
+        let mut blank = foreign_row(1);
+        blank.foreign.as_mut().unwrap().shared_by = String::new();
+        assert_eq!(writer_self_check(&blank, 0).outcome, WriterOutcome::RowRefused);
+        let mut long = foreign_row(1);
+        long.foreign.as_mut().unwrap().shared_by = "a".repeat(MAX_SHARED_BY_UNITS + 1);
+        assert_eq!(writer_self_check(&long, 0).outcome, WriterOutcome::RowRefused);
+        let mut huge = foreign_row(1);
+        huge.foreign.as_mut().unwrap().generation = MAX_SAFE + 1;
+        assert_eq!(writer_self_check(&huge, 0).outcome, WriterOutcome::RowRefused);
+        let mut gone = foreign_row(1);
+        gone.presence = LinkPresence {
+            state: LinkState::Gone,
+            reason: "deleted".into(),
+            since: 5,
+        };
+        let result = writer_self_check(&gone, 0);
+        assert_eq!(result.cells["/content"], Value::Null);
+    }
+
+    #[test]
+    fn a_partial_or_mistyped_foreign_content_cell_is_refused_on_receive() {
+        let key = "[\"org.stackdocs.test\",\"30000000-0000-0000-0000-000000000001\"]/content";
+        let full = json!({"hash": SHA_A, "mime": "application/pdf", "modified": 1, "shared": 1, "protected": 0,
+            "origin": "foreign", "shared_by": "Sam", "foreign_generation": 1});
+        validate_cell(key, &full).unwrap();
+        for broken in [
+            json!({"hash": SHA_A, "mime": "application/pdf", "modified": 1, "shared": 1, "protected": 0, "origin": "foreign"}),
+            json!({"hash": SHA_A, "mime": "application/pdf", "modified": 1, "shared": 1, "protected": 0, "origin": "foreign", "shared_by": "Sam", "foreign_generation": -1}),
+            json!({"hash": SHA_A, "mime": "application/pdf", "modified": 1, "shared": 1, "protected": 0, "origin": "foreign", "shared_by": 7, "foreign_generation": 1}),
+        ] {
+            assert!(validate_cell(key, &broken).is_err());
+        }
     }
 
     #[test]

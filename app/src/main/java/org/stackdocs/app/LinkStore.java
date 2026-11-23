@@ -23,11 +23,21 @@ final class LinkStore {
         final String id, owner, linkId, kind, title, mime, hash, locators, state, excerpt;
         final long modified, addedAt;
         final boolean shared, isProtected, hasPreview;
+        /** Stack's own "Share with partner" switch: 0 off, 1 on, 2 on with a protected link confirmed. */
+        final int partnerShare;
+        /** A record the partner shares with this phone (read-only, never checked with the owner app), and the name to show on its badge. */
+        final boolean foreign; final String sharedBy;
+        /** An own record (not shared by the partner). */
         Link(String id, String owner, String linkId, String kind, String title, String mime, String hash, String locators, String state,
-             String excerpt, long modified, long addedAt, boolean shared, boolean isProtected, boolean hasPreview) {
+             String excerpt, long modified, long addedAt, boolean shared, boolean isProtected, boolean hasPreview, int partnerShare) {
+            this(id, owner, linkId, kind, title, mime, hash, locators, state, excerpt, modified, addedAt, shared, isProtected, hasPreview, partnerShare, false, "");
+        }
+        Link(String id, String owner, String linkId, String kind, String title, String mime, String hash, String locators, String state,
+             String excerpt, long modified, long addedAt, boolean shared, boolean isProtected, boolean hasPreview, int partnerShare, boolean foreign, String sharedBy) {
+            this.foreign = foreign; this.sharedBy = sharedBy;
             this.id = id; this.owner = owner; this.linkId = linkId; this.kind = kind; this.title = title; this.mime = mime; this.hash = hash;
             this.locators = locators; this.state = state; this.excerpt = excerpt; this.modified = modified; this.addedAt = addedAt;
-            this.shared = shared; this.isProtected = isProtected; this.hasPreview = hasPreview;
+            this.shared = shared; this.isProtected = isProtected; this.hasPreview = hasPreview; this.partnerShare = partnerShare;
         }
     }
 
@@ -37,7 +47,7 @@ final class LinkStore {
         Result(String id, boolean created, boolean contentChanged, String duplicateOf) { this.id = id; this.created = created; this.contentChanged = contentChanged; this.duplicateOf = duplicateOf; }
     }
 
-    private static final String COLUMNS = "id,owner,link_id,kind,title,mime,hash,locators,state,modified,added_at,shared,protected,preview_file";
+    private static final String COLUMNS = "id,owner,link_id,kind,title,mime,hash,locators,state,modified,added_at,shared,protected,preview_file,partner_share,origin,shared_by";
     private final Supplier<SQLiteDatabase> database;
     private final File directory;
 
@@ -54,8 +64,12 @@ final class LinkStore {
         SQLiteDatabase db = database.get();
         String id = null, storedHash = null, storedPreview = "", priorState = "live";
         boolean titleEdited = false;
-        try (Cursor c = db.rawQuery("SELECT id,hash,preview_file,title_user_edited,state FROM link_records WHERE owner=? AND link_id=?", new String[]{record.owner, record.linkId})) {
-            if (c.moveToFirst()) { id = c.getString(0); storedHash = c.getString(1); storedPreview = c.getString(2); titleEdited = c.getInt(3) != 0; priorState = c.getString(4); }
+        try (Cursor c = db.rawQuery("SELECT id,hash,preview_file,title_user_edited,state,origin FROM link_records WHERE owner=? AND link_id=?", new String[]{record.owner, record.linkId})) {
+            if (c.moveToFirst()) {
+                // A document the partner shares with us holds this identity; the owner app's publish must not overwrite it.
+                if ("foreign".equals(c.getString(5))) throw new IOException("This document id is already used by a document shared by your partner.");
+                id = c.getString(0); storedHash = c.getString(1); storedPreview = c.getString(2); titleEdited = c.getInt(3) != 0; priorState = c.getString(4);
+            }
         }
         boolean created = id == null;
         boolean contentChanged = created || !record.hash.equals(storedHash);
@@ -74,7 +88,7 @@ final class LinkStore {
         } else if (previewFile != null) previewFile.delete();
 
         String duplicateOf = null;
-        try (Cursor c = db.rawQuery("SELECT id FROM link_records WHERE hash=? AND state<>'trashed' AND NOT (owner=? AND link_id=?) LIMIT 1", new String[]{record.hash, record.owner, record.linkId})) {
+        try (Cursor c = db.rawQuery("SELECT id FROM link_records WHERE hash=? AND origin='own' AND state<>'trashed' AND NOT (owner=? AND link_id=?) LIMIT 1", new String[]{record.hash, record.owner, record.linkId})) {
             if (c.moveToFirst()) duplicateOf = c.getString(0);
         }
         long now = Clock.now();
@@ -123,7 +137,7 @@ final class LinkStore {
             + (searching ? "WHERE link_search MATCH ? AND r.state<>'trashed' " : "WHERE r.state<>'trashed' ") + "ORDER BY r.added_at DESC, r.id";
         List<Link> result = new ArrayList<>();
         try (Cursor c = db.rawQuery(sql, searching ? new String[]{match} : new String[0])) {
-            while (c.moveToNext()) result.add(row(c, c.getString(14)));
+            while (c.moveToNext()) result.add(row(c, c.getString(17)));
         }
         return result;
     }
@@ -171,6 +185,7 @@ final class LinkStore {
     // ---- Lifecycle (slice 4) ----------------------------------------------------------------------------------------
 
     static final long KEEP_MILLIS = 30L * 24 * 60 * 60 * 1000;
+    static final String UNSHARED = "unshared";
     static final String LIVE = "live", UNREACHABLE = "unreachable", MISSING = "missing", TRASHED = "trashed";
 
     /** The record's revision (bumped by publish, removal and user actions), or -1 if it is gone. */
@@ -181,16 +196,18 @@ final class LinkStore {
     /** Links in Recently deleted, newest removal first. */
     List<Trashed> trashed() {
         List<Trashed> out = new ArrayList<>();
-        try (Cursor c = database.get().rawQuery("SELECT id,title,owner,state_since,removed_reason FROM link_records WHERE state='trashed' ORDER BY state_since DESC, id", null)) {
-            while (c.moveToNext()) out.add(new Trashed(c.getString(0), c.getString(1), c.getString(2), c.getLong(3), c.getString(4)));
+        try (Cursor c = database.get().rawQuery("SELECT id,title,owner,state_since,removed_reason,shared_by FROM link_records WHERE state='trashed' ORDER BY state_since DESC, id", null)) {
+            while (c.moveToNext()) out.add(new Trashed(c.getString(0), c.getString(1), c.getString(2), c.getLong(3), c.getString(4), c.getString(5)));
         }
         return out;
     }
 
     /** A link in Recently deleted. */
     static final class Trashed {
-        final String id, title, owner, reason; final long deletedAt;
-        Trashed(String id, String title, String owner, long deletedAt, String reason) { this.id = id; this.title = title; this.owner = owner; this.deletedAt = deletedAt; this.reason = reason; }
+        final String id, title, owner, reason, sharedBy; final long deletedAt;
+        Trashed(String id, String title, String owner, long deletedAt, String reason, String sharedBy) { this.id = id; this.title = title; this.owner = owner; this.deletedAt = deletedAt; this.reason = reason; this.sharedBy = sharedBy; }
+        /** A shared document the partner stopped sharing (removed_reason 'unshared'); shown as "no longer shared". */
+        boolean noLongerShared() { return UNSHARED.equals(reason); }
     }
 
     /** What a check learned. `locators` and `modified` apply only to LIVE and only when they passed validation (otherwise null / -1). */
@@ -246,7 +263,95 @@ final class LinkStore {
     }
 
     /** The owner says the file is gone. Unknown records and already-trashed ones are left alone. Returns whether a record changed. */
-    boolean markRemoved(String owner, String linkId, String reason) { return moveToTrash("owner=? AND link_id=?", new String[]{owner, linkId}, reason); }
+    boolean markRemoved(String owner, String linkId, String reason) {
+        boolean changed = moveToTrash("owner=? AND link_id=? AND origin='own'", new String[]{owner, linkId}, reason);
+        if (!changed && "deleted".equals(reason)) {
+            // The file was in Filen's trash (reason `trashed`, restorable) and is now gone for good: it can no longer come back.
+            try (android.database.sqlite.SQLiteStatement st = database.get().compileStatement(
+                    "UPDATE link_records SET removed_reason='deleted', revision=revision+1 WHERE owner=? AND link_id=? AND origin='own' AND state='trashed' AND removed_reason='trashed'")) {
+                st.bindString(1, owner); st.bindString(2, linkId);
+                changed = st.executeUpdateDelete() > 0;
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * The owner (or Filen) says the file now lives elsewhere: the locators are replaced and nothing else changes (stacks, tags,
+     * notes, the user's title stay). A record that was missing or unreachable, or in Recently deleted only because the file sat in
+     * Filen's trash, is live again. A record the owner reported deleted, or the user removed, stays where it is.
+     * Returns whether a record changed.
+     */
+    boolean markMoved(String owner, String linkId, List<LinkRecord.Locator> locators) {
+        SQLiteDatabase db = database.get();
+        String json = locatorsJson(locators);
+        db.beginTransaction();
+        try {
+            String id = null, state = null, reason = null, old = null;
+            try (Cursor c = db.rawQuery("SELECT id,state,removed_reason,locators FROM link_records WHERE owner=? AND link_id=? AND origin='own'", new String[]{owner, linkId})) {
+                if (c.moveToFirst()) { id = c.getString(0); state = c.getString(1); reason = c.getString(2); old = c.getString(3); }
+            }
+            if (id == null) return false;
+            boolean back = "missing".equals(state) || "unreachable".equals(state) || ("trashed".equals(state) && "trashed".equals(reason));
+            if (json.equals(old) && !back) return false;
+            if (back) db.execSQL("UPDATE link_records SET locators=?, state='live', state_since=?, removed_reason='', revision=revision+1 WHERE id=?", new Object[]{json, Clock.now(), id});
+            else db.execSQL("UPDATE link_records SET locators=?, revision=revision+1 WHERE id=?", new Object[]{json, id});
+            db.setTransactionSuccessful();
+            return true;
+        } finally { db.endTransaction(); }
+    }
+
+    /** Access for others ended; the file still exists. Returns whether a record changed. */
+    boolean markUnshared(String owner, String linkId) {
+        try (android.database.sqlite.SQLiteStatement statement = database.get().compileStatement(
+                "UPDATE link_records SET shared=0, revision=revision+1 WHERE owner=? AND link_id=? AND shared<>0 AND origin='own'")) {
+            statement.bindString(1, owner); statement.bindString(2, linkId);
+            return statement.executeUpdateDelete() > 0;
+        }
+    }
+
+    /** For the device checks: state, shared, removed reason and locators of every record whose locators mention this UUID. */
+    android.database.Cursor debugRows(String uuid) {
+        return database.get().rawQuery("SELECT state,shared,removed_reason,locators FROM link_records WHERE locators LIKE ?", new String[]{"%" + uuid + "%"});
+    }
+
+    /** The (owner, link_id, locators) of every record that has this Filen UUID as its filen locator. */
+    private List<String[]> byFilenUuid(String uuid) {
+        List<String[]> found = new ArrayList<>();
+        try (Cursor c = database.get().rawQuery("SELECT owner,link_id,locators FROM link_records WHERE origin='own' AND locators LIKE ?", new String[]{"%" + uuid + "%"})) {
+            while (c.moveToNext()) {
+                List<LinkRecord.Locator> list = LinkRecord.parseLocators(c.getString(2));
+                if (list == null) continue;
+                for (LinkRecord.Locator l : list) if (LinkRecord.Locator.FILEN.equals(l.type) && uuid.equals(l.uuid)) { found.add(new String[]{c.getString(0), c.getString(1), c.getString(2)}); break; }
+            }
+        }
+        return found;
+    }
+
+    /** Filen moved or renamed the file: only the filen locator is replaced (saf/owner entries stay). Returns how many records changed. */
+    int filenMoved(String uuid, String path) throws org.json.JSONException {
+        int changed = 0;
+        for (String[] r : byFilenUuid(uuid)) {
+            String merged = locatorsFor(r[2], new org.json.JSONObject().put("uuid", uuid).put("path", path));
+            List<LinkRecord.Locator> list = LinkRecord.parseLocators(merged);
+            if (list != null && markMoved(r[0], r[1], list)) changed++;
+        }
+        return changed;
+    }
+
+    /** Filen deleted or trashed the file. Returns how many records changed. */
+    int filenRemoved(String uuid, String reason) {
+        int changed = 0;
+        for (String[] r : byFilenUuid(uuid)) if (markRemoved(r[0], r[1], reason)) changed++;
+        return changed;
+    }
+
+    /** Filen ended access for others. Returns how many records changed. */
+    int filenUnshared(String uuid) {
+        int changed = 0;
+        for (String[] r : byFilenUuid(uuid)) if (markUnshared(r[0], r[1])) changed++;
+        return changed;
+    }
 
     /** The user removed it from Stack, or chose to forget a missing one. */
     boolean trash(String id, String reason) { return moveToTrash("id=?", new String[]{id}, reason); }
@@ -262,8 +367,10 @@ final class LinkStore {
 
     /** Back from Recently deleted. A record the owner reported gone returns as missing, the rest as unreachable; the next check settles it. */
     void restore(String id) {
+        // A shared document the partner stopped sharing has no owner app to ask: it comes back as live, and the next import settles it.
+        database.get().execSQL("UPDATE link_records SET state='live', state_since=?, removed_reason='', revision=revision+1 WHERE id=? AND state='trashed' AND origin='foreign'", new Object[]{Clock.now(), id});
         database.get().execSQL("UPDATE link_records SET state=CASE WHEN removed_reason IN ('deleted','trashed','forgotten') THEN 'missing' ELSE 'unreachable' END,"
-            + " state_since=?, removed_reason='', revision=revision+1 WHERE id=? AND state='trashed'", new Object[]{Clock.now(), id});
+            + " state_since=?, removed_reason='', revision=revision+1 WHERE id=? AND state='trashed' AND origin='own'", new Object[]{Clock.now(), id});
     }
 
     /** Missing for 30 days becomes trashed; trashed for 30 days is deleted for good. Returns how many were deleted. */
@@ -290,6 +397,220 @@ final class LinkStore {
             db.execSQL("UPDATE link_search SET title=? WHERE record_id=?", new Object[]{title, id});
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
+    }
+
+    // ---- Partner sharing, publish side (slice 7, S7-2) ----------------------------------------------------------------
+
+    /** A link the person switched "Share with partner" on, with what the publisher needs. */
+    static final class Candidate {
+        final String id, owner, linkId, kind, title, mime, hash, locators, state;
+        final long modified, revision; final boolean isProtected; final int mode;
+        Candidate(String id, String owner, String linkId, String kind, String title, String mime, String hash, String locators, String state,
+                  long modified, long revision, boolean isProtected, int mode) {
+            this.id = id; this.owner = owner; this.linkId = linkId; this.kind = kind; this.title = title; this.mime = mime; this.hash = hash;
+            this.locators = locators; this.state = state; this.modified = modified; this.revision = revision; this.isProtected = isProtected; this.mode = mode;
+        }
+    }
+
+    /**
+     * Sets Stack's own sharing switch: 0 off, 1 on, 2 on with a protected link confirmed. A protected link cannot be switched on without
+     * the confirmation (mode 1 is refused for it); mode 2 on an unprotected link is stored as 1. Returns whether the stored value is now `mode`
+     * (after that normalisation) and the link exists. Does not touch `revision`, so a running check is not discarded.
+     */
+    boolean setPartnerShare(String id, int mode) {
+        if (mode < 0 || mode > 2) return false;
+        SQLiteDatabase db = database.get();
+        boolean isProtected;
+        try (Cursor c = db.rawQuery("SELECT protected FROM link_records WHERE id=?", new String[]{id})) {
+            if (!c.moveToFirst()) return false;
+            isProtected = c.getInt(0) != 0;
+        }
+        if (mode == 1 && isProtected) return false;
+        if (mode == 2 && !isProtected) mode = 1;
+        db.execSQL("UPDATE link_records SET partner_share=? WHERE id=?", new Object[]{mode, id});
+        return true;
+    }
+
+    /** Every link with the switch on, in any state; the publisher decides which of them go into the file. */
+    List<Candidate> partnerFlagged() {
+        List<Candidate> out = new ArrayList<>();
+        try (Cursor c = database.get().rawQuery("SELECT id,owner,link_id,kind,title,mime,hash,locators,state,modified,revision,protected,partner_share FROM link_records WHERE partner_share>0 AND origin='own' ORDER BY owner,link_id", null)) {
+            while (c.moveToNext()) out.add(new Candidate(c.getString(0), c.getString(1), c.getString(2), c.getString(3), c.getString(4), c.getString(5), c.getString(6),
+                c.getString(7), c.getString(8), c.getLong(9), c.getLong(10), c.getInt(11) != 0, c.getInt(12)));
+        }
+        return out;
+    }
+
+    /**
+     * Brings the sharing log up to date with `sharedNow` (keys `owner\nlink_id` of everything that goes into the file now) and returns the
+     * removal notices still inside their 30 days. Something in the log as 'shared' that is no longer shared becomes 'removed' as of `now`;
+     * something shared again leaves its notice; notices older than 30 days are forgotten. Local only.
+     */
+    List<ShareArchive.Tombstone> partnerTombstones(java.util.Set<String> sharedNow, long now) {
+        SQLiteDatabase db = database.get();
+        List<ShareArchive.Tombstone> out = new ArrayList<>();
+        db.beginTransaction();
+        try {
+            db.execSQL("DELETE FROM partner_share_log WHERE state='removed' AND since<=?", new Object[]{now - KEEP_MILLIS});
+            List<String[]> rows = new ArrayList<>();
+            try (Cursor c = db.rawQuery("SELECT owner,link_id,state FROM partner_share_log", null)) { while (c.moveToNext()) rows.add(new String[]{c.getString(0), c.getString(1), c.getString(2)}); }
+            java.util.Set<String> known = new java.util.HashSet<>();
+            for (String[] r : rows) {
+                String key = r[0] + "\n" + r[1]; known.add(key);
+                boolean shared = sharedNow.contains(key);
+                if (shared && !"shared".equals(r[2])) db.execSQL("UPDATE partner_share_log SET state='shared', since=? WHERE owner=? AND link_id=?", new Object[]{now, r[0], r[1]});
+                else if (!shared && "shared".equals(r[2])) db.execSQL("UPDATE partner_share_log SET state='removed', since=? WHERE owner=? AND link_id=?", new Object[]{now, r[0], r[1]});
+            }
+            for (String key : sharedNow) {
+                if (known.contains(key)) continue;
+                int cut = key.indexOf('\n');
+                db.execSQL("INSERT INTO partner_share_log(owner,link_id,state,since) VALUES(?,?,'shared',?)", new Object[]{key.substring(0, cut), key.substring(cut + 1), now});
+            }
+            try (Cursor c = db.rawQuery("SELECT owner,link_id,since FROM partner_share_log WHERE state='removed' ORDER BY owner,link_id", null)) {
+                while (c.moveToNext()) out.add(new ShareArchive.Tombstone(c.getString(0), c.getString(1), c.getLong(2)));
+            }
+            db.setTransactionSuccessful();
+        } finally { db.endTransaction(); }
+        return out;
+    }
+
+    /** The cached preview bytes of a record, or null when it has none (or it is over the preview limit). */
+    byte[] previewBytes(String id) throws IOException {
+        File file = preview(id);
+        if (file == null || file.length() > LinkRecord.MAX_PREVIEW) return null;
+        byte[] bytes = new byte[(int) file.length()];
+        try (java.io.DataInputStream in = new java.io.DataInputStream(new java.io.FileInputStream(file))) { in.readFully(bytes); }
+        return bytes;
+    }
+
+    // ---- Partner sharing, import side (slice 7, S7-3) -------------------------------------------------------------------
+
+    /** What one import changed. */
+    static final class Imported {
+        int inserted, updated, unshared, back, ownKept, stayedRemoved;
+        int changed() { return inserted + updated + unshared + back; }
+    }
+
+    /**
+     * Applies a share archive from the partner in ONE transaction (run on the IO executor). Rules:
+     * - a record whose (owner, link_id) is one of this phone's OWN records is never touched (counted in ownKept);
+     * - a new record is inserted foreign, live, with `shared_by` set; its text goes into the search table, its preview is placed after the commit;
+     * - an existing foreign record is updated only when the archive's generation is higher (the person's own title stays when edited);
+     * - a tombstoned record, or a foreign record the archive no longer lists, moves to Recently deleted with removed_reason 'unshared';
+     * - a foreign record in Recently deleted as 'unshared' that is listed again comes back live; one the person removed ('user') stays removed;
+     * - the person's own tags, stacks and notes are not in link_records' content columns and are never touched.
+     * Since S7-4 the sync triggers cover foreign rows ({@link LibraryDatabase#addForeignSync}): every change here raises the link dirty flag, and {@link LinkSync} writes the cells only for a computer that announced it can show them.
+     * Nothing is written when anything throws: the transaction rolls back and any half-written preview files are removed.
+     */
+    Imported applyPartnerArchive(ShareArchive.Contents contents, String sharedBy, long now) throws IOException {
+        SQLiteDatabase db = database.get();
+        Imported out = new Imported();
+        List<File[]> placements = new ArrayList<>();   // {partFile, finalFile}
+        List<File> removals = new ArrayList<>();
+        if (!directory.isDirectory() && !directory.mkdirs()) throw new IOException("Cannot create the link folder.");
+        boolean done = false;
+        db.beginTransaction();
+        try {
+            java.util.Map<String, String[]> existing = new java.util.HashMap<>();   // owner\nlink_id -> id, origin, state, reason, title_user_edited, preview_file
+            java.util.Map<String, Long> generations = new java.util.HashMap<>();
+            try (Cursor c = db.rawQuery("SELECT id,owner,link_id,origin,state,removed_reason,title_user_edited,preview_file,foreign_generation FROM link_records", null)) {
+                while (c.moveToNext()) {
+                    String key = c.getString(1) + "\n" + c.getString(2);
+                    existing.put(key, new String[]{c.getString(0), c.getString(3), c.getString(4), c.getString(5), c.getString(6), c.getString(7)});
+                    generations.put(key, c.getLong(8));
+                }
+            }
+            java.util.Set<String> listed = new java.util.HashSet<>();
+            for (ShareArchive.Record r : contents.records) {
+                String key = r.key();
+                listed.add(key);
+                // Text from the partner never keeps direction-changing characters, so a title or a search hit cannot be made to read backwards.
+                final String shownTitle = LinkRecord.stripDirection(r.title), bodyText = LinkRecord.stripDirection(r.text);
+                String[] row = existing.get(key);
+                String locators = new org.json.JSONArray().put(new org.json.JSONObject().put("type", "filen").put("uuid", r.filenUuid).put("path", r.filenPath)).toString();
+                if (row == null) {
+                    String id = UUID.randomUUID().toString();
+                    ContentValues v = new ContentValues();
+                    v.put("id", id); v.put("owner", r.owner); v.put("link_id", r.linkId); v.put("kind", r.kind); v.put("title", shownTitle); v.put("mime", r.mime);
+                    v.put("modified", r.modified); v.put("hash", r.hash); v.put("shared", 1); v.put("protected", r.isProtected ? 1 : 0); v.put("locators", locators);
+                    v.put("state", LIVE); v.put("state_since", now); v.put("removed_reason", ""); v.put("added_at", now); v.put("received_at", now);
+                    v.put("checked_at", 0); v.put("revision", 1); v.put("origin", "foreign"); v.put("shared_by", sharedBy); v.put("foreign_generation", r.generation);
+                    v.put("preview_file", r.preview == null ? "" : id + ".pdf");
+                    db.insertOrThrow("link_records", null, v);
+                    db.execSQL("INSERT INTO link_search(record_id,title,body) VALUES(?,?,?)", new Object[]{id, shownTitle, bodyText});
+                    if (r.preview != null) placements.add(stagePreview(id, r.preview));
+                    out.inserted++;
+                    continue;
+                }
+                if (!"foreign".equals(row[1])) { out.ownKept++; continue; }
+                String id = row[0];
+                boolean trashed = TRASHED.equals(row[2]);
+                if (trashed && !UNSHARED.equals(row[3])) { out.stayedRemoved++; continue; }   // the person removed it: it stays removed
+                boolean higher = r.generation > generations.get(key);
+                boolean previewLost = !higher && r.preview != null && !new File(directory, id + ".pdf").isFile();
+                ContentValues v = new ContentValues();
+                if (higher) {
+                    v.put("kind", r.kind); v.put("mime", r.mime); v.put("modified", r.modified); v.put("hash", r.hash); v.put("protected", r.isProtected ? 1 : 0);
+                    v.put("locators", locators); v.put("foreign_generation", r.generation); v.put("shared", 1);
+                    v.put("preview_file", r.preview == null ? "" : id + ".pdf");
+                    // The saved text and preview may change without the hash changing: the digests the sync keeps for them are reset (as publish does), so capture hashes the new files.
+                    v.put("text_sha", ""); v.put("text_len", 0); v.put("preview_sha", ""); v.put("preview_len", 0); v.put("preview_mtime", 0);
+                    if (!"1".equals(row[4])) v.put("title", shownTitle);
+                } else if (previewLost) v.put("preview_file", id + ".pdf");
+                if (trashed) { v.put("state", LIVE); v.put("state_since", now); v.put("removed_reason", ""); }
+                if (v.size() == 0) continue;
+                v.put("shared_by", sharedBy);
+                db.update("link_records", v, "id=?", new String[]{id});
+                db.execSQL("UPDATE link_records SET revision=revision+1 WHERE id=?", new Object[]{id});
+                if (higher) {
+                    String title = "1".equals(row[4]) ? titleOf(db, id) : shownTitle;
+                    db.execSQL("DELETE FROM link_search WHERE record_id=?", new Object[]{id});
+                    db.execSQL("INSERT INTO link_search(record_id,title,body) VALUES(?,?,?)", new Object[]{id, title, bodyText});
+                }
+                if (higher || previewLost) {
+                    if (r.preview != null) placements.add(stagePreview(id, r.preview));
+                    else { removals.add(new File(directory, id + ".pdf")); removals.add(new File(directory, id + ".rendering")); }
+                    if (r.preview != null) new File(directory, id + ".rendering").delete();
+                }
+                if (trashed) out.back++; else out.updated++;
+            }
+            // Removed notices and records that are simply no longer listed.
+            java.util.Set<String> gone = new java.util.HashSet<>();
+            for (ShareArchive.Tombstone t : contents.tombstones) gone.add(t.key());
+            for (java.util.Map.Entry<String, String[]> e : existing.entrySet()) {
+                String[] row = e.getValue();
+                if (!"foreign".equals(row[1]) || TRASHED.equals(row[2])) continue;
+                if (listed.contains(e.getKey())) continue;
+                // Tombstoned or not listed: both mean the partner stopped sharing it.
+                db.execSQL("UPDATE link_records SET state='trashed', state_since=?, removed_reason=?, revision=revision+1 WHERE id=? AND state<>'trashed'", new Object[]{now, UNSHARED, row[0]});
+                out.unshared++;
+            }
+            // The badge name follows the name chosen at pairing.
+            db.execSQL("UPDATE link_records SET shared_by=? WHERE origin='foreign' AND shared_by<>?", new Object[]{sharedBy, sharedBy});
+            if (out.changed() > 0 || out.stayedRemoved > 0) LinkSync.markDirty(db);
+            db.setTransactionSuccessful();
+            done = true;
+        } catch (org.json.JSONException error) {
+            throw new IOException("A shared document could not be stored.");
+        } finally {
+            db.endTransaction();
+            if (!done) for (File[] p : placements) p[0].delete();
+        }
+        for (File[] p : placements) if (!p[0].renameTo(p[1])) { copyOrDrop(p[0], p[1]); }
+        for (File f : removals) f.delete();
+        LinkSync.syncDir(directory);
+        return out;
+    }
+
+    private File[] stagePreview(String id, byte[] bytes) throws IOException {
+        File part = new File(directory, id + ".pdf.part");
+        try (java.io.FileOutputStream stream = new java.io.FileOutputStream(part)) { stream.write(bytes); stream.getFD().sync(); }
+        return new File[]{part, new File(directory, id + ".pdf")};
+    }
+
+    private static void copyOrDrop(File from, File to) {
+        try { copy(from, to); } catch (IOException ignored) { /* the preview is missing until the next import re-places it */ }
+        from.delete();
     }
 
     // ---- Applying synced link records (slice 6, P1) --------------------------------------------------------------------
@@ -361,8 +682,10 @@ final class LinkStore {
     private void applyOne(SQLiteDatabase db, org.json.JSONObject link, File blobs, Applied result) throws org.json.JSONException, IOException {
         String key = link.getString("key"), owner = link.getString("owner"), linkId = link.getString("link_id"), outcome = link.getString("outcome");
         String id = null, state = null, storedHash = null, locators = null; long titleEdited = 0, wasProtected = 0;
-        try (Cursor c = db.rawQuery("SELECT id,state,hash,locators,title_user_edited,protected FROM link_records WHERE owner=? AND link_id=?", new String[]{owner, linkId})) {
-            if (c.moveToFirst()) { id = c.getString(0); state = c.getString(1); storedHash = c.getString(2); locators = c.getString(3); titleEdited = c.getLong(4); wasProtected = c.getLong(5); }
+        try (Cursor c = db.rawQuery("SELECT id,state,hash,locators,title_user_edited,protected,origin FROM link_records WHERE owner=? AND link_id=?", new String[]{owner, linkId})) {
+            if (c.moveToFirst()) { id = c.getString(0); state = c.getString(1); storedHash = c.getString(2); locators = c.getString(3); titleEdited = c.getLong(4); wasProtected = c.getLong(5);
+                // A shared copy of the partner's document is phone-authoritative (S7-4): the computer never changes it, and its cells never apply here.
+                if ("foreign".equals(c.getString(6))) { result.skipped++; result.status.put(key, "skipped"); return; } }
         }
         if ("gone".equals(outcome)) {
             // Only the phone produces `gone`. A received one never deletes a row, and never creates one.
@@ -566,7 +889,7 @@ final class LinkStore {
     private Link row(Cursor c, String excerpt) {
         String id = c.getString(0);
         return new Link(id, c.getString(1), c.getString(2), c.getString(3), c.getString(4), c.getString(5), c.getString(6), c.getString(7), c.getString(8), excerpt,
-            c.getLong(9), c.getLong(10), c.getInt(11) != 0, c.getInt(12) != 0, !c.getString(13).isEmpty());
+            c.getLong(9), c.getLong(10), c.getInt(11) != 0, c.getInt(12) != 0, !c.getString(13).isEmpty(), c.getInt(14), "foreign".equals(c.getString(15)), c.getString(16));
     }
 
     private static String prefixed(String columns) {

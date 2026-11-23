@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
  * package, so one app cannot publish as another. The provider never reads or returns library content.
  */
 public final class LinkProvider extends ContentProvider {
-    static final String METHOD_CONTRACT = "contract", METHOD_BEGIN = "begin", METHOD_COMMIT = "commit", METHOD_ABORT = "abort", METHOD_REMOVED = "removed";
+    static final String METHOD_CONTRACT = "contract", METHOD_BEGIN = "begin", METHOD_COMMIT = "commit", METHOD_ABORT = "abort", METHOD_REMOVED = "removed", METHOD_MOVED = "moved", METHOD_UNSHARED = "unshared";
     static final int MAX_RECORD_JSON = 256 * 1024, MAX_TEXT_BYTES = 4 * 1024 * 1024, MAX_STAGED = 8;
     static final long STAGING_LIFETIME_MS = 10 * 60 * 1000L;
     private static final java.util.regex.Pattern TOKEN = java.util.regex.Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
@@ -48,8 +48,21 @@ public final class LinkProvider extends ContentProvider {
         return allowed;
     }
 
+    /** Filen Files is pinned only here: a Filen-origin event may come from it; every other method needs an owner app or Stack itself. */
+    private String eventCaller() {
+        int uid = Binder.getCallingUid();
+        String allowed = LinkCallers.allowedCaller(getContext(), uid);
+        if (allowed == null) allowed = LinkCallers.allowedFilenCaller(getContext(), uid);
+        if (allowed == null) throw new SecurityException("This app may not use Stack's link provider.");
+        return allowed;
+    }
+
+    private static boolean filenEvent(String method, String argument) {
+        return ("removed".equals(method) || "moved".equals(method) || "unshared".equals(method)) && LinkRecord.isFilenEvent(argument);
+    }
+
     @Override public Bundle call(String method, String argument, Bundle extras) {
-        String caller = caller();
+        String caller = filenEvent(method, argument) ? eventCaller() : caller();
         Bundle out = new Bundle();
         try {
             switch (method == null ? "" : method) {
@@ -57,7 +70,9 @@ public final class LinkProvider extends ContentProvider {
                 case METHOD_BEGIN: return begin(caller, argument);
                 case METHOD_COMMIT: return commit(caller, argument);
                 // Accepted while the app lock is on: it changes a stored state and shows nothing.
-                case METHOD_REMOVED: return removed(caller, argument);
+                case METHOD_REMOVED: return LinkRecord.isFilenEvent(argument) ? filenEvent(caller, argument, "removed") : removed(caller, argument);
+                case METHOD_MOVED: return LinkRecord.isFilenEvent(argument) ? filenEvent(caller, argument, "moved") : changeStored(caller, argument, true);
+                case METHOD_UNSHARED: return LinkRecord.isFilenEvent(argument) ? filenEvent(caller, argument, "unshared") : changeStored(caller, argument, false);
                 case METHOD_ABORT: { File dir = stage(caller, argument); if (dir != null) deleteTree(dir); return out; }
                 default: out.putString("error", "unknown_method"); return out;
             }
@@ -88,6 +103,60 @@ public final class LinkProvider extends ContentProvider {
     }
 
     /** The owner saw its file gone. Only the owner's own record can change; an unknown link_id is a harmless no-op. */
+    /** The package that may send Filen-origin events (matched by Filen UUID). */
+    static final String FILEN_PACKAGE = LinkCallers.FILEN_PACKAGE;
+
+    /** A Filen-origin event: every record whose filen locator has this UUID changes, whoever owns it. Only Filen Files may send it. */
+    private Bundle filenEvent(String caller, String json, String kind) throws IOException {
+        if (!FILEN_PACKAGE.equals(caller)) throw new IOException("Only Filen Files may report a Filen file by its UUID.");
+        LinkRecord.FilenEvent event = LinkRecord.parseFilenEvent(json, kind);
+        if (!COMMITS.tryAcquire()) throw new IOException("Stack is busy. Try again in a moment.");
+        Future<Integer> work = null;
+        try {
+            StackApplication app = (StackApplication) getContext().getApplicationContext();
+            try {
+                if (!app.libraryReady.await(20, TimeUnit.SECONDS)) throw new IOException("Stack is still starting. Try again.");
+                work = app.io.submit(() -> "moved".equals(kind) ? app.library.links.filenMoved(event.uuid, event.path)
+                    : "removed".equals(kind) ? app.library.links.filenRemoved(event.uuid, event.reason) : app.library.links.filenUnshared(event.uuid));
+                int changed = work.get(30, TimeUnit.SECONDS);
+                if (changed > 0) app.notifySyncChanged();
+                Bundle out = new Bundle();
+                out.putBoolean("ok", true); out.putBoolean("changed", changed > 0); out.putInt("count", changed);
+                return out;
+            } catch (InterruptedException | java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException error) {
+                if (work != null && !work.isDone()) work.cancel(true);
+                if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+                throw new IOException("Stack could not store the change. Try again.");
+            }
+        } finally { COMMITS.release(); }
+    }
+
+    /** `moved` (true) or `unshared` (false): a stored-state change like `removed`, accepted while the app lock is on. */
+    private Bundle changeStored(String caller, String json, boolean moved) throws IOException {
+        LinkRecord.Move move = moved ? LinkRecord.parseMove(json) : null;
+        String[] share = moved ? null : LinkRecord.parseUnshare(json);
+        String owner = moved ? move.owner : share[0], linkId = moved ? move.linkId : share[1];
+        if (!owner.equals(caller)) throw new IOException("A record can only be changed by the app named in its owner field.");
+        if (!COMMITS.tryAcquire()) throw new IOException("Stack is busy. Try again in a moment.");
+        Future<Boolean> work = null;
+        try {
+            StackApplication app = (StackApplication) getContext().getApplicationContext();
+            try {
+                if (!app.libraryReady.await(20, TimeUnit.SECONDS)) throw new IOException("Stack is still starting. Try again.");
+                work = app.io.submit(() -> moved ? app.library.links.markMoved(owner, linkId, move.locators) : app.library.links.markUnshared(owner, linkId));
+                boolean changed = work.get(30, TimeUnit.SECONDS);
+                if (changed) app.notifySyncChanged();
+                Bundle out = new Bundle();
+                out.putBoolean("ok", true); out.putBoolean("changed", changed);
+                return out;
+            } catch (InterruptedException | java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException error) {
+                if (work != null && !work.isDone()) work.cancel(true);
+                if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+                throw new IOException("Stack could not store the change. Try again.");
+            }
+        } finally { COMMITS.release(); }
+    }
+
     private Bundle removed(String caller, String json) throws IOException {
         String[] message = LinkRecord.parseRemoval(json);
         if (!message[0].equals(caller)) throw new IOException("A record can only be removed by the app named in its owner field.");

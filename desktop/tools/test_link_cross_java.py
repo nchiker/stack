@@ -82,7 +82,9 @@ def main():
                          'preview-over-32MiB': 'cell_skipped', 'title-over-limit-refused': 'row_refused',
                          'filen-path-over-1024': 'cell_skipped', 'gone-from-start': 'emitted', 'trashed': 'emitted',
                          'text-with-nul': 'cell_skipped', 'over-link-limit-refused': 'row_refused', 'no-filen': 'emitted',
-                         'protected-with-preview': 'emitted', 'trashed-now-gone': 'emitted', 'plain-edited': 'emitted', 'new-row': 'emitted'}
+                         'protected-with-preview': 'emitted', 'trashed-now-gone': 'emitted', 'plain-edited': 'emitted', 'new-row': 'emitted',
+                         'foreign-live': 'emitted', 'foreign-unshared-trashed': 'emitted', 'foreign-to-be-gone': 'emitted', 'foreign-protected': 'emitted',
+                         'foreign-empty-name-refused': 'row_refused', 'foreign-updated': 'emitted', 'foreign-now-gone': 'emitted'}
     assert outcomes == expected_outcomes, outcomes
     by_id = {link['link_id']: link for link in capture['expect']['links']}
 
@@ -97,6 +99,13 @@ def main():
     assert link(8)['outcome'] == 'gone' and link(9)['outcome'] == 'gone'
     assert link(1)['title']['title'] == 'Budget 2' and link(1)['text']['length'] == len('quarterly zebra budget revised')
     assert link(12)['filen'] is None and link(14)['outcome'] == 'applied'
+    # Slice 7: the partner's records keep origin, name and generation through Java writer -> Rust kernel/projection.
+    assert link(15)['content']['origin'] == 'foreign' and link(15)['content']['shared_by'] == 'Samantha' and link(15)['content']['foreign_generation'] == 4
+    assert link(15)['title']['title'] == 'Shared budget v2' and link(15)['text'] is not None
+    assert link(16)['state'] == 'trashed' and link(16)['content']['origin'] == 'foreign'
+    assert link(17)['outcome'] == 'gone' and link(19) is None
+    assert link(18)['outcome'] == 'applied_metadata_only' and link(18)['text'] is None and link(18)['content']['origin'] == 'foreign'
+    assert link(1)['content'].get('origin') is None, 'an own record never carries the foreign fields'
     assert capture['expect']['skipped'] == 0 and capture['expect']['conflicted'] == 0 and capture['expect']['conflict_keys'] == []
     rust = subprocess.run([*cargo, 'cross_b', '--', '--ignored'], cwd=root / 'desktop', env=env, capture_output=True, text=True)
     sys.stderr.write(rust.stdout[-3000:] + rust.stderr[-3000:] if rust.returncode else '')

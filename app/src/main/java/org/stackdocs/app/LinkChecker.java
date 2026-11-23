@@ -50,6 +50,8 @@ final class LinkChecker {
 
     /** One `stat` for one record, and the write of its outcome. */
     static Result check(StackApplication app, LinkStore.Link link) {
+        // A document the partner shares is another person's: there is no owner app here to ask.
+        if (link.foreign) return new Result(link.state, false, false);
         long revision;
         try { revision = io(app, () -> app.library.links.revision(link.id)); } catch (Exception error) { return new Result(link.state, false, true); }
         if (revision < 0) return new Result(link.state, false, false);
@@ -76,6 +78,7 @@ final class LinkChecker {
         List<LinkStore.Link> links;
         try { links = io(app, () -> app.library.links.list("")); } catch (Exception error) { return summary; }
         for (LinkStore.Link link : links) {
+            if (link.foreign) continue;
             Result result = check(app, link);
             if (result.busy) { summary.skipped++; continue; }
             summary.checked++;
@@ -90,6 +93,7 @@ final class LinkChecker {
 
     /** Asks the owner to publish a fresh copy. Returns null on success, otherwise a sentence the person can read. */
     static String refresh(StackApplication app, LinkStore.Link link) {
+        if (link.foreign) return "This document belongs to your partner. Only they can update it.";
         String name = LinkOpener.ownerName(link.owner);
         try {
             Bundle reply = call(app, link.owner, "refresh", link.linkId, null);

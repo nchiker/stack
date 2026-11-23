@@ -99,6 +99,71 @@ final class LinkRecord {
         return new String[]{text(o, "owner", PACKAGE, 200), text(o, "link_id", UUID, 36), reason};
     }
 
+    /** The owner's `moved` message: exactly contract, owner, link_id, locators (validated like a record's). Returns {owner, link_id} and the locators. */
+    static final class Move {
+        final String owner, linkId; final List<Locator> locators;
+        Move(String owner, String linkId, List<Locator> locators) { this.owner = owner; this.linkId = linkId; this.locators = locators; }
+    }
+
+    static Move parseMove(String json) throws IOException {
+        if (json == null || json.length() > 32 * 1024) throw bad("the message is missing or too large");
+        JSONObject o = ArchiveJson.read(json);
+        checkContract(o);
+        exactKeys(o, set("contract", "owner", "link_id", "locators"), set(), "move");
+        Object list = o.opt("locators");
+        if (!(list instanceof JSONArray)) throw bad("locators must be a list");
+        JSONArray array = (JSONArray) list;
+        if (array.length() == 0 || array.length() > MAX_LOCATORS) throw bad("locators must hold 1 to " + MAX_LOCATORS + " entries");
+        List<Locator> locators = new ArrayList<>();
+        for (int i = 0; i < array.length(); i++) {
+            Object entry = array.opt(i);
+            if (!(entry instanceof JSONObject)) throw bad("each locator must be an object");
+            locators.add(locator((JSONObject) entry));
+        }
+        return new Move(text(o, "owner", PACKAGE, 200), text(o, "link_id", UUID, 36), locators);
+    }
+
+    /** The owner's `unshared` message: exactly contract, owner, link_id. Returns {owner, link_id}. */
+    static String[] parseUnshare(String json) throws IOException {
+        if (json == null || json.length() > 4096) throw bad("the message is missing or too large");
+        JSONObject o = ArchiveJson.read(json);
+        checkContract(o);
+        exactKeys(o, set("contract", "owner", "link_id"), set(), "unshare");
+        return new String[]{text(o, "owner", PACKAGE, 200), text(o, "link_id", UUID, 36)};
+    }
+
+    /** A Filen-origin event: Filen knows the file's UUID, not the owner app's link_id. `kind` is moved, removed or unshared. */
+    static final class FilenEvent {
+        final String uuid, path, reason;
+        FilenEvent(String uuid, String path, String reason) { this.uuid = uuid; this.path = path; this.reason = reason; }
+    }
+
+    /** True if the message names a Filen file (`filen_uuid`) instead of an owner and link_id. */
+    static boolean isFilenEvent(String json) {
+        try { return json != null && json.length() <= 4096 && ArchiveJson.read(json).has("filen_uuid"); } catch (IOException | RuntimeException error) { return false; }
+    }
+
+    /** moved: contract, filen_uuid, path. removed: contract, filen_uuid, reason. unshared: contract, filen_uuid. */
+    static FilenEvent parseFilenEvent(String json, String kind) throws IOException {
+        if (json == null || json.length() > 4096) throw bad("the message is missing or too large");
+        JSONObject o = ArchiveJson.read(json);
+        checkContract(o);
+        switch (kind) {
+            case "moved": exactKeys(o, set("contract", "filen_uuid", "path"), set(), "filen move"); break;
+            case "removed": exactKeys(o, set("contract", "filen_uuid", "reason"), set(), "filen removal"); break;
+            default: exactKeys(o, set("contract", "filen_uuid"), set(), "filen unshare");
+        }
+        return new FilenEvent(text(o, "filen_uuid", UUID, 36), "moved".equals(kind) ? free(o, "path", MAX_PATH) : null,
+            "removed".equals(kind) ? text(o, "reason", Pattern.compile("deleted|trashed"), 16) : null);
+    }
+
+    private static void checkContract(JSONObject o) throws IOException {
+        Object number = o.opt("contract");
+        if (!(number instanceof Integer) && !(number instanceof Long)) throw bad("contract must be a whole number");
+        long version = ((Number) number).longValue();
+        if (version != CONTRACT) throw new UnsupportedContract((int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, version)));
+    }
+
     /** The locators of a `stat` reply (a JSON array of at most 16 KiB), validated like a record's; null if they are not valid. */
     static List<Locator> parseLocators(String json) {
         try {
@@ -161,6 +226,12 @@ final class LinkRecord {
         String value = free(o, key, max);
         if (!pattern.matcher(value).matches()) throw bad(key + " has the wrong form");
         return value;
+    }
+
+    /** Removes bidirectional override, embedding, isolate and mark characters (U+202A-202E, U+2066-2069, U+200E, U+200F, U+061C). */
+    static String stripDirection(String s) {
+        if (s == null) return null;
+        return s.replaceAll("[\\u202a-\\u202e\\u2066-\\u2069\\u200e\\u200f\\u061c]", "");
     }
 
     /** A non-empty string without control characters or unpaired surrogates, at most `max` UTF-16 units. */

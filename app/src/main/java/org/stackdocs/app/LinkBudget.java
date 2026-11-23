@@ -68,7 +68,9 @@ final class LinkBudget {
 
     /** Presence mapping (design section 2): live/unreachable/missing are `live`; trashed stays trashed with its reason and since. */
     static String[] presence(String state, String removedReason, long stateSince) {
-        if ("trashed".equals(state)) return new String[]{"trashed", removedReason, Long.toString(stateSince)};
+        // Slice 7: a shared record the partner stopped sharing sits in Recently deleted as 'unshared'; the wire has no such reason, so it travels
+        // as 'deleted' (the computer hides every trashed record and deletes it when the phone says gone).
+        if ("trashed".equals(state)) return new String[]{"trashed", "unshared".equals(removedReason) ? "deleted" : removedReason, Long.toString(stateSince)};
         return new String[]{"live", "", "0"};
     }
 

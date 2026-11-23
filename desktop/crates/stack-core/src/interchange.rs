@@ -1108,11 +1108,12 @@ impl Library {
             links,
         })
     }
-    /// Link rows with exactly the archive columns (`LinkArchive.FIELDS`); the local lifecycle columns are not
+    /// Link rows with exactly the archive columns (`LinkArchive.FIELDS`); documents the partner shares are not the
+    /// person's own and stay out of archives, as on the phone; the local lifecycle columns are not
     /// exported. The local row id is the archive id, so `previews/<id>.pdf` matches `links/<id>.pdf`.
     fn link_rows_for_export(&self) -> Result<Vec<(Value, bool)>> {
         let mut statement = self.db.prepare(
-            "SELECT row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,title_user_edited,added_at,text,preview AND NOT preview_pending FROM link_records WHERE state<>'trashed' ORDER BY added_at,row_id",
+            "SELECT row_id,owner,link_id,kind,title,mime,modified,hash,shared,protected,locators,state,title_user_edited,added_at,text,preview AND NOT preview_pending FROM link_records WHERE state<>'trashed' AND origin='own' ORDER BY added_at,row_id",
         )?;
         let rows = statement
             .query_map([], |r| {

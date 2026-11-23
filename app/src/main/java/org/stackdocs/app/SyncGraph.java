@@ -270,6 +270,8 @@ final class SyncGraph {
     // semantic limit lives in the writer self-check (linkWriter) and is applied again, as a skip, by projectLinks.
     // It deliberately bypasses validatePrimitives (its integer list lacks modified/shared/protected/since, finding M4).
     // ---------------------------------------------------------------------------------------------------------------
+    /** The partner's name on the badge, at most this many UTF-16 units on the wire (the phone cleans it to 40). */
+    static final int LINK_SHARED_BY_UNITS=100;
     static final String LINK_PREFIX="link_records/",LINK_MARKER_PREFIX="link_records/enabled/";
     static final int LINK_LIMIT=1000,LINK_TITLE_UNITS=200,LINK_OWNER_UNITS=200,LINK_PATH_UNITS=1024;
     static final long LINK_TEXT_BYTES=1L<<20,LINK_PREVIEW_BYTES=32L<<20;
@@ -314,7 +316,10 @@ final class SyncGraph {
                 SyncProtocol.exact(row,"owner,link_id,kind,added_at");linkString(row,"owner",1024);linkString(row,"link_id",36);linkString(row,"kind",64);SyncProtocol.integer(row.get("added_at"));
                 if(!ids.getString(0).equals(row.getString("owner"))||!ids.getString(1).equals(row.getString("link_id")))throw SyncProtocol.invalid("link row identity changed");break;
             case "content":
-                SyncProtocol.exact(row,"hash,mime,modified,shared,protected");linkString(row,"hash",64);linkString(row,"mime",100);SyncProtocol.integer(row.get("modified"));linkBit(row,"shared");linkBit(row,"protected");break;
+                // Slice 7 (S7-4): a record the partner shares carries origin, shared_by and foreign_generation too, all or none.
+                if(row.has("origin")){SyncProtocol.exact(row,"hash,mime,modified,shared,protected,origin,shared_by,foreign_generation");linkString(row,"origin",64);linkString(row,"shared_by",LINK_SHARED_BY_UNITS);SyncProtocol.integer(row.get("foreign_generation"));}
+                else SyncProtocol.exact(row,"hash,mime,modified,shared,protected");
+                linkString(row,"hash",64);linkString(row,"mime",100);SyncProtocol.integer(row.get("modified"));linkBit(row,"shared");linkBit(row,"protected");break;
             case "text":SyncProtocol.exact(row,"sha256,length");linkString(row,"sha256",64);linkLength(row,LINK_TEXT_BYTES);break;
             case "preview":SyncProtocol.exact(row,"sha256,length");linkString(row,"sha256",64);linkLength(row,LINK_PREVIEW_BYTES);break;
             case "title":SyncProtocol.exact(row,"title,title_user_edited");linkString(row,"title",LINK_TITLE_UNITS);linkBit(row,"title_user_edited");break;
@@ -360,8 +365,15 @@ final class SyncGraph {
     }
     private static boolean linkContentOk(JSONObject row) {
         return linkMatch(LINK_HASH,row.opt("hash"),64)&&linkMatch(LINK_MIME,row.opt("mime"),100)&&linkSafe(row.opt("modified"),0,SyncProtocol.MAX_SEQUENCE)
-                &&linkSafe(row.opt("shared"),0,1)&&linkSafe(row.opt("protected"),0,1);
+                &&linkSafe(row.opt("shared"),0,1)&&linkSafe(row.opt("protected"),0,1)&&linkForeignOk(row);
     }
+    /** Slice 7: no `origin` is an own record; `origin` must be "foreign" with a clean partner name and a generation in range. */
+    private static boolean linkForeignOk(JSONObject row) {
+        if(!row.has("origin"))return true;
+        return "foreign".equals(row.opt("origin"))&&linkFree(row.opt("shared_by"),LINK_SHARED_BY_UNITS)&&linkSafe(row.opt("foreign_generation"),0,SyncProtocol.MAX_SEQUENCE);
+    }
+    /** True when a link content cell (or writer row) says the record is the partner's. */
+    static boolean linkIsForeign(JSONObject content){return content!=null&&"foreign".equals(content.opt("origin"));}
     private static boolean linkPresenceOk(JSONObject row) {
         return LINK_STATES.contains(row.opt("state"))&&LINK_REASONS.contains(row.opt("reason"))&&linkSafe(row.opt("since"),0,SyncProtocol.MAX_SEQUENCE);
     }
@@ -414,7 +426,9 @@ final class SyncGraph {
         if(gone) {
             for(String suffix:new String[]{"/content","/text","/preview","/title","/filen"})cells.put(suffix,JSONObject.NULL);
         } else {
-            cells.put("/content",new JSONObject().put("hash",row.get("hash")).put("mime",row.get("mime")).put("modified",row.get("modified")).put("shared",row.get("shared")).put("protected",row.get("protected")));
+            JSONObject content=new JSONObject().put("hash",row.get("hash")).put("mime",row.get("mime")).put("modified",row.get("modified")).put("shared",row.get("shared")).put("protected",row.get("protected"));
+            if(row.has("origin"))content.put("origin",row.get("origin")).put("shared_by",row.get("shared_by")).put("foreign_generation",row.get("foreign_generation"));   // linkContentOk accepted them
+            cells.put("/content",content);
             Object title=row.opt("title");
             cells.put("/title",title==null||title==JSONObject.NULL?JSONObject.NULL:new JSONObject().put("title",title).put("title_user_edited",row.opt("title_user_edited")==null?0:row.get("title_user_edited")));
             JSONObject filen=firstFilen(row);

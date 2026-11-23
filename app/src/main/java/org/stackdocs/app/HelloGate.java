@@ -19,6 +19,8 @@ final class HelloGate {
     static final int FRONTIER_FEATURES = 0, FRONTIER = 1, PLAIN = 2;
     static final long REFUSAL_MEMORY_MS = 15 * 60 * 1000L;
     static final String LINKS = "links";
+    /** Slice 7 (S7-4): the peer can show the partner's shared records read-only; only then does the phone write them into link cells. */
+    static final String LINK_FOREIGN = "link_foreign";
     private static final int MAX_FEATURES = 16, MAX_FEATURE_UNITS = 64;
 
     /** What the peer's hello said. Package-private API for P1 and D5. */
@@ -29,8 +31,12 @@ final class HelloGate {
         final boolean announcesLinks;
         /** The peer's {@code enabled}; null when absent. */
         final Boolean enabled;
-        Peer(boolean hasFrontier, boolean announcesLinks, Boolean enabled) {
+        /** The peer announced {@code link_foreign} (a computer that shows the partner's shared records). Needs {@code links} too. */
+        final boolean announcesLinkForeign;
+        Peer(boolean hasFrontier, boolean announcesLinks, Boolean enabled) { this(hasFrontier, announcesLinks, enabled, false); }
+        Peer(boolean hasFrontier, boolean announcesLinks, Boolean enabled, boolean announcesLinkForeign) {
             this.hasFrontier = hasFrontier; this.announcesLinks = announcesLinks; this.enabled = enabled;
+            this.announcesLinkForeign = announcesLinks && announcesLinkForeign;
         }
         /** True only for a peer that announced links and reports enabled=true. */
         boolean linksEnabled() { return announcesLinks && Boolean.TRUE.equals(enabled); }
@@ -44,7 +50,7 @@ final class HelloGate {
         boolean frontier = remote.has("frontier"), features = remote.has("features"), enabled = remote.has("enabled");
         String names = "version,group,replica" + (frontier ? ",frontier" : "") + (features ? ",features" : "") + (enabled ? ",enabled" : "");
         SyncProtocol.exact(remote, names);
-        boolean links = false;
+        boolean links = false, foreign = false;
         if (features) {
             Object value = remote.opt("features");
             if (!(value instanceof JSONArray)) throw SyncProtocol.invalid("hello features must be an array");
@@ -56,6 +62,7 @@ final class HelloGate {
                 if (!(item instanceof String) || ((String) item).isEmpty() || ((String) item).length() > MAX_FEATURE_UNITS
                     || !seen.add((String) item)) throw SyncProtocol.invalid("hello features must be distinct short strings");
                 if (LINKS.equals(item)) links = true; // unknown names are ignored: a newer peer may announce more
+                if (LINK_FOREIGN.equals(item)) foreign = true;
             }
         }
         Boolean flag = null;
@@ -64,7 +71,7 @@ final class HelloGate {
             if (!(value instanceof Boolean)) throw SyncProtocol.invalid("hello enabled must be a boolean");
             flag = (Boolean) value;
         }
-        return new Peer(frontier, links, flag);
+        return new Peer(frontier, links, flag, foreign);
     }
 
     /** Levels this build starts from: the features level only when announcing is switched on. */

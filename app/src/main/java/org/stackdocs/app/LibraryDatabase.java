@@ -7,7 +7,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.graphics.Color;
 
 final class LibraryDatabase extends SQLiteOpenHelper {
-    static final int VERSION = 13;
+    static final int VERSION = 16;
 
     LibraryDatabase(Context context) { this(context, "library.db"); }
 
@@ -52,6 +52,9 @@ final class LibraryDatabase extends SQLiteOpenHelper {
         addLinks(db);
         addLinkLifecycle(db);
         addLinkSync(db);
+        addPartnerShare(db);
+        addPartnerImport(db);
+        addForeignSync(db);
         String[] ids = {"bills", "banking", "ids", "house", "medical", "receipts", "starred"};
         String[] names = {"Bills", "Banking", "IDs", "House", "Medical", "Receipts", "Starred"};
         String[] colors = {"#DCEADB", "#E5E8FA", "#F7E6D2", "#F1DDE8", "#DCECF2", "#F7EDCA", "#E2E5E0"};
@@ -66,7 +69,7 @@ final class LibraryDatabase extends SQLiteOpenHelper {
     }
 
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 1 || oldVersion > 12 || newVersion != VERSION) {
+        if (oldVersion < 1 || oldVersion > 15 || newVersion != VERSION) {
             throw new IllegalStateException("No migration from library version " + oldVersion);
         }
         if (oldVersion < 2) {
@@ -87,6 +90,75 @@ final class LibraryDatabase extends SQLiteOpenHelper {
         if (oldVersion < 11) addLinks(db);
         if (oldVersion < 12) addLinkLifecycle(db);
         if (oldVersion < 13) addLinkSync(db);
+        if (oldVersion < 14) addPartnerShare(db);
+        if (oldVersion < 15) addPartnerImport(db);
+        if (oldVersion < 16) addForeignSync(db);
+    }
+
+    /**
+     * Partner sharing, sync to the computer (docs/STACK_LINK_SLICE7_DESIGN.md, S7-4). The three link sync triggers of schema 15 ignored foreign
+     * rows; now that the partner's shared records are written into link cells (only for a computer that announced `link_foreign`, see
+     * `LinkSync`), the triggers cover every row again, own and foreign, so an import, an update, Recently deleted ('unshared' or removed by
+     * the person) and a delete for good all raise the link dirty flag. Nothing else changes: with no such computer, capture leaves foreign
+     * rows alone. The column list and the IS NOT comparison of the update trigger are those of schema 15.
+     */
+    static void addForeignSync(SQLiteDatabase db) {
+        db.execSQL("DROP TRIGGER IF EXISTS sync_link_records_insert");
+        db.execSQL("DROP TRIGGER IF EXISTS sync_link_records_delete");
+        db.execSQL("DROP TRIGGER IF EXISTS sync_link_records_update");
+        String enabled = "(SELECT enabled=1 AND applying=0 FROM sync_control WHERE singleton=1)";
+        String body = " BEGIN INSERT INTO sync_change(table_name,action) VALUES('link_records','%s'); "
+                + "INSERT OR REPLACE INTO sync_meta(key,value) VALUES('link_dirty','1'); END";
+        db.execSQL("CREATE TRIGGER sync_link_records_insert AFTER INSERT ON link_records WHEN " + enabled + String.format(java.util.Locale.ROOT, body, "INSERT"));
+        db.execSQL("CREATE TRIGGER sync_link_records_delete AFTER DELETE ON link_records WHEN " + enabled + String.format(java.util.Locale.ROOT, body, "DELETE"));
+        String[] synced = {"owner", "link_id", "kind", "title", "mime", "modified", "hash", "shared", "protected", "locators",
+                "preview_file", "title_user_edited", "removed_reason", "origin", "shared_by", "foreign_generation"};
+        StringBuilder changed = new StringBuilder("(OLD.state='trashed') IS NOT (NEW.state='trashed')");
+        for (String column : synced) changed.append(" OR OLD.").append(column).append(" IS NOT NEW.").append(column);
+        db.execSQL("CREATE TRIGGER sync_link_records_update AFTER UPDATE OF owner,link_id,kind,title,mime,modified,hash,shared,protected,"
+                + "locators,state,preview_file,title_user_edited,removed_reason,origin,shared_by,foreign_generation ON link_records"
+                + " WHEN " + enabled + " AND (" + changed + ")"
+                + String.format(java.util.Locale.ROOT, body, "UPDATE"));
+    }
+
+    /**
+     * Partner sharing, publish side (docs/STACK_LINK_SLICE7_DESIGN.md, S7-2). `partner_share` is Stack's own switch per link, separate from the owner
+     * app's `shared` flag: 0 = off, 1 = shared, 2 = shared and the person confirmed that a protected link's text and preview are readable by the
+     * partner. It is NOT in the sync triggers or the library archive, so it stays on this phone. `partner_share_log` remembers what was last
+     * shared (state 'shared') and what stopped being shared (state 'removed', `since` = when), which becomes the 30-day tombstones. Local only.
+     */
+    static void addPartnerShare(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE link_records ADD COLUMN partner_share INTEGER NOT NULL DEFAULT 0");
+        db.execSQL("CREATE TABLE partner_share_log (owner TEXT NOT NULL, link_id TEXT NOT NULL, state TEXT NOT NULL, since INTEGER NOT NULL, PRIMARY KEY(owner, link_id))");
+    }
+
+    /**
+     * Partner sharing, import side (docs/STACK_LINK_SLICE7_DESIGN.md, S7-3). A record the partner shares with us is stored as a link record with
+     * `origin='foreign'`, the partner's display name in `shared_by` and the archive's generation number in `foreign_generation` (an own record keeps the
+     * defaults 'own', '' and 0). Foreign records are read-only copies: they are never checked with the owner app, and, until S7-4 adds them
+     * deliberately, they stay out of the sync cells, the sync journal and every backup. The three sync triggers are therefore replaced by versions that
+     * ignore foreign rows; the update trigger keeps its column list.
+     */
+    static void addPartnerImport(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE link_records ADD COLUMN origin TEXT NOT NULL DEFAULT 'own'");
+        db.execSQL("ALTER TABLE link_records ADD COLUMN shared_by TEXT NOT NULL DEFAULT ''");
+        db.execSQL("ALTER TABLE link_records ADD COLUMN foreign_generation INTEGER NOT NULL DEFAULT 0");
+        db.execSQL("DROP TRIGGER IF EXISTS sync_link_records_insert");
+        db.execSQL("DROP TRIGGER IF EXISTS sync_link_records_delete");
+        db.execSQL("DROP TRIGGER IF EXISTS sync_link_records_update");
+        String enabled = "(SELECT enabled=1 AND applying=0 FROM sync_control WHERE singleton=1)";
+        String body = " BEGIN INSERT INTO sync_change(table_name,action) VALUES('link_records','%s'); "
+                + "INSERT OR REPLACE INTO sync_meta(key,value) VALUES('link_dirty','1'); END";
+        db.execSQL("CREATE TRIGGER sync_link_records_insert AFTER INSERT ON link_records WHEN " + enabled + " AND NEW.origin='own'" + String.format(java.util.Locale.ROOT, body, "INSERT"));
+        db.execSQL("CREATE TRIGGER sync_link_records_delete AFTER DELETE ON link_records WHEN " + enabled + " AND OLD.origin='own'" + String.format(java.util.Locale.ROOT, body, "DELETE"));
+        String[] synced = {"owner", "link_id", "kind", "title", "mime", "modified", "hash", "shared", "protected", "locators",
+                "preview_file", "title_user_edited", "removed_reason"};
+        StringBuilder changed = new StringBuilder("(OLD.state='trashed') IS NOT (NEW.state='trashed')");
+        for (String column : synced) changed.append(" OR OLD.").append(column).append(" IS NOT NEW.").append(column);
+        db.execSQL("CREATE TRIGGER sync_link_records_update AFTER UPDATE OF owner,link_id,kind,title,mime,modified,hash,shared,protected,"
+                + "locators,state,preview_file,title_user_edited,removed_reason ON link_records"
+                + " WHEN " + enabled + " AND NEW.origin='own' AND OLD.origin='own' AND (" + changed + ")"
+                + String.format(java.util.Locale.ROOT, body, "UPDATE"));
     }
 
     /**

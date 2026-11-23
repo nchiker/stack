@@ -96,12 +96,12 @@ final class LinkStoreChecks {
             WorkflowRepositoryChecks.require(documentJournal(db) == journal && count(db, "documents") == documents, "the document journal and documents are still untouched after every operation");
 
             // A version 10 library gains the link tables without losing anything.
-            db.execSQL("DROP TABLE link_search"); db.execSQL("DROP TABLE link_records"); db.execSQL("DROP TABLE sync_link_projection"); db.setVersion(10);
+            db.execSQL("DROP TABLE link_search"); db.execSQL("DROP TABLE link_records"); db.execSQL("DROP TABLE sync_link_projection"); db.execSQL("DROP TABLE partner_share_log"); db.setVersion(10);
         } finally { helper.close(); }
         LibraryDatabase upgraded = new LibraryDatabase(isolated);
         try {
             SQLiteDatabase db = upgraded.getWritableDatabase();
-            WorkflowRepositoryChecks.require(db.getVersion() == 13 && count(db, "link_records") == 0 && count(db, "link_search") == 0, "a version 10 library upgrades to 13 with empty link tables");
+            WorkflowRepositoryChecks.require(db.getVersion() == 16 && count(db, "link_records") == 0 && count(db, "link_search") == 0, "a version 10 library upgrades to 16 with empty link tables");
         } finally { upgraded.close(); }
         mark.accept("Link store: publish/repeat/replace/rename/delete, text+title search with excerpt, duplicate-hash report, refused text stores nothing, sync journal and documents untouched, v10 to v11 upgrade");
     }

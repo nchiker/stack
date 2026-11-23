@@ -87,7 +87,7 @@ public final class BackupActivity extends LibraryActivity {
     }
     /** Asks Filen Files for its "Stack backups" folder: one Allow tap there, no browsing. */
     private void filenFolder() {
-        try{startActivityForResult(FilenFolder.request(),FILEN_FOLDER);}catch(ActivityNotFoundException error){pickFolder();}
+        try{if(!FilenFolder.available(this))throw new ActivityNotFoundException();startActivityForResult(FilenFolder.request(),FILEN_FOLDER);}catch(ActivityNotFoundException error){pickFolder();}
     }
     /** Keeps the folder permission (the provider may be slow, so off the UI thread), then makes the first backup. */
     private void folderChosen(Intent data) {
@@ -142,7 +142,7 @@ public final class BackupActivity extends LibraryActivity {
     }
     private void askSecret(android.net.Uri uri,String problem) {
         android.widget.EditText field=secret("Passphrase or recovery key");
-        new SecureBuilder().setTitle("Encrypted backup").setMessage((problem.isEmpty()?"":problem+"\n\n")+"Enter the passphrase, or scan the recovery key from Key Vault (keyvault show-qr stack/stack-backup-recovery-key.txt).")
+        new SecureBuilder().setTitle("Encrypted backup").setMessage((problem.isEmpty()?"":problem+"\n\n")+"Enter the passphrase, or scan the recovery key: in Key Vault on your computer, open \"stack backup recovery key\" and choose Show QR code.")
                 .setView(field).setNegativeButton("Cancel",null)
                 .setNeutralButton("Scan key",(d,w) -> {pendingRestore=uri;scanKey(KEY_RESTORE);})
                 .setPositiveButton("Open",(d,w) -> {
@@ -191,7 +191,7 @@ public final class BackupActivity extends LibraryActivity {
                     if(a.length()<BackupKeys.MIN_PASSPHRASE||!a.equals(two.getText().toString())){new SecureBuilder().setMessage("The passphrases must match and have at least "+BackupKeys.MIN_PASSPHRASE+" characters.").setPositiveButton("OK",null).show();return;}
                     pendingPassphrase=a;
                     new SecureBuilder().setTitle("Recovery key")
-                            .setMessage("Stack needs a recovery key as a second way to open backups. Best: make it on your computer with\nkeyvault newkey stack/stack-backup-recovery-key.txt\nwhich saves it in Key Vault and shows a QR code to scan here. Or let Stack make one now and show it to you once.")
+                            .setMessage("Stack needs a recovery key as a second way to open backups. Best: create it in Key Vault on your computer (it saves the key and shows a QR code), then scan the code here. Or let Stack make one now and show it to you once.")
                             .setPositiveButton("Scan key",(d2,w2) -> scanKey(KEY_SETUP))
                             .setNeutralButton("Make one here",(d2,w2) -> startKeys(a,null))
                             .setNegativeButton("Cancel setup",(d2,w2) -> pendingPassphrase=null).show();
@@ -216,7 +216,7 @@ public final class BackupActivity extends LibraryActivity {
                 if(scanned==null){handler.post(() -> showRecoveryKey(pending));return;}
                 // The key came from Key Vault, which only shows it after it is sealed and copied: no confirm-back needed.
                 String problem="";try{if(app().archives.busy())throw new IllegalStateException("A backup is running. Try again when it has finished.");BackupKeys.save(this,pending.slots);}catch(Exception error){problem=error.getMessage()==null?"unknown error":error.getMessage();}
-                String shown=problem;handler.post(() -> {render();new SecureBuilder().setMessage(shown.isEmpty()?"Backup encryption is on. Check that this fingerprint matches the one keyvault showed under the QR code: "+fingerprint(pending.recoveryHex)+"\n\nIf it differs, turn encryption off and set it up again. ":"Encryption could not be saved: "+shown).setPositiveButton("OK",null).show();});
+                String shown=problem;handler.post(() -> {render();new SecureBuilder().setMessage(shown.isEmpty()?"Backup encryption is on. Check that this fingerprint matches the one Key Vault showed under the QR code: "+fingerprint(pending.recoveryHex)+"\n\nIf it differs, turn encryption off and set it up again. ":"Encryption could not be saved: "+shown).setPositiveButton("OK",null).show();});
             }
             catch(Exception error){handler.post(() -> new SecureBuilder().setMessage("Encryption could not be set up: "+error.getMessage()).setPositiveButton("OK",null).show());}
             finally{if(scanned!=null)java.util.Arrays.fill(scanned,(byte)0);}
@@ -226,7 +226,7 @@ public final class BackupActivity extends LibraryActivity {
         StringBuilder grouped=new StringBuilder();for(int i=0;i<64;i+=8){if(i>0)grouped.append(i==32?"\n":" ");grouped.append(pending.recoveryHex,i,i+8);}
         android.widget.TextView text=new android.widget.TextView(this);text.setText(grouped);text.setTypeface(android.graphics.Typeface.MONOSPACE);text.setTextSize(18);text.setPadding(Ui.dp(this,24),Ui.dp(this,8),Ui.dp(this,24),0);
         new SecureBuilder().setTitle("Your recovery key").setView(text).setCancelable(false)
-                .setMessage("This is shown once. Save it somewhere safe, for example in your Key Vault:\nkeyvault protect --no-live-copy --expect-hex 64 stack/stack-backup-recovery-key.txt")
+                .setMessage("This is shown once. Save it somewhere safe, for example in Key Vault on your computer as \"stack backup recovery key\".")
                 .setPositiveButton("I have saved it",(d,w) -> confirmRecoveryKey(pending))
                 .setNegativeButton("Cancel setup",null).show();
     }
@@ -270,6 +270,7 @@ public final class BackupActivity extends LibraryActivity {
             return;
         }
         if(result!=RESULT_OK||data==null||data.getData()==null)return;
+        if(request==FILEN_FOLDER&&!FilenFolder.treeTrusted(this,data)){new AlertDialog.Builder(this).setTitle("Filen Drive").setMessage("Filen Files is not available. Choose the folder another way.").setPositiveButton("OK",null).setNeutralButton("Other folder",(d,w) -> pickFolder()).show();return;}
         if(request==AUTO_FOLDER||request==FILEN_FOLDER){whenAllowed(() -> folderChosen(data));return;}
         whenAllowed(() -> {if(request==BACKUP)app().archives.export(data.getData(),plainLinks);if(request==RESTORE)restoreChosen(data.getData());render();});
     }
