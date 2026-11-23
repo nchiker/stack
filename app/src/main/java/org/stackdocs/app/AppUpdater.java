@@ -34,7 +34,7 @@ final class AppUpdater {
     static final String CACHE_DIR = "update";
     private static final long MAX_APK = 200L * 1024 * 1024, MAX_SUMS = 64 * 1024;
     private static final AtomicBoolean running = new AtomicBoolean();
-    private static volatile boolean canceled;
+    static volatile boolean canceled;
 
     private AppUpdater() {}
 
@@ -121,12 +121,17 @@ final class AppUpdater {
         return null;
     }
 
-    private interface Progress { void percent(int value); }
-    private static final class Canceled extends IOException {}
+    interface Progress { void percent(int value); }
+    static final class Canceled extends IOException {}
 
     /** Downloads one release file (only from this repository's release downloads), returning its SHA-256 hex. */
     private static String download(String url, OutputStream out, long expected, long[] size, Progress progress) throws IOException {
-        if (!UpdateCheck.isReleaseFile(url)) throw new IOException("not a release file");
+        return download(url, UpdateCheck.DOWNLOAD_PREFIX, out, expected, size, progress);
+    }
+
+    /** The same download for any pinned companion: only files under {@code prefix} (that repository's release downloads). */
+    static String download(String url, String prefix, OutputStream out, long expected, long[] size, Progress progress) throws IOException {
+        if (url == null || !url.startsWith(prefix) || url.contains("..") || url.contains("?") || url.contains("#")) throw new IOException("not a release file");
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         connection.setConnectTimeout(15000);
         connection.setReadTimeout(30000);
@@ -159,9 +164,14 @@ final class AppUpdater {
 
     /** Writes the checked file into an install session, hashing it again, and commits it. */
     private static void commit(Context context, File file, long size, String want) throws IOException {
+        commit(context, file, size, want, context.getPackageName());
+    }
+
+    /** Installs {@code file} as package {@code pkg}; {@code want} null skips the second hash check (none was published). */
+    static void commit(Context context, File file, long size, String want, String pkg) throws IOException {
         PackageInstaller installer = context.getPackageManager().getPackageInstaller();
         PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
-        params.setAppPackageName(context.getPackageName());
+        params.setAppPackageName(pkg);
         params.setSize(size);
         if (Build.VERSION.SDK_INT >= 31) params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED);
         int id = installer.createSession(params);
@@ -173,8 +183,9 @@ final class AppUpdater {
                 while ((n = in.read(buffer)) != -1) { if (canceled) throw new Canceled(); digest.update(buffer, 0, n); out.write(buffer, 0, n); }
                 session.fsync(out);
             }
-            if (!hex(digest.digest()).equals(want)) throw new IOException("The saved update changed before installing. Nothing was installed.");
+            if (want != null && !hex(digest.digest()).equals(want)) throw new IOException("The saved update changed before installing. Nothing was installed.");
             Intent intent = new Intent(context, InstallResultReceiver.class).setPackage(context.getPackageName());
+            if (!pkg.equals(context.getPackageName())) intent.putExtra(Companions.EXTRA, pkg);
             int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0);
             session.commit(PendingIntent.getBroadcast(context, id, intent, flags).getIntentSender());
             committed = true;
@@ -184,11 +195,11 @@ final class AppUpdater {
         }
     }
 
-    private static MessageDigest sha256() {
+    static MessageDigest sha256() {
         try { return MessageDigest.getInstance("SHA-256"); } catch (java.security.NoSuchAlgorithmException error) { throw new AssertionError(error); }
     }
 
-    private static String hex(byte[] bytes) {
+    static String hex(byte[] bytes) {
         StringBuilder out = new StringBuilder();
         for (byte b : bytes) out.append(String.format(Locale.ROOT, "%02x", b));
         return out.toString();

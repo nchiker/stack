@@ -21,6 +21,7 @@
         <!-- The Filen Files pairing account call (FilenFolder.ownerEmail). -->
         <provider android:authorities="app.filenfiles.stacklink" />
         <package android:name="app.amipro.editor"/>
+        <package android:name="app.filenfiles"/>
     </queries>
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
@@ -51,10 +52,13 @@
         <activity android:name=".DuplicatesActivity" android:exported="false" />
         <activity android:name=".PairingQrActivity" android:exported="false" />
         <activity android:name=".SyncActivity" android:exported="false" />
+        <activity android:name=".CompanionsActivity" android:exported="false" />
         <activity android:name=".DocumentActivity" android:exported="false" />
         <activity android:name=".LinkActivity" android:exported="false" />
         <activity android:name=".PartnerShareActivity" android:exported="false" />
         <activity android:name=".PairPartnerActivity" android:exported="false" />
+        <activity android:name=".PartnerJoinActivity" android:exported="false" />
+        <activity android:name=".PartnerInviteActivity" android:exported="false" />
         <activity android:name=".ScanActivity" android:exported="false" />
         <activity android:name=".PageEditorActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true"

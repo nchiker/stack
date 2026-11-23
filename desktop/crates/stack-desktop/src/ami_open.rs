@@ -21,6 +21,33 @@ pub struct Ui {
     pub status: Option<String>,
     /// A chosen file whose content differs from the saved record, waiting for Cancel / Open anyway.
     pub differs: Option<PathBuf>,
+    /// When this computer's own files were last looked at (launch, then window focus at most every 10 s).
+    pub last_refresh: Option<std::time::Instant>,
+    /// Waiting for the library to be ready before the launch check; gives up after a while.
+    pub launch_tries: u8,
+    /// The launch check has run.
+    pub launched: bool,
+    /// What the last look found, so the screens are only refreshed when it changed.
+    pub last_report: Option<stack_core::LocalRefresh>,
+    /// The Filen folder this computer learned (Settings shows it, with "Forget this folder").
+    pub filen_root: Option<String>,
+}
+
+impl Ui {
+    /// A new document view: forget the button's messages but keep what belongs to the whole app.
+    pub fn reset_view(&mut self) {
+        self.busy = false;
+        self.status = None;
+        self.differs = None;
+    }
+}
+
+/// The least time between two looks at the files when the window keeps regaining focus.
+pub const REFRESH_EVERY: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// True when a look is due: never done, or at least `every` ago.
+pub fn refresh_due(last: Option<std::time::Instant>, now: std::time::Instant, every: std::time::Duration) -> bool {
+    last.is_none_or(|last| now.saturating_duration_since(last) >= every)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -47,6 +74,13 @@ pub enum Event {
     CancelDiffers,
     Opened(Result<(), OpenError>),
     Saved(Result<(), String>),
+    /// The window gained focus.
+    Focused,
+    /// The launch check: waits until the library has opened.
+    LaunchTick,
+    Refreshed(Result<(stack_core::LocalRefresh, Option<String>), String>),
+    ForgetFolder,
+    FolderRead(Result<Option<String>, String>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -62,7 +96,7 @@ pub enum Button {
 /// The button for a link, from its state and whether a file is remembered.
 pub fn button_state(state: &str, remembered: bool) -> Button {
     if state == "trashed" {
-        Button::Disabled("This document was removed, so it cannot be opened.")
+        Button::Disabled("Removed, so it cannot be opened.")
     } else if remembered {
         Button::Open
     } else {
@@ -131,8 +165,20 @@ fn classify(error: &std::io::Error) -> OpenError {
     }
 }
 
-/// The Ami Pro program (documented in Ami Pro's INSTALL notes); found on PATH.
-const AMI_PRO_PROGRAM: &str = "amipro-linux";
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum When {
+    Launch,
+    Focus,
+    Force,
+}
+
+/// A message to run the launch check again after `after`.
+pub fn launch_tick(after: std::time::Duration) -> app::Task<Message> {
+    cosmic::task::future(async move {
+        tokio::time::sleep(after).await;
+        Message::Ami(Event::LaunchTick)
+    })
+}
 
 /// True when running inside a Flatpak sandbox: the app id is set, or `/.flatpak-info` exists.
 pub fn sandboxed(flatpak_id: Option<&std::ffi::OsStr>, info_file_exists: bool) -> bool {
@@ -150,7 +196,9 @@ async fn open_document(path: PathBuf) -> Result<(), OpenError> {
     if in_flatpak() {
         portal_open(path).await
     } else {
-        tokio::task::spawn_blocking(move || launch(std::ffi::OsStr::new(AMI_PRO_PROGRAM), &path))
+        let home = std::env::var_os("HOME").map(PathBuf::from);
+        let program = crate::ami_install::program(&std::env::var("PATH").unwrap_or_default(), home.as_deref());
+        tokio::task::spawn_blocking(move || launch(&program, &path))
             .await
             .map_err(|e| OpenError::Failed(e.to_string()))?
     }
@@ -230,10 +278,25 @@ impl Stack {
         self.linked
             .as_ref()
             .filter(|l| !l.foreign)
-            .map(|l| button_state(&l.state, l.remembered_file.is_some()))
+            .map(|l| button_state(&l.state, l.remembered_file.is_some() || l.derived_file.is_some()))
     }
 
     pub fn ami_action(&mut self, event: Event) -> app::Task<Message> {
+        match event {
+            Event::Focused => return self.ami_refresh(When::Focus),
+            Event::LaunchTick => return self.ami_refresh(When::Launch),
+            Event::Refreshed(result) => return self.ami_refreshed(result),
+            Event::ForgetFolder => return self.ami_folder(true),
+            Event::FolderRead(Ok(root)) => {
+                self.ami.filen_root = root;
+                return app::Task::none();
+            }
+            Event::FolderRead(Err(error)) => {
+                self.ami.status = Some(format!("Could not read the Filen folder setting: {error}"));
+                return app::Task::none();
+            }
+            _ => {}
+        }
         let Some(linked) = self.linked.as_ref().filter(|l| !l.foreign) else {
             return app::Task::none();
         };
@@ -241,8 +304,16 @@ impl Stack {
         match event {
             Event::Press if !self.ami.busy => {
                 self.ami.differs = None;
-                match button_state(&linked.state, linked.remembered_file.is_some()) {
+                let derived = linked.derived_file.clone().filter(|_| linked.remembered_file.is_none());
+                match button_state(&linked.state, linked.remembered_file.is_some() || derived.is_some()) {
                     Button::Disabled(_) => app::Task::none(),
+                    // Found under the learned Filen folder: no chooser, but the same name and content check as a chosen file.
+                    Button::Open if derived.is_some() => {
+                        self.ami.busy = true;
+                        self.ami.status = Some("Checking the file in your Filen folder…".into());
+                        let path = PathBuf::from(derived.unwrap());
+                        cosmic::task::future(async move { Message::Ami(Event::Chosen(Ok(Some(path)))) })
+                    }
                     Button::Open => {
                         let path = PathBuf::from(linked.remembered_file.clone().unwrap());
                         self.ami.busy = true;
@@ -305,7 +376,7 @@ impl Stack {
             Event::Checked(path, Ok(Verdict::Differs)) => {
                 self.ami.busy = false;
                 self.ami.status = Some(
-                    "This file has a different name and content than the saved copy. It may be a different document.".into(),
+                    "This file looks different from the saved copy. Open it anyway?".into(),
                 );
                 self.ami.differs = Some(path);
                 app::Task::none()
@@ -328,7 +399,7 @@ impl Stack {
             Event::Opened(Err(OpenError::Gone)) => {
                 self.ami.busy = false;
                 self.ami.status = Some(
-                    "The file is gone, or this app can no longer reach it. Press Open in Ami Pro to choose it again.".into(),
+                    "Stack cannot find the file. Choose it again with Open in Ami Pro.".into(),
                 );
                 if let Some(linked) = &mut self.linked {
                     linked.remembered_file = None;
@@ -342,12 +413,92 @@ impl Stack {
             }
             Event::Saved(Err(error)) => {
                 self.ami.status = Some(format!(
-                    "Could not remember the file, so you will be asked again next time: {error}"
+                    "Could not remember the file; you will be asked again: {error}"
                 ));
                 app::Task::none()
             }
-            Event::Saved(Ok(())) | Event::Press => app::Task::none(),
+            Event::Saved(Ok(())) => {
+                // A first choice may have taught the Filen folder: look at the other documents' files now.
+                self.ami_refresh(When::Force)
+            }
+            _ => app::Task::none(),
         }
+    }
+
+    /// Look at this computer's own copies of the linked documents' files: at launch (once the library is open) and when
+    /// the window gains focus, at most every 10 seconds. The work runs on the library worker, never on the UI.
+    fn ami_refresh(&mut self, when: When) -> app::Task<Message> {
+        if self.closing || self.flags.library.is_none() || self.flags.smoke.is_some() || self.repository.is_none() {
+            return app::Task::none();
+        }
+        // The library opens lazily on the first request; wait for the first screen before adding work.
+        if !self.layout_loaded || self.library_loading {
+            return if when == When::Launch && !self.ami.launched && self.ami.launch_tries < 40 {
+                self.ami.launch_tries += 1;
+                launch_tick(std::time::Duration::from_secs(1))
+            } else {
+                app::Task::none()
+            };
+        }
+        let now = std::time::Instant::now();
+        match when {
+            When::Launch if self.ami.launched => return app::Task::none(),
+            When::Focus if !refresh_due(self.ami.last_refresh, now, REFRESH_EVERY) => return app::Task::none(),
+            _ => {}
+        }
+        self.ami.launched = true;
+        self.ami.last_refresh = Some(now);
+        let receive = self.repository.as_ref().expect("checked").submit_required(Request::RefreshLocal);
+        cosmic::task::future(async move {
+            Message::Ami(Event::Refreshed(
+                receive
+                    .await
+                    .unwrap_or_else(|_| Err("Library worker stopped".into()))
+                    .map(|response| match response {
+                        Response::LocalRefreshed { report, root } => (report, root),
+                        _ => (stack_core::LocalRefresh::default(), None),
+                    }),
+            ))
+        })
+    }
+
+    fn ami_refreshed(&mut self, result: Result<(stack_core::LocalRefresh, Option<String>), String>) -> app::Task<Message> {
+        // A busy library worker simply means "not now"; the next focus tries again.
+        let Ok((report, root)) = result else {
+            return app::Task::none();
+        };
+        self.ami.filen_root = root;
+        let changed = self.ami.last_report.is_some_and(|last| last.changed != report.changed || last.with_text != report.with_text)
+            || (self.ami.last_report.is_none() && (report.changed > 0 || report.with_text > 0));
+        self.ami.last_report = Some(report);
+        if !changed {
+            return app::Task::none();
+        }
+        // Search results and the open document may now read differently.
+        let browse = self.refresh_browser();
+        match self.linked.as_ref().filter(|l| !l.foreign).map(|l| l.id.clone()) {
+            Some(id) if !self.ami.busy => app::Task::batch([browse, self.select_document(id, 0)]),
+            _ => browse,
+        }
+    }
+
+    /// Settings: forget the learned Filen folder (and read it when the page opens).
+    pub fn ami_folder(&mut self, forget: bool) -> app::Task<Message> {
+        let Some(repository) = &self.repository else {
+            return app::Task::none();
+        };
+        let receive = repository.submit_required(Request::FilenRoot { forget });
+        cosmic::task::future(async move {
+            Message::Ami(Event::FolderRead(
+                receive
+                    .await
+                    .unwrap_or_else(|_| Err("Library worker stopped".into()))
+                    .map(|response| match response {
+                        Response::FilenRoot(root) => root,
+                        _ => None,
+                    }),
+            ))
+        })
     }
 
     fn ami_remember_and_open(&mut self, id: String, path: PathBuf) -> app::Task<Message> {
@@ -420,6 +571,24 @@ mod tests {
         assert_eq!(button_state("live", false), Button::Choose);
         assert_eq!(button_state("unreachable", false), Button::Choose);
         assert_eq!(button_state("missing", true), Button::Open);
+    }
+
+    #[test]
+    fn the_file_check_runs_at_launch_and_at_most_every_ten_seconds_after_that() {
+        use std::time::{Duration, Instant};
+        let start = Instant::now();
+        assert!(refresh_due(None, start, REFRESH_EVERY), "the launch check is always due");
+        assert!(!refresh_due(Some(start), start + Duration::from_secs(9), REFRESH_EVERY));
+        assert!(refresh_due(Some(start), start + Duration::from_secs(10), REFRESH_EVERY));
+        // A clock that appears to go backwards never makes a check due early.
+        assert!(!refresh_due(Some(start + Duration::from_secs(5)), start, REFRESH_EVERY));
+    }
+
+    #[test]
+    fn a_file_found_under_the_filen_folder_means_open_not_choose() {
+        // The app passes `remembered || derived`: a derived file gives the Open button (after the usual name/hash check).
+        assert_eq!(button_state("live", false), Button::Choose);
+        assert_eq!(button_state("live", true), Button::Open);
     }
 
     #[test]

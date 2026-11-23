@@ -14,8 +14,6 @@ import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -108,12 +106,8 @@ final class ShareArchive {
             return new FileOutputStream(new File(dir, tempName));
         }
         @Override public void commit(String tempName, String finalName) throws IOException {
-            File temp = new File(dir, tempName);
-            try {
-                Files.move(temp.toPath(), new File(dir, finalName).toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
-                throw new IOException("The shared folder cannot replace the file in one step.");
-            }
+            // rename(2) is atomic and replaces an existing file on the same file system (File.renameTo works on every supported API level).
+            if (!new File(dir, tempName).renameTo(new File(dir, finalName))) throw new IOException("The shared folder cannot replace the file in one step.");
         }
         @Override public void discard(String tempName) { try { new File(dir, tempName).delete(); } catch (RuntimeException ignored) { } }
     }

@@ -2,3 +2,5 @@
 *.bat text eol=crlf
 *.jar binary
 *.apk binary
+*.sam binary
+*.SAM binary

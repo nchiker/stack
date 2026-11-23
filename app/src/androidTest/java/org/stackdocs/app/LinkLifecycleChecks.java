@@ -235,7 +235,22 @@ final class LinkLifecycleChecks {
             require(LinkStore.TRASHED.equals(state(mine)), "a record deleted for good is never revived by a later move");
             io(() -> app.library.links.publish(LinkRecord.parse(new JSONObject(sharedRecord).put("locators", new JSONArray().put(new JSONObject().put("type", "filen").put("uuid", uuid2).put("path", "/Docs/b.sam"))).toString()), "lifecycle check text", null));
             require(io(() -> app.library.links.filenUnshared(uuid2)) == 1 && !io(() -> app.library.links.get(mine.id)).shared, "Filen ending the share clears shared");
-            mark.accept("Lifecycle: Filen-origin events");
+            // list_owned: the caller's own records only, no text, no protected/trashed rows.
+            Bundle listed = app.getContentResolver().call(Uri.parse("content://" + me + ".link"), "list_owned", new JSONObject().put("contract", 1).put("owner", me).toString(), null);
+            JSONArray owned = new JSONArray(listed.getString("records"));
+            boolean found = false;
+            for (int i = 0; i < owned.length(); i++) {
+                JSONObject ownedRow = owned.getJSONObject(i);
+                require(ownedRow.length() == 6 && ownedRow.has("link_id") && ownedRow.has("locators") && !ownedRow.has("text") && !ownedRow.has("preview"), "list_owned entries carry only ids, title, hash, modified, state and filen locators");
+                if (ownedRow.getString("link_id").equals(mine.linkId)) found = true;
+            }
+            require(found && listed.getInt("count") == owned.length() && !listed.getBoolean("truncated"), "list_owned lists the caller's own live record");
+            require("invalid".equals(app.getContentResolver().call(Uri.parse("content://" + me + ".link"), "list_owned", new JSONObject().put("contract", 1).put("owner", "some.other.app").toString(), null).getString("error")), "list_owned for another owner is refused");
+            LinkStore.Link throwaway = publish(me, "Lifecycle list_owned throwaway", hash());
+            io(() -> app.library.links.trash(throwaway.id, "user"));
+            Bundle afterList = app.getContentResolver().call(Uri.parse("content://" + me + ".link"), "list_owned", new JSONObject().put("contract", 1).put("owner", me).toString(), null);
+            require(!afterList.getString("records").contains(throwaway.linkId), "list_owned leaves out trashed records");
+            mark.accept("Lifecycle: Filen-origin events and list_owned");
 
             // User removal, restore, expiry.
             require(!io(() -> app.library.links.deleteTrashed(mine.id)) && io(() -> app.library.links.get(mine.id)) != null, "Delete for good never deletes a record that is not in Recently deleted");

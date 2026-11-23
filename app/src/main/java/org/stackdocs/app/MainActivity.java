@@ -40,7 +40,8 @@ public final class MainActivity extends LibraryActivity {
     private String alsoStackId;
     private final java.util.LinkedHashSet<String> selected=new java.util.LinkedHashSet<>();
     private android.widget.Button selection;
-    private android.widget.Button updateNotice;
+    private android.widget.Button updateNotice,companionNotice;
+    private LinearLayout firstRun;
     private String organization;
     private String documentSort="newest";
     private FrameLayout filters;
@@ -100,7 +101,7 @@ public final class MainActivity extends LibraryActivity {
         }
     }
 
-    @Override protected void onResume() { super.onResume(); thumbnails.invalidate(); refresh(); observeImport(); whenAllowed(() -> work(() -> getSharedPreferences("library_reset",MODE_PRIVATE).getString("completed",""),this::showResetRecovery)); }
+    @Override protected void onResume() { super.onResume(); thumbnails.invalidate(); refresh(); observeImport(); check(() -> LinkChecker.checkRestored(app()), asked -> { if (asked > 0) refresh(); }); whenAllowed(() -> work(() -> getSharedPreferences("library_reset",MODE_PRIVATE).getString("completed",""),this::showResetRecovery)); }
 
     private void showResetRecovery(String mode){if(mode.isEmpty())return;getSharedPreferences("library_reset",MODE_PRIVATE).edit().remove("completed").apply();new android.app.AlertDialog.Builder(this).setTitle(mode.equals("erase")?"This phone's library was erased":"Ready for a new connection").setMessage(mode.equals("erase")?"Restore a saved backup, or set up sync with a computer that still has your documents. On that computer choose Start a new connection while keeping its documents, then pair again. Automatic photo import is off.":"Saved documents are kept. Choose Start a new connection on the computer too while keeping its documents, then open Settings → Sync on the computer and select Connect phone. Approve the connection here.").setNegativeButton("Later",null).setNeutralButton("Restore backup",(d,w)->startActivity(new Intent(this,BackupActivity.class))).setPositiveButton("Open Sync",(d,w)->startActivity(new Intent(this,SyncActivity.class))).show();}
 
@@ -191,7 +192,8 @@ public final class MainActivity extends LibraryActivity {
             @Override public void afterTextChanged(Editable value) {}
         });
         selection=Ui.button(this,"Selected documents",this::selectionActions);selection.setVisibility(View.GONE);root.addView(selection);
-        updateNotice=Ui.button(this,"",this::updateNoticeActions);updateNotice.setVisibility(View.GONE);root.addView(updateNotice);
+        updateNotice=Ui.button(this,"",this::updateNoticeActions);updateNotice.setVisibility(View.GONE);root.addView(updateNotice);companionNotice=Ui.button(this,"",()->{});companionNotice.setVisibility(View.GONE);root.addView(companionNotice);
+        firstRun=Ui.column(this);firstRun.setVisibility(View.GONE);root.addView(firstRun);
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setProgressTintList(android.content.res.ColorStateList.valueOf(Ui.BLUE));
         progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Ui.BLUE));
@@ -303,6 +305,14 @@ public final class MainActivity extends LibraryActivity {
             boolean update=UpdateCheck.available(this);
             if(update)updateNotice.setText("Stack "+UpdateCheck.latest(this)+" is available");
             updateNotice.setVisibility(update?View.VISIBLE:View.GONE);
+            String companions=update?null:Companions.notice(this);
+            if(companions!=null&&Companions.noticeDismissed(this,companions))companions=null;
+            final String companionText=companions;
+            companionNotice.setText(companions==null?"":companions);
+            companionNotice.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("Companion apps").setMessage(companionText+". Stack can install it; Android asks you to confirm.")
+                    .setPositiveButton("Open",(d,w)->startActivity(new Intent(this,CompanionsActivity.class))).setNeutralButton("Not now",(d,w)->{Companions.dismissNotice(this,companionText);refresh();}).setNegativeButton("Close",null).show());
+            companionNotice.setVisibility(companions==null?View.GONE:View.VISIBLE);
+            showFirstRun(snapshot.total,snapshot.links.size(),homeTab&&filter==null&&orgFilter==null&&query.isEmpty());
             selection.setText(selected.size()+" selected · Actions");
             selection.setVisibility(selected.isEmpty()?View.GONE:View.VISIBLE);
             categories = snapshot.categories;organization=snapshot.organization;alsoStackId=snapshot.also;
@@ -449,6 +459,19 @@ public final class MainActivity extends LibraryActivity {
         });
     }
 
+    /** Two cards on a brand-new, empty phone: join a partner, or invite one. "Not now" hides them for good. */
+    private void showFirstRun(int documents,int links,boolean plainHome){
+        boolean show=PartnerJourney.showFirstRun(PartnerJourney.setupDone(this),documents,links,plainHome)&&!PartnerJourney.dismissed(this);
+        firstRun.removeAllViews();
+        if(show){
+            firstRun.setPadding(Ui.dp(this,24),0,Ui.dp(this,24),0);
+            firstRun.addView(Ui.actionRow(this,Icons.Symbol.CHECK,"I'm joining my partner","Install, sign in and scan",0xFFDCECF9,()->startActivity(new Intent(this,PartnerJoinActivity.class))));
+            firstRun.addView(Ui.actionRow(this,Icons.Symbol.SHARE,"Invite partner","Send a link to get started",0xFFF9E8DC,()->startActivity(new Intent(this,PartnerInviteActivity.class))));
+            firstRun.addView(Ui.button(this,"Not now",()->{PartnerJourney.dismiss(this);refresh();}));
+        }
+        firstRun.setVisibility(show?View.VISIBLE:View.GONE);
+    }
+
     private void libraryOptions(View anchor) {
         PopupMenu menu = new PopupMenu(this, anchor);
         menu.getMenu().add("Select documents").setOnMenuItemClickListener(item -> {selectionActions();return true;});
@@ -459,6 +482,8 @@ public final class MainActivity extends LibraryActivity {
         menu.getMenu().add("Find duplicates").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,DuplicatesActivity.class));return true;});
         menu.getMenu().add("Check linked documents").setOnMenuItemClickListener(item -> {checkLinked();return true;});
         menu.getMenu().add("Recently deleted").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,TrashActivity.class));return true;});
+        menu.getMenu().add("I'm joining my partner").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,PartnerJoinActivity.class));return true;});
+        menu.getMenu().add("Invite partner").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,PartnerInviteActivity.class));return true;});
         menu.getMenu().add("Backup & restore").setOnMenuItemClickListener(item -> {
             startActivity(new Intent(this,BackupActivity.class));return true;
         });

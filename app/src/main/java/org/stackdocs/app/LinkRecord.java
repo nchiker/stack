@@ -123,6 +123,15 @@ final class LinkRecord {
         return new Move(text(o, "owner", PACKAGE, 200), text(o, "link_id", UUID, 36), locators);
     }
 
+    /** The owner's `list_owned` request: exactly contract and owner. Returns the owner. */
+    static String parseListOwned(String json) throws IOException {
+        if (json == null || json.length() > 4096) throw bad("the message is missing or too large");
+        JSONObject o = ArchiveJson.read(json);
+        checkContract(o);
+        exactKeys(o, set("contract", "owner"), set(), "list request");
+        return text(o, "owner", PACKAGE, 200);
+    }
+
     /** The owner's `unshared` message: exactly contract, owner, link_id. Returns {owner, link_id}. */
     static String[] parseUnshare(String json) throws IOException {
         if (json == null || json.length() > 4096) throw bad("the message is missing or too large");

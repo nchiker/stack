@@ -203,7 +203,7 @@ final class PartnerKeys {
             }
             return out;
         } catch (GeneralSecurityException | RuntimeException | IOException error) {
-            throw new IOException("The partner sharing key is unavailable on this phone (its protection was lost or changed). Make a new key in Pair with partner.", error);
+            throw new IOException("The sharing key is unavailable on this phone. Make a new code in Pair with partner.", error);
         } finally { if (plainBytes != null) Arrays.fill(plainBytes, (byte) 0); }
     }
 

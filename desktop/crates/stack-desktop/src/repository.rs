@@ -34,6 +34,12 @@ pub enum Request {
         id: String,
         path: Option<String>,
     },
+    /// Look at this computer's own copy of every linked document's file (see `Library::refresh_local_files`).
+    RefreshLocal,
+    /// Read (or, with `forget`, clear) the Filen folder this computer learned.
+    FilenRoot {
+        forget: bool,
+    },
     Select {
         id: String,
         page: usize,
@@ -111,6 +117,11 @@ pub enum Response {
     Operation(crate::operations::RepoOutcome),
     SelectedLinked(stack_core::LinkedDocument),
     LinkFileSaved,
+    LocalRefreshed {
+        report: stack_core::LocalRefresh,
+        root: Option<String>,
+    },
+    FilenRoot(Option<String>),
     Selected {
         document: DocumentView,
         page: usize,
@@ -331,7 +342,24 @@ pub fn start_operations(
                 }
                 Request::LinkFile { id, path } => {
                     library.set_link_local_file(&id, path.as_deref())?;
+                    // One chooser per Filen folder: the first chosen file teaches where the folder is.
+                    if let Some(path) = &path {
+                        library.learn_filen_root(&id, std::path::Path::new(path))?;
+                    }
                     Ok(Response::LinkFileSaved)
+                }
+                Request::RefreshLocal => {
+                    let report = library.refresh_local_files(&crate::local_text::extract)?;
+                    Ok(Response::LocalRefreshed {
+                        report,
+                        root: library.link_filen_root()?,
+                    })
+                }
+                Request::FilenRoot { forget } => {
+                    if forget {
+                        library.set_link_filen_root(None)?;
+                    }
+                    Ok(Response::FilenRoot(library.link_filen_root()?))
                 }
                 Request::SelectLinked { id } => {
                     Ok(Response::SelectedLinked(library.linked_document(&id)?))
@@ -723,7 +751,7 @@ mod tests {
             .blocking_recv()
             .unwrap()
             .unwrap_err();
-        assert!(error.contains("already using"));
+        assert!(error.contains("already open"));
         drop(held);
         let Response::Browser { stacks, hits, .. } =
             worker.submit(browse()).blocking_recv().unwrap().unwrap()

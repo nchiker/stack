@@ -29,7 +29,7 @@ public final class BackupActivity extends LibraryActivity {
         screen.encryption(() -> whenAllowed(this::encryptionClicked));
         screen.reset(() -> whenAllowed(() -> startActivity(new Intent(this,LibraryResetActivity.class))));
         Ui.install(this,screen.root);removeBack=Ui.backHandler(this,this::finish);
-        if(state!=null && state.getBoolean("active") && app().archives.state.equals("idle")) app().archives.message="The previous operation was interrupted. Existing data was kept; select the file or destination again. Startup recovery removes uncommitted restored files.";
+        if(state!=null && state.getBoolean("active") && app().archives.state.equals("idle")) app().archives.message="The last backup or restore was interrupted. Nothing existing was changed. Start it again.";
         render();
     }
     @Override protected void onResume(){super.onResume();resumed=true;render();schedule();AutoBackup.verifyPendingAsync(app());}
@@ -46,8 +46,14 @@ public final class BackupActivity extends LibraryActivity {
         screen.render(controller.state,controller.progress.label,controller.message,controller.review(),controller.progress.canceled);
     }
     private void aboutBackups() {
+        new AlertDialog.Builder(this).setTitle("What's included")
+                .setMessage("\u2022 Documents and page edits\n\u2022 Names, notes, details and tags\n\u2022 Stacks and recognized text\n\u2022 Linked documents, if encrypted\n\nNo account is needed.")
+                .setPositiveButton("Got it",null)
+                .setNeutralButton("Learn more",(d,w) -> aboutBackupsMore()).show();
+    }
+    private void aboutBackupsMore() {
         new AlertDialog.Builder(this).setTitle("About library backups")
-                .setMessage("Your saved originals, page order and edits, names, notes, typed details, organization tags, stacks, recognized text and review choices are included. No account is needed.\n\nUnfinished scans and local consolidation recovery archives are excluded and stay on this device. Save an unfinished scan first to include it.\n\nLinked documents (their text and preview) are included when backup encryption is on, or when you agree to an unencrypted backup. Without encryption, backup files are not protected: choose a private location. Automatic Android cloud backup and device transfer are disabled.\n\nRestore adds documents and keeps your existing library. Selecting the same backup again imports another copy.\n\nIf saving fails or is canceled, your storage provider may leave an incomplete file. Delete that file and choose a destination again to retry.")
+                .setMessage("Unfinished scans stay on this phone. Save one first to include it.\n\nLinked documents are included only when encryption is on or you agree to an unencrypted backup. Without encryption, anyone with the file can read it, so choose a private place.\n\nRestore adds documents and keeps your library. Restoring the same backup twice adds a second copy.")
                 .setPositiveButton("Got it",null).show();
     }
     private void autoBackup() {
@@ -71,12 +77,12 @@ public final class BackupActivity extends LibraryActivity {
             return;
         }
         new AlertDialog.Builder(this).setTitle("Automatic backup")
-                .setMessage("Choose a folder and Stack saves a new backup there about once a week, each "+kept+". The folder can be on this phone, a USB drive or a cloud app such as Filen Files or Google Drive.\n\n"+(BackupKeys.configured(this)?"Backups are encrypted.":"Stack does not encrypt backup files, so choose a private folder.")+"")
+                .setMessage("Stack saves a backup in the folder you choose about once a week, each "+kept+". It can be on this phone, a USB drive or a cloud app.\n\n"+(BackupKeys.configured(this)?"Backups are encrypted.":"Backups are not encrypted, so choose a private folder.")+"")
                 .setNegativeButton("Cancel",null).setPositiveButton("Choose folder",(d,w) -> pickFolder()).show();
     }
     private void pickFolder() {
         Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
-        try{startActivityForResult(intent,AUTO_FOLDER);}catch(ActivityNotFoundException error){new AlertDialog.Builder(this).setMessage("No folder picker is available on this phone.").setPositiveButton("OK",null).show();}
+        try{startActivityForResult(intent,AUTO_FOLDER);}catch(ActivityNotFoundException error){new AlertDialog.Builder(this).setMessage("No folder picker found.").setPositiveButton("Got it",null).show();}
     }
     /** One choice, applied at the next backup. The newest backup is never removed by this. */
     private void keepFor() {
@@ -102,7 +108,7 @@ public final class BackupActivity extends LibraryActivity {
                 AutoBackup.enable(this,tree,flags,shown);
                 handler.post(() -> {AutoBackup.run(app(),null);render();});
             } catch(RuntimeException error) {
-                handler.post(() -> new AlertDialog.Builder(this).setMessage("Stack could not keep access to that folder. Choose another folder.").setPositiveButton("OK",null).show());
+                handler.post(() -> new AlertDialog.Builder(this).setMessage("Could not keep access to that folder. Choose another.").setPositiveButton("Got it",null).show());
             }
         },"Stack backup folder").start();
     }
@@ -114,7 +120,7 @@ public final class BackupActivity extends LibraryActivity {
             int count=links;handler.post(() -> {
                 if(count==0){pick(true);return;}
                 new AlertDialog.Builder(this).setTitle("Linked documents")
-                        .setMessage("You have "+count+" linked "+(count==1?"document":"documents")+". Backups with encryption off leave them out, because their text and previews would be readable by anyone who gets the file.")
+                        .setMessage("You have "+count+" linked "+(count==1?"document":"documents")+". Without encryption they are left out, because anyone with the file could read them.")
                         .setPositiveButton("Set up encryption",(d,w) -> whenAllowed(this::setupEncryption))
                         .setNeutralButton("Leave them out",(d,w) -> pick(true))
                         .setNegativeButton("Include, not encrypted",(d,w) -> {plainLinks=true;pick(true);}).show();
@@ -126,7 +132,7 @@ public final class BackupActivity extends LibraryActivity {
     private void restoreConfirmed() {
         if(!app().archives.reviewUnencrypted()){app().archives.restore();render();return;}
         new AlertDialog.Builder(this).setTitle("Not encrypted")
-                .setMessage("This backup is not encrypted, so Stack cannot tell whether someone changed it. Add it only if you made it and kept it private.")
+                .setMessage("Stack cannot tell if this unencrypted backup was changed. Add it only if it is yours.")
                 .setPositiveButton("Add it",(d,w) -> {app().archives.restore();render();}).setNegativeButton("Cancel",null).show();
     }
     /** Plain backups go straight to review; an encrypted one first asks for the passphrase or the recovery key. */
@@ -142,7 +148,7 @@ public final class BackupActivity extends LibraryActivity {
     }
     private void askSecret(android.net.Uri uri,String problem) {
         android.widget.EditText field=secret("Passphrase or recovery key");
-        new SecureBuilder().setTitle("Encrypted backup").setMessage((problem.isEmpty()?"":problem+"\n\n")+"Enter the passphrase, or scan the recovery key: in Key Vault on your computer, open \"stack backup recovery key\" and choose Show QR code.")
+        new SecureBuilder().setTitle("Encrypted backup").setMessage((problem.isEmpty()?"":problem+"\n\n")+"Enter the passphrase or the recovery key, or scan the recovery key QR code.")
                 .setView(field).setNegativeButton("Cancel",null)
                 .setNeutralButton("Scan key",(d,w) -> {pendingRestore=uri;scanKey(KEY_RESTORE);})
                 .setPositiveButton("Open",(d,w) -> {
@@ -166,7 +172,7 @@ public final class BackupActivity extends LibraryActivity {
     private void encryptionClicked() {
         if(!BackupKeys.configured(this)){setupEncryption();return;}
         new SecureBuilder().setTitle("Backup encryption")
-                .setMessage("Backups are encrypted. Older encrypted backups still need the passphrase or recovery key they were made with.")
+                .setMessage("Backups are encrypted. Older ones still need the key they were made with.")
                 .setPositiveButton("Set up again",(d,w) -> setupEncryption())
                 .setNeutralButton("Turn off",(d,w) -> new SecureBuilder().setMessage("New backups will not be encrypted and will leave out linked documents.")
                         .setPositiveButton("Turn off",(d2,w2) -> {if(app().archives.busy())return;BackupKeys.clear(this);render();}).setNegativeButton("Keep on",null).show())
@@ -175,25 +181,25 @@ public final class BackupActivity extends LibraryActivity {
     /** The easy path: one scan of the key that the Key Vault app shows. Nothing to type. */
     private void setupEncryption() {
         new SecureBuilder().setTitle("Encrypt backups")
-                .setMessage("In the Key Vault app on your computer, click \"Stack backup key (QR)\". Then tap Scan key and point the camera at the code. That is all: nothing to type.")
-                .setPositiveButton("Scan key",(d,w) -> {pendingPassphrase=null;scanKey(KEY_SETUP);})
-                .setNeutralButton("Other options",(d,w) -> setupWithPassphrase())
+                .setMessage("Choose a passphrase to protect your backups. Stack then gives you a recovery key to keep safe.")
+                .setPositiveButton("Use a passphrase",(d,w) -> setupWithPassphrase())
+                .setNeutralButton("I have a key to scan",(d,w) -> {pendingPassphrase=null;scanKey(KEY_SETUP);})
                 .setNegativeButton("Cancel",null).show();
     }
     private void setupWithPassphrase() {
         android.widget.LinearLayout form=new android.widget.LinearLayout(this);form.setOrientation(android.widget.LinearLayout.VERTICAL);form.setPadding(Ui.dp(this,20),0,Ui.dp(this,20),0);
         android.widget.EditText one=secret("Passphrase (at least "+BackupKeys.MIN_PASSPHRASE+" characters)"),two=secret("Passphrase again");form.addView(one);form.addView(two);
         new SecureBuilder().setTitle("Encrypt backups")
-                .setMessage("Choose a long passphrase. Stack will then show a recovery key once. You need the passphrase or the recovery key to open any encrypted backup; if you lose both, the backup is gone.")
+                .setMessage("Choose a long passphrase. Stack then shows a recovery key once. If you lose both, backups cannot be opened.")
                 .setView(form).setNegativeButton("Cancel",null)
                 .setPositiveButton("Continue",(d,w) -> {
                     String a=one.getText().toString();
-                    if(a.length()<BackupKeys.MIN_PASSPHRASE||!a.equals(two.getText().toString())){new SecureBuilder().setMessage("The passphrases must match and have at least "+BackupKeys.MIN_PASSPHRASE+" characters.").setPositiveButton("OK",null).show();return;}
+                    if(a.length()<BackupKeys.MIN_PASSPHRASE||!a.equals(two.getText().toString())){new SecureBuilder().setMessage("The passphrases must match and have at least "+BackupKeys.MIN_PASSPHRASE+" characters.").setPositiveButton("Got it",null).show();return;}
                     pendingPassphrase=a;
                     new SecureBuilder().setTitle("Recovery key")
-                            .setMessage("Stack needs a recovery key as a second way to open backups. Best: create it in Key Vault on your computer (it saves the key and shows a QR code), then scan the code here. Or let Stack make one now and show it to you once.")
-                            .setPositiveButton("Scan key",(d2,w2) -> scanKey(KEY_SETUP))
-                            .setNeutralButton("Make one here",(d2,w2) -> startKeys(a,null))
+                            .setMessage("Stack makes a recovery key now. Write it down and keep it safe.")
+                            .setPositiveButton("Make one here",(d2,w2) -> startKeys(a,null))
+                            .setNeutralButton("Scan key",(d2,w2) -> scanKey(KEY_SETUP))
                             .setNegativeButton("Cancel setup",(d2,w2) -> pendingPassphrase=null).show();
                 }).show();
     }
@@ -204,7 +210,7 @@ public final class BackupActivity extends LibraryActivity {
     }
     private void scanKey(int request) {
         try{startActivityForResult(new Intent(this,PairingQrActivity.class).putExtra("key_mode",true),request);}
-        catch(ActivityNotFoundException error){new SecureBuilder().setMessage("The scanner is not available.").setPositiveButton("OK",null).show();}
+        catch(ActivityNotFoundException error){new SecureBuilder().setMessage("The scanner is not available.").setPositiveButton("Got it",null).show();}
     }
     /** Derives the keys off the UI thread; {@code scanned} is a Key Vault key, or null to make one here and show it once. */
     private void startKeys(String passphrase,byte[] scanned) {
@@ -216,9 +222,9 @@ public final class BackupActivity extends LibraryActivity {
                 if(scanned==null){handler.post(() -> showRecoveryKey(pending));return;}
                 // The key came from Key Vault, which only shows it after it is sealed and copied: no confirm-back needed.
                 String problem="";try{if(app().archives.busy())throw new IllegalStateException("A backup is running. Try again when it has finished.");BackupKeys.save(this,pending.slots);}catch(Exception error){problem=error.getMessage()==null?"unknown error":error.getMessage();}
-                String shown=problem;handler.post(() -> {render();new SecureBuilder().setMessage(shown.isEmpty()?"Backup encryption is on. Check that this fingerprint matches the one Key Vault showed under the QR code: "+fingerprint(pending.recoveryHex)+"\n\nIf it differs, turn encryption off and set it up again. ":"Encryption could not be saved: "+shown).setPositiveButton("OK",null).show();});
+                String shown=problem;handler.post(() -> {render();new SecureBuilder().setMessage(shown.isEmpty()?"Encryption is on. Check this fingerprint matches Key Vault's: "+fingerprint(pending.recoveryHex)+"\n\nIf not, turn encryption off and set it up again.":"Encryption could not be saved: "+shown).setPositiveButton("Got it",null).show();});
             }
-            catch(Exception error){handler.post(() -> new SecureBuilder().setMessage("Encryption could not be set up: "+error.getMessage()).setPositiveButton("OK",null).show());}
+            catch(Exception error){handler.post(() -> new SecureBuilder().setMessage("Encryption could not be set up: "+error.getMessage()).setPositiveButton("Got it",null).show());}
             finally{if(scanned!=null)java.util.Arrays.fill(scanned,(byte)0);}
         },"Stack backup keys").start();
     }
@@ -226,7 +232,7 @@ public final class BackupActivity extends LibraryActivity {
         StringBuilder grouped=new StringBuilder();for(int i=0;i<64;i+=8){if(i>0)grouped.append(i==32?"\n":" ");grouped.append(pending.recoveryHex,i,i+8);}
         android.widget.TextView text=new android.widget.TextView(this);text.setText(grouped);text.setTypeface(android.graphics.Typeface.MONOSPACE);text.setTextSize(18);text.setPadding(Ui.dp(this,24),Ui.dp(this,8),Ui.dp(this,24),0);
         new SecureBuilder().setTitle("Your recovery key").setView(text).setCancelable(false)
-                .setMessage("This is shown once. Save it somewhere safe, for example in Key Vault on your computer as \"stack backup recovery key\".")
+                .setMessage("Write it down and keep it safe. Anyone with it can open your backups.")
                 .setPositiveButton("I have saved it",(d,w) -> confirmRecoveryKey(pending))
                 .setNegativeButton("Cancel setup",null).show();
     }
@@ -241,7 +247,7 @@ public final class BackupActivity extends LibraryActivity {
                     }
                     new Thread(() -> {
                         String problem="";try{if(app().archives.busy())throw new IllegalStateException("A backup is running. Try again when it has finished.");BackupKeys.save(this,pending.slots);}catch(Exception error){problem=error.getMessage()==null?"unknown error":error.getMessage();}
-                        String shown=problem;handler.post(() -> {render();new SecureBuilder().setMessage(shown.isEmpty()?"Backup encryption is on. Do the recovery drill once: store the key, then check you can read it back before you trust backups.":"Encryption could not be saved: "+shown).setPositiveButton("OK",null).show();});
+                        String shown=problem;handler.post(() -> {render();new SecureBuilder().setMessage(shown.isEmpty()?"Encryption is on. Check you can read the saved key back before relying on backups.":"Encryption could not be saved: "+shown).setPositiveButton("Got it",null).show();});
                     },"Stack backup keys").start();
                 }).setNegativeButton("Cancel setup",null).show();
     }
@@ -249,14 +255,14 @@ public final class BackupActivity extends LibraryActivity {
         Intent intent=new Intent(saving?Intent.ACTION_CREATE_DOCUMENT:Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/octet-stream");
         if(saving) intent.putExtra(Intent.EXTRA_TITLE,"Stack-"+new SimpleDateFormat("yyyy-MM-dd-HHmmss",Locale.ROOT).format(new Date(Clock.now()))+".stackbackup");
         else intent.setType("*/*");
-        try{startActivityForResult(intent,saving?BACKUP:RESTORE);}catch(ActivityNotFoundException error){new AlertDialog.Builder(this).setMessage("No document provider is available. Install or enable a local document picker, then retry.").setPositiveButton("OK",null).show();}
+        try{startActivityForResult(intent,saving?BACKUP:RESTORE);}catch(ActivityNotFoundException error){new AlertDialog.Builder(this).setMessage("No file picker is available on this phone.").setPositiveButton("Got it",null).show();}
     }
     @Override protected void onActivityResult(int request,int result,Intent data) {
         super.onActivityResult(request,result,data);
         if(request==FILEN_FOLDER && (result!=RESULT_OK||data==null||data.getData()==null)) {
             String why=FilenFolder.reason(data);
             if(!why.isEmpty()) new AlertDialog.Builder(this).setTitle("Filen Drive").setMessage(why)
-                    .setPositiveButton("OK",null).setNeutralButton("Other folder",(d,w) -> pickFolder()).show();
+                    .setPositiveButton("Got it",null).setNeutralButton("Other folder",(d,w) -> pickFolder()).show();
             return;
         }
         if(request==KEY_SETUP||request==KEY_RESTORE) {
@@ -270,7 +276,7 @@ public final class BackupActivity extends LibraryActivity {
             return;
         }
         if(result!=RESULT_OK||data==null||data.getData()==null)return;
-        if(request==FILEN_FOLDER&&!FilenFolder.treeTrusted(this,data)){new AlertDialog.Builder(this).setTitle("Filen Drive").setMessage("Filen Files is not available. Choose the folder another way.").setPositiveButton("OK",null).setNeutralButton("Other folder",(d,w) -> pickFolder()).show();return;}
+        if(request==FILEN_FOLDER&&!FilenFolder.treeTrusted(this,data)){new AlertDialog.Builder(this).setTitle("Filen Drive").setMessage("Filen Files is not available. Use another folder.").setPositiveButton("Got it",null).setNeutralButton("Other folder",(d,w) -> pickFolder()).show();return;}
         if(request==AUTO_FOLDER||request==FILEN_FOLDER){whenAllowed(() -> folderChosen(data));return;}
         whenAllowed(() -> {if(request==BACKUP)app().archives.export(data.getData(),plainLinks);if(request==RESTORE)restoreChosen(data.getData());render();});
     }

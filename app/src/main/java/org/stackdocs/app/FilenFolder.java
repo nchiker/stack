@@ -35,7 +35,7 @@ final class FilenFolder {
     /** TODO-confirm with the Filen Files session: the scope says only "extra: the tree URI"; this name is Stack's guess. */
     static final String EXTRA_TREE_URI = "app.filenfiles.extra.TREE_URI";
     /** The one calm line both phones show while the other person has not finished yet. */
-    static final String WAITING_LINE = "Waiting for your partner to finish on their phone. Tap Try again once they have.";
+    static final String WAITING_LINE = "Waiting for your partner. Tap Try again when they are done.";
 
     private FilenFolder() {}
 
@@ -127,8 +127,8 @@ final class FilenFolder {
 
     static String reason(String error, String message) {
         switch (String.valueOf(error)) {
-            case "not_signed_in": return "Sign in to Filen in Filen Files first, then try again.";
-            case "offline": return "Filen Drive could not be reached. Connect to the internet and try again.";
+            case "not_signed_in": return "Sign in to Filen Files first.";
+            case "offline": return "Filen Drive is unreachable. Check your connection.";
             case "failed": {
                 return message == null || message.trim().isEmpty() ? "Filen Files could not set up the folder." : message.trim();
             }

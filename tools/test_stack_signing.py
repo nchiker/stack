@@ -7,6 +7,7 @@ from pathlib import Path
 import secrets
 import shutil
 import subprocess
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -56,7 +57,17 @@ def main():
         check('missing-key', {**credentials, 'storeFile': str(scratch / 'absent.p12')}, expected='missing or symlinked')
         check('missing-backup', {**credentials, 'backupFile': str(scratch / 'absent-backup.p12')}, expected='missing or symlinked')
         check('wrong-password', {**credentials, 'storePassword': 'deliberately-incorrect'}, expected='could not be verified')
-        check('temporary-key', {**credentials, 'storeFile': '/tmp/stack-dev/android-user/debug.keystore'}, expected='outside temporary')
+        # A throwaway synthetic file (no key material) in a private directory under /tmp, made here and removed below: the guard must
+        # refuse any signing file that lives in a temporary directory, whatever it contains. No real key is read or copied.
+        temporary = Path(tempfile.mkdtemp(prefix='stack-signing-temporary-', dir='/tmp'))
+        try:
+            temporary.chmod(0o700)
+            synthetic = temporary / 'debug.keystore'
+            synthetic.write_bytes(b'synthetic, not a keystore')
+            synthetic.chmod(0o600)
+            check('temporary-key', {**credentials, 'storeFile': str(synthetic)}, expected='outside temporary')
+        finally:
+            shutil.rmtree(temporary, ignore_errors=True)
         check('repository-secret', {**credentials, 'storeFile': str(ROOT / 'gradle/signing-policy.json')}, expected='outside the source repository')
         wrong = scratch / 'wrong.p12'
         shutil.copyfile(Path.home() / '.android/debug.keystore', wrong)

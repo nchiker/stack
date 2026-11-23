@@ -34,9 +34,11 @@ public final class PartnerShareActivity extends LibraryActivity {
     private void refresh() {
         if (body == null) return;
         body.removeAllViews();
-        TextView intro = Ui.text(this, "Documents you switch on with “Share with partner” are saved, encrypted, into one folder. Your partner's Stack reads them from there.", 14, false);
+        TextView intro = Ui.text(this, "Documents set to “Share with partner” are saved, encrypted, in one folder your partner reads.", 14, false);
         intro.setTextColor(Ui.MUTED);
         body.addView(intro);
+        body.addView(Ui.actionRow(this, Icons.Symbol.SHARE, "Invite partner", "Send a link to get started", 0xFFF9E8DC, () -> startActivity(new Intent(this, PartnerInviteActivity.class))));
+        body.addView(Ui.divider(this), new LinearLayout.LayoutParams(-1, Ui.dp(this, 1)));
         body.addView(Ui.actionRow(this, Icons.Symbol.DOCUMENTS, "Partner sharing folder", PartnerShare.label(this), 0xFFDCEADB, this::folder));
         String error = PartnerShare.lastError(this);
         if (PartnerShare.enabled(this) && !error.isEmpty()) {
@@ -46,7 +48,7 @@ public final class PartnerShareActivity extends LibraryActivity {
         }
         int skipped = PartnerShare.prefs(this).getInt("last_skipped", 0);
         if (PartnerShare.enabled(this) && skipped > 0) {
-            TextView line = Ui.text(this, skipped + (skipped == 1 ? " document is" : " documents are") + " not in Filen yet, so " + (skipped == 1 ? "it is" : "they are") + " not shared.", 13, false);
+            TextView line = Ui.text(this, skipped + (skipped == 1 ? " document is" : " documents are") + " not in Filen yet, so not shared.", 13, false);
             line.setTextColor(Ui.MUTED);
             body.addView(line);
         }
@@ -57,7 +59,7 @@ public final class PartnerShareActivity extends LibraryActivity {
         body.addView(photo);
         if (PartnerShare.enabled(this)) body.addView(Ui.button(this, "Stop using this folder", () -> { PartnerShare.disable(app()); refresh(); }));
         body.addView(Ui.divider(this), new LinearLayout.LayoutParams(-1, Ui.dp(this, 1)));
-        TextView receiveIntro = Ui.text(this, "Documents your partner shares appear in Stack, marked “Shared by”. Scan your partner's code under Pair with partner, then choose the folder they share with you.", 14, false);
+        TextView receiveIntro = Ui.text(this, "Your partner's documents appear here, marked “Shared by”. Scan their code in Pair with partner, then choose their folder.", 14, false);
         receiveIntro.setTextColor(Ui.MUTED);
         body.addView(receiveIntro);
         body.addView(Ui.actionRow(this, Icons.Symbol.DOCUMENTS, "Partner shared folder", PartnerImport.label(this), 0xFFDCEADB, this::receiveFolder));
@@ -87,7 +89,7 @@ public final class PartnerShareActivity extends LibraryActivity {
     private void receiveFolder() {
         if (FilenFolder.receivedAvailable(this)) {
             new AlertDialog.Builder(this).setTitle("Partner shared folder")
-                    .setMessage("Filen Files can give Stack read access to the folder your partner shared with you.")
+                    .setMessage("Use the folder your partner shared in Filen Drive.")
                     .setPositiveButton("Use Filen Drive", (d, w) -> {
                         try { if (!FilenFolder.receivedAvailable(this)) throw new ActivityNotFoundException(); startActivityForResult(FilenFolder.receivedRequest(), RECEIVE_FILEN); } catch (ActivityNotFoundException error) { receivePick(); }
                     })
@@ -101,7 +103,7 @@ public final class PartnerShareActivity extends LibraryActivity {
     private void receivePick() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         try { startActivityForResult(intent, RECEIVE_PICK); }
-        catch (ActivityNotFoundException error) { new AlertDialog.Builder(this).setMessage("No folder picker is available on this phone.").setPositiveButton("OK", null).show(); }
+        catch (ActivityNotFoundException error) { new AlertDialog.Builder(this).setMessage("No folder picker found.").setPositiveButton("Got it", null).show(); }
     }
 
     private void filen() {
@@ -111,7 +113,7 @@ public final class PartnerShareActivity extends LibraryActivity {
     private void pick() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         try { startActivityForResult(intent, PICK); }
-        catch (ActivityNotFoundException error) { new AlertDialog.Builder(this).setMessage("No folder picker is available on this phone.").setPositiveButton("OK", null).show(); }
+        catch (ActivityNotFoundException error) { new AlertDialog.Builder(this).setMessage("No folder picker found.").setPositiveButton("Got it", null).show(); }
     }
 
     @Override protected void onActivityResult(int request, int result, Intent data) {
@@ -119,11 +121,11 @@ public final class PartnerShareActivity extends LibraryActivity {
         if (request != PICK && request != FILEN && request != RECEIVE_PICK && request != RECEIVE_FILEN) return;
         if (result != RESULT_OK || data == null || data.getData() == null) {
             String why = request == FILEN || request == RECEIVE_FILEN ? FilenFolder.reason(data) : "";
-            if (!why.isEmpty()) new AlertDialog.Builder(this).setTitle("Filen Drive").setMessage(why).setPositiveButton("OK", null).setNeutralButton("Other folder", (d, w) -> { if (request == RECEIVE_FILEN) receivePick(); else pick(); }).show();
+            if (!why.isEmpty()) new AlertDialog.Builder(this).setTitle("Filen Drive").setMessage(why).setPositiveButton("Got it", null).setNeutralButton("Other folder", (d, w) -> { if (request == RECEIVE_FILEN) receivePick(); else pick(); }).show();
             return;
         }
         if ((request == FILEN || request == RECEIVE_FILEN) && !FilenFolder.treeTrusted(this, data)) {
-            new AlertDialog.Builder(this).setTitle("Filen Drive").setMessage("Filen Files is not available. Choose the folder another way.").setPositiveButton("OK", null)
+            new AlertDialog.Builder(this).setTitle("Filen Drive").setMessage("Filen Files is not available. Use another folder.").setPositiveButton("Got it", null)
                     .setNeutralButton("Other folder", (d, w) -> { if (request == RECEIVE_FILEN) receivePick(); else pick(); }).show();
             return;
         }
@@ -132,7 +134,7 @@ public final class PartnerShareActivity extends LibraryActivity {
     }
 
     private void failedFolder() {
-        new AlertDialog.Builder(this).setMessage("Stack could not keep access to that folder. Choose another folder.").setPositiveButton("OK", null).show();
+        new AlertDialog.Builder(this).setMessage("Could not keep access to that folder. Choose another.").setPositiveButton("Got it", null).show();
     }
 
     /** Keeps the read permission for the folder the partner shares, then imports from it (shared with the pairing screen). */

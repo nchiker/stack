@@ -22,6 +22,8 @@ public final class InstallResultReceiver extends BroadcastReceiver {
             return;
         }
         AppUpdater.clearCache(context);
+        String companion = intent.getStringExtra(Companions.EXTRA);
+        if (companion != null) { Companions.onResult(context, companion, status); return; }
         if (status == PackageInstaller.STATUS_SUCCESS || status == PackageInstaller.STATUS_FAILURE_ABORTED) return;
         String words = status == PackageInstaller.STATUS_FAILURE_CONFLICT || status == PackageInstaller.STATUS_FAILURE_INCOMPATIBLE
                 ? "This update is not signed like your Stack, so Android refused it"

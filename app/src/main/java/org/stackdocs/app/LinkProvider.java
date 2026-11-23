@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
  * package, so one app cannot publish as another. The provider never reads or returns library content.
  */
 public final class LinkProvider extends ContentProvider {
-    static final String METHOD_CONTRACT = "contract", METHOD_BEGIN = "begin", METHOD_COMMIT = "commit", METHOD_ABORT = "abort", METHOD_REMOVED = "removed", METHOD_MOVED = "moved", METHOD_UNSHARED = "unshared";
+    static final String METHOD_CONTRACT = "contract", METHOD_BEGIN = "begin", METHOD_COMMIT = "commit", METHOD_ABORT = "abort", METHOD_REMOVED = "removed", METHOD_MOVED = "moved", METHOD_UNSHARED = "unshared", METHOD_LIST_OWNED = "list_owned";
     static final int MAX_RECORD_JSON = 256 * 1024, MAX_TEXT_BYTES = 4 * 1024 * 1024, MAX_STAGED = 8;
     static final long STAGING_LIFETIME_MS = 10 * 60 * 1000L;
     private static final java.util.regex.Pattern TOKEN = java.util.regex.Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
@@ -71,6 +71,7 @@ public final class LinkProvider extends ContentProvider {
                 case METHOD_COMMIT: return commit(caller, argument);
                 // Accepted while the app lock is on: it changes a stored state and shows nothing.
                 case METHOD_REMOVED: return LinkRecord.isFilenEvent(argument) ? filenEvent(caller, argument, "removed") : removed(caller, argument);
+                case METHOD_LIST_OWNED: return listOwned(caller, argument);
                 case METHOD_MOVED: return LinkRecord.isFilenEvent(argument) ? filenEvent(caller, argument, "moved") : changeStored(caller, argument, true);
                 case METHOD_UNSHARED: return LinkRecord.isFilenEvent(argument) ? filenEvent(caller, argument, "unshared") : changeStored(caller, argument, false);
                 case METHOD_ABORT: { File dir = stage(caller, argument); if (dir != null) deleteTree(dir); return out; }
@@ -103,6 +104,28 @@ public final class LinkProvider extends ContentProvider {
     }
 
     /** The owner saw its file gone. Only the owner's own record can change; an unknown link_id is a harmless no-op. */
+    static final int MAX_LIST_OWNED = 1000;
+
+    /** `list_owned`: read-only. The caller (an owner app, never Filen) gets only its own records' ids, titles, hashes and filen locators; refused while the app lock is on. */
+    private Bundle listOwned(String caller, String json) throws IOException {
+        String owner = LinkRecord.parseListOwned(json);
+        if (!owner.equals(caller)) throw new IOException("An app can only list the records it owns.");
+        StackApplication app = (StackApplication) getContext().getApplicationContext();
+        Bundle out = new Bundle();
+        try {
+            if (!app.libraryReady.await(20, TimeUnit.SECONDS)) throw new IOException("Stack is still starting. Try again.");
+            if (!app.access.allowed()) { out.putString("error", "locked"); return out; }
+            org.json.JSONObject listed = app.io.submit(() -> app.library.links.listOwned(owner, MAX_LIST_OWNED)).get(30, TimeUnit.SECONDS);
+            out.putString("records", listed.getJSONArray("records").toString());
+            out.putInt("count", listed.getJSONArray("records").length());
+            out.putBoolean("truncated", listed.getBoolean("truncated"));
+            return out;
+        } catch (InterruptedException | java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException | org.json.JSONException error) {
+            if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+            throw new IOException("Stack could not list the records. Try again.");
+        }
+    }
+
     /** The package that may send Filen-origin events (matched by Filen UUID). */
     static final String FILEN_PACKAGE = LinkCallers.FILEN_PACKAGE;
 

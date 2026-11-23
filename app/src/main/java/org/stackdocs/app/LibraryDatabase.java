@@ -7,7 +7,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.graphics.Color;
 
 final class LibraryDatabase extends SQLiteOpenHelper {
-    static final int VERSION = 16;
+    static final int VERSION = 17;
 
     LibraryDatabase(Context context) { this(context, "library.db"); }
 
@@ -55,6 +55,7 @@ final class LibraryDatabase extends SQLiteOpenHelper {
         addPartnerShare(db);
         addPartnerImport(db);
         addForeignSync(db);
+        addRestoredLinks(db);
         String[] ids = {"bills", "banking", "ids", "house", "medical", "receipts", "starred"};
         String[] names = {"Bills", "Banking", "IDs", "House", "Medical", "Receipts", "Starred"};
         String[] colors = {"#DCEADB", "#E5E8FA", "#F7E6D2", "#F1DDE8", "#DCECF2", "#F7EDCA", "#E2E5E0"};
@@ -69,7 +70,7 @@ final class LibraryDatabase extends SQLiteOpenHelper {
     }
 
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 1 || oldVersion > 15 || newVersion != VERSION) {
+        if (oldVersion < 1 || oldVersion > 16 || newVersion != VERSION) {
             throw new IllegalStateException("No migration from library version " + oldVersion);
         }
         if (oldVersion < 2) {
@@ -93,6 +94,17 @@ final class LibraryDatabase extends SQLiteOpenHelper {
         if (oldVersion < 14) addPartnerShare(db);
         if (oldVersion < 15) addPartnerImport(db);
         if (oldVersion < 16) addForeignSync(db);
+        if (oldVersion < 17) addRestoredLinks(db);
+    }
+
+    /**
+     * "Set up again" (docs/STACK_LINK_CONTRACT.md, Restore and setup). `restored` marks a link row that came back from a backup and whose
+     * owner app has not confirmed its link_id yet: 1 = restored, not yet checked; 2 = checked and the owner does not know it (the
+     * detail screen offers "Set up again" and the owner's next share is adopted into this row); 0 = an ordinary link. Local only: it is
+     * not in the sync triggers, the backup or the link sync.
+     */
+    static void addRestoredLinks(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE link_records ADD COLUMN restored INTEGER NOT NULL DEFAULT 0");
     }
 
     /**

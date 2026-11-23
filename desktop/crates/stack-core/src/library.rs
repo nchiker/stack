@@ -18,7 +18,7 @@ pub enum Error {
     Invalid(&'static str),
     #[error("The library changed; review this action again")]
     Stale,
-    #[error("Stack is already open on this computer (it is already using this library). Switch to its window.")]
+    #[error("Stack is already open on this computer. Switch to its window.")]
     Busy,
     #[error("Archive was committed; reopen to finish local cleanup (operation {0})")]
     CommittedCleanup(String),

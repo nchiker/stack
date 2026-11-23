@@ -59,7 +59,7 @@ final class PartnerFilenChecks {
         require(FilenFolder.statusLine(false, false, "user_cancelled", null).equals(FilenFolder.WAITING_LINE), "user_cancelled line");
         require(FilenFolder.outcome(true, false, null) == FilenFolder.Outcome.BACKED_OUT, "OK without a tree is not a grant");
         require(FilenFolder.statusLine(false, false, "not_signed_in", null).startsWith("Sign in"), "not_signed_in");
-        require(FilenFolder.statusLine(false, false, "offline", null).contains("internet"), "offline");
+        require(FilenFolder.statusLine(false, false, "offline", null).contains("connection"), "offline");
         require(FilenFolder.statusLine(false, false, "failed", " odd ").equals("odd"), "failed message");
         require(FilenFolder.statusLine(false, false, "no_caller", null).equals(FilenFolder.WAITING_LINE), "unknown code stays calm");
 

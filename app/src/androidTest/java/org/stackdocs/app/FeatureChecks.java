@@ -343,7 +343,7 @@ final class FeatureChecks {
         LibraryDatabase second = new LibraryDatabase(isolated);
         try {
             android.database.sqlite.SQLiteDatabase db = second.getWritableDatabase();
-            require(db.getVersion() == 16, "library upgrades from version 9 to 16");
+            require(db.getVersion() == 17, "library upgrades from version 9 to 17");
             try (android.database.Cursor c = db.rawQuery("SELECT title FROM documents WHERE id=?", new String[]{id})) { require(c.moveToFirst() && c.getString(0).equals("Upgrade specimen"), "documents survive the upgrade"); }
             db.execSQL("INSERT INTO trash(document_id,deleted_at) VALUES(?,1)", new Object[]{id});
             db.execSQL("DELETE FROM documents WHERE id=?", new Object[]{id});

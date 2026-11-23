@@ -19,6 +19,9 @@
   <provides><binary>stack</binary></provides>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.7.1" date="2026-11-23">
+      <description><p>On first start, Stack can offer to install Ami Pro through the system installer when it is missing; it stays hidden when Ami Pro is already installed, including a copy installed by its own script in your home folder. Starting Stack a second time now brings the window you already have open to the front instead of showing an error. Stack remembers where your Filen folder is after you choose one document for Open in Ami Pro, so the other documents in it open without asking again (Settings has "Forget this folder"). When you edit a linked document on this computer, Stack notices at start and when you return to the window, marks it "Changed on this computer", and uses the text from this computer's copy for search until your phone saves it again. Wording is shorter across the app. The library moves to a newer format the first time you open this version, so install it on every computer you use, together with phone update 0.20.0.</p></description>
+    </release>
     <release version="0.7.0" date="2026-11-22">
       <description><p>Documents your partner shares with you now appear in search and the document list, marked "Shared by" their name. Opening the original still happens on the phone. Stack updates its library to a newer format the first time you open this version, so install it on every computer you use.</p></description>
     </release>

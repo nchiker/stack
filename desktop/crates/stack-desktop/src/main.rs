@@ -1,4 +1,7 @@
+mod ami_install;
 mod ami_open;
+mod local_text;
+mod single_instance;
 mod catalog;
 mod catalog_smoke;
 #[cfg(test)]
@@ -54,6 +57,8 @@ struct Flags {
     frames: Arc<AtomicU64>,
     smoke_title: Option<String>,
     ui_scale: f32,
+    /// This is the normal run on the person's own library: take the "one window" name on the session bus.
+    single_instance: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -76,6 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .and_then(|v| v.parse::<f32>().ok())
             .filter(|v| (1.0..=2.0).contains(v))
             .unwrap_or(1.0),
+        single_instance: false,
     };
     let mut requested_size = iced::Size::new(1080.0, 780.0);
     let mut theme = cosmic::theme::system_preference();
@@ -135,6 +141,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if flags.demo.is_none() && flags.library.is_none() {
         flags.library = Some(stack_core::library::default_root()?);
+        // The normal run on the person's own library: one window per computer. A second launch asks the running
+        // one to come forward and ends quietly; if that fails, it starts as before and the library lock explains.
+        if flags.smoke.is_none() && flags.visual_review.is_none() && flags.browser_fixtures.is_none() {
+            let handed = single_instance::hand_off(
+                None,
+                single_instance::BUS_NAME,
+                single_instance::OBJECT_PATH,
+                single_instance::platform_data(),
+            );
+            if handed == single_instance::Handoff::Accepted {
+                return Ok(());
+            }
+            flags.single_instance = true;
+        }
     }
     if flags.library.is_some() {
         flags.preferences = Some(preferences::path()?);
@@ -300,6 +320,7 @@ struct Stack {
     tiles: thumbnails::Tiles,
     text: text_ui::Ui,
     ami: ami_open::Ui,
+    ami_install: ami_install::State,
     text_worker: Option<Worker<stack_core::TextJob, stack_core::TextOutput>>,
     context_title: String,
     reset: reset_ui::Ui,
@@ -349,6 +370,9 @@ enum Message {
     Reset(reset_ui::Action),
     Text(text_ui::Event),
     Ami(ami_open::Event),
+    AmiInstall(ami_install::Event),
+    /// Another launch asked this window to come forward (with the launcher's activation token, if any).
+    Activate(Option<String>),
     KeepEditing,
     DiscardAndQuit,
     Shutdown(Result<(), String>),
@@ -448,6 +472,7 @@ impl cosmic::Application for Stack {
             tiles: thumbnails::Tiles::default(),
             text: text_ui::Ui::default(),
             ami: ami_open::Ui::default(),
+            ami_install: ami_install::State::default(),
             text_worker: Some(text_ui::worker()),
             context_title: String::new(),
             reset: reset_ui::Ui::default(),
@@ -498,7 +523,13 @@ impl cosmic::Application for Stack {
             app.browse()
         };
         let recovery = app.reset_recovery();
-        (app, app::Task::batch([title, render, recovery]))
+        let launch = ami_open::launch_tick(std::time::Duration::from_secs(1));
+        let offer = if app.flags.smoke.is_some() || app.flags.demo.is_some() {
+            app::Task::none()
+        } else {
+            ami_install::probe_task(false)
+        };
+        (app, app::Task::batch([title, render, recovery, launch, offer]))
     }
 
     fn subscription(&self) -> iced::Subscription<Message> {
@@ -506,6 +537,16 @@ impl cosmic::Application for Stack {
             transfers_ui::progress_subscription(&self.transfers),
             text_ui::subscription(self),
             network_ui::subscription(&self.sync.network),
+            // Look at this computer's own copies of linked files when the window comes back into focus.
+            iced::event::listen_with(|event, _status, _window| {
+                matches!(event, iced::Event::Window(iced::window::Event::Focused))
+                    .then_some(Message::Ami(ami_open::Event::Focused))
+            }),
+            if self.flags.single_instance {
+                iced::Subscription::run(single_instance::stream)
+            } else {
+                iced::Subscription::none()
+            },
         ])
     }
 
@@ -958,6 +999,12 @@ impl Stack {
             Message::Reset(action) => return self.reset_action(action),
             Message::Text(event) => return self.text_action(event),
             Message::Ami(event) => return self.ami_action(event),
+            Message::AmiInstall(event) => return self.ami_install_action(event),
+            Message::Activate(token) => {
+                return app::Task::done(cosmic::Action::Cosmic(cosmic::app::Action::Activate(
+                    token.unwrap_or_default(),
+                )));
+            }
             Message::Close
                 if !self.closing
                     && (self.catalog.has_unsaved_changes()
@@ -1252,6 +1299,8 @@ impl Stack {
                         | Response::TextFinished { .. }
                         | Response::ResetPreview(_)
                         | Response::LinkFileSaved
+                        | Response::LocalRefreshed { .. }
+                        | Response::FilenRoot(_)
                         | Response::ResetScheduled
                         | Response::ResetRecovery(_),
                     ) => {}
@@ -1349,7 +1398,7 @@ impl Stack {
                         return self.load_tiles();
                     }
                     Ok(Response::SelectedLinked(linked)) => {
-                        self.ami = ami_open::Ui::default();
+                        self.ami.reset_view();
                         let preview = linked.preview.clone();
                         self.linked = Some(linked);
                         self.page = 0;
@@ -1409,7 +1458,7 @@ impl Stack {
                                 && self
                                     .library_error
                                     .as_ref()
-                                    .is_some_and(|e| e.contains("already using"))
+                                    .is_some_and(|e| e.contains("already open"))
                                 || self.flags.browser_case == "error"
                                     && self
                                         .library_error

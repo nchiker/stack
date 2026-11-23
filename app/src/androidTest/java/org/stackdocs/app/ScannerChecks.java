@@ -43,8 +43,8 @@ public final class ScannerChecks extends Instrumentation {
     private boolean features,backupLayout,navigationOnly,backupUi,archivePerformance,archiveOnly,archivePrepare,archiveResume;
     private String archiveBoundary;
     private Bundle syncArguments;
-    private String filenSeed,filenShow,filenLocate,filenLookup;
-    private boolean longWorkflow,workflowOnly,providerWorkflow,workflowUi,namingOnly,shareArchive,partnerPublish,partnerImport,partnerFilen,linkContract,linkSync,linkLan,linkE2e,linkSeed,linkUnseed;
+    private String filenSeed,filenShow,filenLocate,filenLookup,upgradeVerify;private boolean upgradeRecord;
+    private boolean longWorkflow,workflowOnly,providerWorkflow,workflowUi,namingOnly,shareArchive,partnerPublish,partnerImport,partnerFilen,linkContract,linkRestore,linkSync,linkLan,linkE2e,linkSeed,linkUnseed,companions,partnerJourney;
     private boolean suggestionPrepare,suggestionResume, suggestionUi, suggestionCorpus, suggestionsOnly, baseline, qualityOnly, ocrOnly, preserveOnly, restartPrepare, restartResume, corpusOnly;
 
     @Override public void onCreate(Bundle arguments) {
@@ -72,6 +72,11 @@ public final class ScannerChecks extends Instrumentation {
         partnerImport=arguments!=null && "true".equals(arguments.getString("partnerImport"));
         partnerFilen=arguments!=null && "true".equals(arguments.getString("partnerFilen"));
         linkContract=arguments!=null && "true".equals(arguments.getString("linkContract"));
+        linkRestore=arguments!=null && "true".equals(arguments.getString("linkRestore"));
+        companions=arguments!=null && "true".equals(arguments.getString("companions"));
+        partnerJourney=arguments!=null && "true".equals(arguments.getString("partnerJourney"));
+        upgradeRecord=arguments!=null && "true".equals(arguments.getString("upgradeRecord"));
+        upgradeVerify=arguments==null?null:arguments.getString("upgradeVerify");
         linkSync=arguments!=null && "true".equals(arguments.getString("linkSync"));
         linkLan=arguments!=null && "true".equals(arguments.getString("linkLan"));
         linkE2e=arguments!=null && "true".equals(arguments.getString("linkE2e"));
@@ -170,6 +175,11 @@ public final class ScannerChecks extends Instrumentation {
             else if(providerWorkflow) ProviderWorkflowChecks.run(this,new IsolatedContext(getTargetContext()),this::mark);
             else if(workflowUi) WorkflowUiChecks.run(this,new IsolatedContext(getTargetContext()),this::mark);
             else if(namingOnly) NamingChecks.run(this::mark);
+            else if(linkRestore) LinkRestoreChecks.run(getTargetContext(),getContext().getPackageName(),this::mark);
+            else if(companions) CompanionChecks.run(this::mark);
+            else if(partnerJourney) PartnerJourneyChecks.run(getTargetContext(),this::mark);
+            else if(upgradeRecord) UpgradeChecks.record(getTargetContext(),this::mark);
+            else if(upgradeVerify!=null) UpgradeChecks.verify(getTargetContext(),upgradeVerify,this::mark);
             else if(linkSync) LinkSyncChecks.run(this,this::mark);
             else if(linkLan) LinkLanChecks.run(this,syncArguments,this::mark);
             else if(linkE2e) LinkLifecycleChecks.endToEnd(getTargetContext(),this::mark);

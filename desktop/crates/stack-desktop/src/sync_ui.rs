@@ -153,7 +153,7 @@ impl Stack {
             Action::Settings => {
                 let task = self.sync_action(Action::Open);
                 self.sync.page = Page::Settings;
-                task
+                app::Task::batch([task, self.ami_folder(false), crate::ami_install::probe_task(true)])
             }
             Action::Network(action) => self.network_action(action),
             Action::Open => {

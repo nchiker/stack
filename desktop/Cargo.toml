@@ -1,6 +1,7 @@
 [workspace]
 members = ["crates/stack-core", "crates/stack-archive", "crates/stack-render", "crates/stack-cli", "crates/stack-desktop", "crates/stack-sync", "crates/stack-transport"]
 resolver = "3"
+exclude = ["third_party/amipro/amipro-document", "third_party/amipro/amipro-formats"]
 
 [workspace.package]
 version = "0.1.0-dev"
@@ -15,6 +16,8 @@ stack-core = { path = "crates/stack-core" }
 stack-archive = { path = "crates/stack-archive" }
 stack-render = { path = "crates/stack-render" }
 stack-transport = { path = "crates/stack-transport" }
+amipro-formats = { path = "third_party/amipro/amipro-formats" }
+amipro-document = { path = "third_party/amipro/amipro-document" }
 rustls = { version = "=0.23.46", default-features = false, features = ["std", "ring"] }
 rcgen = { version = "=0.14.10", default-features = false, features = ["crypto", "ring"] }
 image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
@@ -35,6 +38,7 @@ libcosmic = { git = "https://github.com/pop-os/libcosmic", rev = "dbc62f2d899cdb
 iced-accessibility = { package = "iced_accessibility", git = "https://github.com/pop-os/libcosmic", rev = "dbc62f2d899cdbfbe43d170689ddc0290db663f4" }
 iced-tiny-skia = { package = "iced_tiny_skia", git = "https://github.com/pop-os/libcosmic", rev = "dbc62f2d899cdbfbe43d170689ddc0290db663f4" }
 iced-winit = { package = "iced_winit", git = "https://github.com/pop-os/libcosmic", rev = "dbc62f2d899cdbfbe43d170689ddc0290db663f4" }
+zbus = { version = "=5.19.0", default-features = false, features = ["tokio"] }
 tokio = { version = "=1.53.3", features = ["rt", "time", "sync"] }
 rusqlite = { version = "=0.40.2", features = ["bundled"] }
 uuid = { version = "=1.28.0", features = ["v4", "v5"] }

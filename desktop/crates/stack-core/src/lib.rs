@@ -18,7 +18,7 @@ pub use interchange::{
     FrozenSnapshot, IdMappings, ImportWork, OutputWork, RestorePlan, RestoreReceipt, SnapshotWork,
     StagedImport,
 };
-pub use links::{BackupKey, LinkedDocument};
+pub use links::{BackupKey, LinkedDocument, LocalRefresh, derive_filen_root, filen_path_of};
 pub use search::{SearchHit, Sort, StackOverlap};
 pub use text::{TEXT_CONFIG, TextJob, TextOutput, TextStatus};
 

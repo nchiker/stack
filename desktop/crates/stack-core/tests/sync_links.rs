@@ -2268,3 +2268,51 @@ fn a_cell_cannot_flip_a_rows_origin_in_either_direction() {
     phone_b.send(&mut b);
     assert_eq!(origin_of(&b, 5).0, "foreign", "a cell without origin never makes a shared copy an own row");
 }
+
+#[test]
+fn text_read_from_the_computers_own_copy_is_local_only_and_the_phones_newer_record_outranks_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut a = library_with(dir.path(), "a", vec![]);
+    let mut phone = join(&mut a, dir.path());
+    let mut l1 = input(1, "Budget", "quarterly zebra budget", None);
+    phone.publish(std::slice::from_ref(&l1), true);
+    phone.send(&mut a);
+    let id = row_of(&a, 1).row_id;
+    let found = |a: &Library, q: &str| a.search(q, None, Sort::Newest, 10).unwrap().len();
+
+    // The file on this computer differs from the record's hash and is newer than its `modified`.
+    let file = dir.path().join("Budget.sam");
+    fs::write(&file, b"edited on this computer").unwrap();
+    a.set_link_local_file(&id, Some(file.to_str().unwrap())).unwrap();
+    let report = a
+        .refresh_local_files(&|_: &Path| Some("migrating flamingo plan".to_owned()))
+        .unwrap();
+    assert_eq!((report.changed, report.with_text), (1, 1));
+    assert_eq!((found(&a, "flamingo"), found(&a, "zebra")), (1, 0));
+    let local = a.linked_document(&id).unwrap();
+    assert!(local.changed_here && local.text_from_computer);
+    // Nothing the sync reads was changed: the record text is still the phone's.
+    assert_eq!(row_of(&a, 1).text, "quarterly zebra budget");
+
+    // A phone update that is not newer (same `modified`, new title) rewrites the row but keeps the local text.
+    l1.title = "Budget renamed".into();
+    phone.publish(std::slice::from_ref(&l1), false);
+    phone.send(&mut a);
+    assert_eq!(row_of(&a, 1).title, "Budget renamed");
+    assert_eq!((found(&a, "flamingo"), found(&a, "zebra")), (1, 0));
+    assert!(a.linked_document(&id).unwrap().changed_here);
+
+    // The phone saves a NEWER version (later `modified`, new hash and text): the local text is gone from search.
+    l1.modified = 4_000_000_000_000;
+    l1.hash = "d".repeat(64);
+    l1.text = Some("phone hippo version".into());
+    phone.publish(std::slice::from_ref(&l1), false);
+    phone.send(&mut a);
+    assert_eq!((found(&a, "flamingo"), found(&a, "hippo")), (0, 1));
+    let view = a.linked_document(&id).unwrap();
+    assert!(!view.changed_here && !view.text_from_computer);
+    assert_eq!(view.text, "phone hippo version");
+    // Refreshing again does not bring the old local text back: the file is now older than the phone's record.
+    assert_eq!(a.refresh_local_files(&|_: &Path| Some("migrating flamingo plan".to_owned())).unwrap().changed, 0);
+    assert_eq!((found(&a, "flamingo"), found(&a, "hippo")), (0, 1));
+}

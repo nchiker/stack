@@ -24,8 +24,11 @@ The key/backup are distinct files with equal hashes; an independent restored cop
 successfully used its private key. PKCS12 uses PBES2/PBKDF2/AES256-CBC with a strong
 locally generated password. Files are600, containing directories700. Credentials
 are not printed, committed, or bundled with APK/source artifacts. The backup and
-credential recovery copy remain on this computer; no off-machine/disaster backup
-is claimed. Keep any future offline copy encrypted and its credentials separately
+credential recovery copy remain on this computer. An off-machine copy exists as well (found
+2026-11-22): the Key Vault archive under `~/APK-Keys/stack/` holds a byte-identical copy of the
+keystore and its credentials, and Key Vault keeps its encrypted backups on the Filen drive
+(`~/Filen/Key Vault/`). The encrypted backup itself was not opened or restored in this check;
+run the vault's recovery drill (`unseal-check`) before relying on it. Keep any future offline copy encrypted and its credentials separately
 protected. Never overwrite an existing backup when making another copy.
 
 The original `db7352c8…e620eeab` private key was not recovered. The `canonical`
@@ -127,3 +130,18 @@ primary. They are retained unchanged despite the user's later data-disposal waiv
 
 The [Android signing guide](https://developer.android.com/studio/publish/app-signing)
 explains why public APKs/certificates cannot replace the missing original private key.
+
+## Pinned companion certificates
+Stack's Companion apps screen installs and updates these apps only if the downloaded APK's package name matches,
+its versionCode is higher than the installed one, and its single signing certificate's SHA-256 is in the app's list.
+Each app has a list so a later key rotation can add a second entry. Public hashes only; the pins live in
+`Companions.java`.
+
+| App | Package | GitHub repo | Accepted signing-certificate SHA-256 |
+| --- | --- | --- | --- |
+| Stack | `org.stackdocs.app` | `nchiker/stack` | `e873f2fd869005e59828db6d4f8f31d1b05a37988818a7dd94adc1ae1b07e311` |
+| Filen Files | `app.filenfiles` | `nchiker/Filen-Filemanager` | `59ccca4c8c1126ec48257a8f3051c6be5eccdd5888df82215560ce2ff8b580bf` |
+| Ami Pro | `app.amipro.editor` | `nchiker/AmiPro-APK` | `9a387c70c8c19a3bb29e9b02f18840f4b1bb18ac291983d2d0ec1c684670868a` |
+
+Download integrity: the release's SHA256SUMS line, else GitHub's asset digest, else no checksum (the pins above and
+Android's own signature check decide). A published checksum that does not match always refuses.

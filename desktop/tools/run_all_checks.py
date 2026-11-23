@@ -333,7 +333,7 @@ def main():
         full = [py, '-I', TOOLS / 'test_android_archive_interop.py', '--adb', ADB, '--adb-port', ADB_PORT,
                 '--output', logdir / 'interop-phone'] + (['--large'] if large else [])
         run_step('phone-interop', full, timeout=3600 if not large else 7200)
-        for name, option in (('phone-link-contract', 'linkContract'), ('phone-archive', 'archiveOnly'), ('phone-features', 'features'), ('phone-link-sync', 'linkSync')):
+        for name, option in (('phone-link-contract', 'linkContract'), ('phone-archive', 'archiveOnly'), ('phone-features', 'features'), ('phone-link-sync', 'linkSync'), ('phone-link-restore', 'linkRestore'), ('phone-partner-journey', 'partnerJourney')):
             phone_suite(adb, name, option)
 
     if not lan:

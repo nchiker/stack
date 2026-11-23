@@ -82,7 +82,7 @@ final class BackupScreen {
         if(encryption==null)return;
         String caption=on?"On · Backups are encrypted, including linked documents":"Off · Turn on to include linked documents";
         if(!encryptionCaption.getText().toString().equals(caption)){encryptionCaption.setText(caption);encryption.setContentDescription("Backup encryption. "+caption);}
-        protection.setText(on?"Backups are encrypted. Without the recovery key (kept in Key Vault), a backup cannot be opened.":"Backup files are not encrypted, and leave out linked documents unless you choose otherwise.");
+        protection.setText(on?"Backups are encrypted. Without the recovery key (kept in Key Vault), a backup cannot be opened.":"Backups are not encrypted and leave out linked documents.");
     }
     void reset(Runnable open){body.addView(Ui.divider(activity));body.addView(Ui.actionRow(activity,Icons.Symbol.TUNE,"Reset or rebuild library…","Careful local erase or a fresh sync connection",0xFFF0E3EF,open));}
     /** Adds the "Automatic backup" row between Backup and Restore; call once. */

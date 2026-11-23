@@ -28,6 +28,7 @@ public final class SettingsActivity extends LibraryActivity {
         line();boolean locked=app().access.enabled();
         body.addView(Ui.actionRow(this,Icons.Symbol.DOCUMENTS,"App lock",locked?"On · Unlock when you return":"Off · Android screen lock",0xFFDCEADB,() -> app().access.change(this,!app().access.enabled(),this::refresh)));
         line();body.addView(Ui.actionRow(this,Icons.Symbol.CHECK,"Update check",UpdateCheck.status(this),0xFFF7E1A3,this::updateCheck));
+        line();body.addView(Ui.actionRow(this,Icons.Symbol.DOCUMENTS,"Companion apps",companionStatus(),0xFFDCECF9,()->startActivity(new Intent(this,CompanionsActivity.class))));
         Button about=Ui.button(this,"About these settings",() -> new AlertDialog.Builder(this).setTitle("About these settings")
                 .setMessage("Photo import checks new Camera photos for documents. Existing photos stay untouched. Android controls timing and which photos Stack can access. You can import missed photos yourself.\n\nApp lock uses Android security and hides Stack in Recents. It does not encrypt backups or copies you have shared.")
                 .setPositiveButton("Got it",null).show());
@@ -47,6 +48,7 @@ public final class SettingsActivity extends LibraryActivity {
         else dialog.setPositiveButton("Check now",(d,w) -> {UpdateCheck.checkNow(app(),null);Toast.makeText(this,"Checking for updates",Toast.LENGTH_SHORT).show();});
         dialog.show();
     }
+    private String companionStatus(){String n=Companions.notice(this);return n==null?"Filen Files and Ami Pro · installed and up to date":n;}
     private void line(){body.addView(Ui.divider(this),new LinearLayout.LayoutParams(-1,Ui.dp(this,1)));}
     private void photoOptions(){boolean enabled=app().photos.enabled();new AlertDialog.Builder(this).setTitle("Photo import")
             .setMessage(enabled?"Stop adding documents from new camera photos? Your saved documents will stay in Stack.":"Automatically add likely documents from new Camera photos. Existing photos are not imported. You choose which photos Stack can access.")

@@ -29,7 +29,7 @@ public final class PairingQrActivity extends LibraryActivity {
     private boolean active,decoding,keyMode,shareMode;private int generation;private Runnable removeBack;
     @Override public void onCreate(Bundle state){super.onCreate(state);
         LinearLayout root=Ui.column(this);LinearLayout toolbar=Ui.toolbar(this);toolbar.addView(Ui.iconButton(this,Icons.Symbol.BACK,"Back",this::finish));shareMode=getIntent().getBooleanExtra("share_mode",false);keyMode=shareMode||getIntent().getBooleanExtra("key_mode",false);if(keyMode)getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);toolbar.addView(Ui.text(this,shareMode?"Scan partner code":keyMode?"Scan recovery key":"Scan computer QR code",18,false));root.addView(toolbar);
-        status=Ui.text(this,shareMode?"Point the camera at the pairing code on your partner's phone. Hold the phone about 20 to 30 cm away and keep it steady.":keyMode?"Point the camera at the QR code in the Key Vault window on your computer. Hold the phone about 20 to 30 cm away and keep it steady.":"Point the camera at the QR code in Stack on your computer.",16,false);status.setPadding(Ui.dp(this,24),Ui.dp(this,16),Ui.dp(this,24),Ui.dp(this,16));root.addView(status);
+        status=Ui.text(this,shareMode?"Point the camera at the pairing code on your partner's phone. Hold the phone about 20 to 30 cm away and keep it steady.":keyMode?"Point the camera at your recovery key's QR code. Hold the phone about 20 to 30 cm away and keep it steady.":"Point the camera at the QR code in Stack on your computer.",16,false);status.setPadding(Ui.dp(this,24),Ui.dp(this,16),Ui.dp(this,24),Ui.dp(this,16));root.addView(status);
         preview=new SurfaceView(this);root.addView(preview,new LinearLayout.LayoutParams(-1,0,1));root.addView(Ui.button(this,"Retry camera",this::open));Ui.install(this,root);removeBack=Ui.backHandler(this,this::finish);
         camera=new CameraController(this,preview,new CameraController.Listener(){
             public void ready(boolean flash){capture();}
@@ -51,7 +51,7 @@ public final class PairingQrActivity extends LibraryActivity {
             if(shareMode){PartnerQr.Parsed code=PartnerQr.parse(found);if(code!=null){Intent out=new Intent().putExtra("share_key",code.keyHex);if(code.email!=null)out.putExtra("owner_email",code.email);if(code.nonce!=null)out.putExtra("pair_nonce",code.nonce);setResult(RESULT_OK,out);finish();return;}
                 status.setText("That QR code is not a Stack partner code. Use the one on your partner's phone under Pair with partner.");handler.postDelayed(this::capture,500);return;}
             if(found.matches("stackkey1:[0-9a-fA-F]{64}")){setResult(RESULT_OK,new Intent().putExtra("stack_key",found.substring(10)));finish();return;}
-            status.setText("That QR code is not a Stack recovery key. Use the one from keyvault.");handler.postDelayed(this::capture,500);return;
+            status.setText("That QR code is not a Stack recovery key.");handler.postDelayed(this::capture,500);return;
         }
         if(found!=null){try{NearbyPairing.qr(found);setResult(RESULT_OK,new Intent().putExtra("stack_pair_qr",found));finish();return;}catch(Exception ignored){status.setText("That QR code is not an active Stack connection code. Point at the code in Stack on your computer.");}}handler.postDelayed(this::capture,500);});
     });}

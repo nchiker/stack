@@ -372,7 +372,7 @@ impl Stack {
             Action::KeySaved(result) => match result {
                 Ok(fingerprint) => {
                     self.transfers.status = Some(format!(
-                        "Backup key saved on this computer. Fingerprint {fingerprint}; check it matches Key Vault."
+                        "Backup key saved. Check fingerprint {fingerprint} matches Key Vault."
                     ));
                     self.transfers.key_status =
                         Some(Ok(stack_core::keystore::KeyStatus::Saved { fingerprint }));

@@ -28,7 +28,7 @@ final class UpdateCheck {
     static final String REPO = "nchiker/stack";
     private static final String API = "https://api.github.com/repos/" + REPO + "/releases/latest";
     private static final String PAGE_PREFIX = "https://github.com/" + REPO + "/releases/";
-    private static final String DOWNLOAD_PREFIX = PAGE_PREFIX + "download/";
+    static final String DOWNLOAD_PREFIX = PAGE_PREFIX + "download/";
     private static final long INTERVAL = 24L * 60 * 60 * 1000, RETRY = 60L * 60 * 1000;
     private static final int MAX_BYTES = 512 * 1024;
     private static final Pattern APK = Pattern.compile("^Stack-(\\d+\\.\\d+\\.\\d+)\\.apk$");
@@ -124,6 +124,7 @@ final class UpdateCheck {
                 edit.commit();
             } catch (Exception offline) {
                 p.edit().putBoolean("failed", true).commit();
+                try { Companions.refreshAll(app); } catch (RuntimeException ignored) { /* companions are optional here */ }
             } finally {
                 running.set(false);
                 app.notifySyncChanged();

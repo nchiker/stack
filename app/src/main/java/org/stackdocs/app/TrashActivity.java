@@ -48,7 +48,7 @@ public final class TrashActivity extends LibraryActivity {
         empty.setOnClickListener(view -> confirmEmpty(items.size() + links.size()));
         TextView intro = Ui.text(this, nothing
                 ? "Nothing here. Documents you delete stay here for 30 days before they are deleted for good."
-                : "Deleted documents stay here for 30 days. If you sync with a computer, they stay there until they are deleted for good.", 14, false);
+                : "Deleted documents stay here, and on synced computers, for 30 days.", 14, false);
         intro.setTextColor(Ui.MUTED);
         intro.setPadding(0, 0, 0, Ui.dp(this, 12));
         body.addView(intro);
@@ -74,7 +74,7 @@ public final class TrashActivity extends LibraryActivity {
 
     private void linkOptions(LinkStore.Trashed item) {
         new AlertDialog.Builder(this).setTitle(item.title)
-                .setMessage(item.noLongerShared() ? item.sharedBy + " no longer shares this document. You can keep the saved copy here or delete it for good. The document itself is never touched." : "Restore it to your library, or delete Stack's saved copy for good. The document itself is never touched.")
+                .setMessage(item.noLongerShared() ? item.sharedBy + " no longer shares this document. Keep the saved copy, or delete it for good." : "Restore it, or delete Stack's saved copy for good. The original is untouched.")
                 .setPositiveButton("Restore", (d, w) -> work(() -> { app().library.links.restore(item.id); return true; }, ok -> { app().notifySyncChanged(); app().notifyLibraryChanged(); }))
                 .setNeutralButton("Delete for good", (d, w) -> work(() -> { app().library.links.deleteTrashed(item.id); return true; }, ok -> app().notifyLibraryChanged()))
                 .setNegativeButton("Cancel", null).show();
@@ -90,14 +90,14 @@ public final class TrashActivity extends LibraryActivity {
 
     private void confirmDelete(LibraryRepository.Trashed item) {
         new AlertDialog.Builder(this).setTitle("Delete for good?")
-                .setMessage("“" + item.title + "” and its information will be removed from this device. This cannot be undone.")
+                .setMessage("“" + item.title + "” will be deleted from this phone. This cannot be undone.")
                 .setPositiveButton("Delete", (d, w) -> work(() -> { app().library.deleteDocument(item.id); return true; }, ok -> app().notifyLibraryChanged()))
                 .setNegativeButton("Cancel", null).show();
     }
 
     private void confirmEmpty(int count) {
         new AlertDialog.Builder(this).setTitle("Delete " + count + (count == 1 ? " item" : " items") + " for good?")
-                .setMessage("Everything in Recently deleted will be removed from this device. This cannot be undone.")
+                .setMessage("This deletes everything here for good. It cannot be undone.")
                 .setPositiveButton("Delete all", (d, w) -> work(() -> { app().library.links.emptyTrash(); return app().library.purgeTrash(Long.MAX_VALUE); }, n -> app().notifyLibraryChanged()))
                 .setNegativeButton("Cancel", null).show();
     }

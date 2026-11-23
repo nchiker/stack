@@ -9,6 +9,8 @@ the dearmored public key stack-apt.gpg and an index.html) in the Pages checkout 
 a clone of nchiker/stack-flatpak). The signing key comes from ~/APK-Keys/stack-apt/ (fingerprint.txt,
 apt-signing-public.asc, apt-signing-secret.asc), is imported into a throwaway keyring that is deleted afterwards and
 is never printed. The newest 3 versions of each package are kept; files over 95 MB are refused (GitHub limit).
+--also-from-amipro first fetches and verifies the latest Ami Pro Linux release (sync_amipro_linux.py) and publishes
+that .deb too; any number of different packages (stack-docs, amipro-linux, stack-suite) share the one pool.
 With --push the site is committed and pushed. Installed copies then update through the system updater once
 the stack-docs-apt-source package (package_apt_setup_deb.py) is installed.
 """
@@ -18,10 +20,12 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 SITE_REPO = 'https://github.com/nchiker/stack-flatpak.git'
 BASE_URL = 'https://nchiker.github.io/stack-flatpak/'
 HOMEPAGE = 'https://github.com/nchiker/stack'
@@ -112,6 +116,7 @@ def prune(pool):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--deb', action='append', type=Path, default=[], help='built .deb to publish (repeatable)')
+    parser.add_argument('--also-from-amipro', action='store_true', help='also fetch, verify and publish the latest Ami Pro Linux release')
     parser.add_argument('--site', type=Path, default=Path.home() / '.cache/stack-flatpak-site')
     parser.add_argument('--keys', type=Path, default=Path.home() / 'APK-Keys/stack-apt')
     parser.add_argument('--make-key', action='store_true', help='create the signing key pair in --keys (only if absent) and exit')
@@ -121,6 +126,12 @@ def main():
 
     if args.make_key:
         return make_key(args.keys)
+    if args.also_from_amipro:
+        import sync_amipro_linux
+        with tempfile.TemporaryDirectory(prefix='stack-amipro-') as download:
+            fetched = sync_amipro_linux.sync(download)
+            kept = Path(tempfile.mkdtemp(prefix='stack-amipro-deb-'))
+            args.deb.append(Path(shutil.copy2(fetched, kept / fetched.name)))
     if not args.deb:
         parser.error('give at least one --deb')
     for deb in args.deb:

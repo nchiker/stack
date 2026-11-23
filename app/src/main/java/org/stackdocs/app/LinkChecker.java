@@ -91,6 +91,35 @@ final class LinkChecker {
         return summary;
     }
 
+    private static final long AUTO_GAP_MS = 60_000;
+    private static long lastAuto = Long.MIN_VALUE;
+    private static boolean autoRunning;
+
+    /**
+     * Quiet "Check linked documents" for links restored from a backup that no check has settled (restored = 1): no dialog, no toast.
+     * An owner app that is not installed or does not answer leaves the link unsettled, so a later call tries it again, but never
+     * more than once a minute; once every restored link has been answered (found, or not known by its owner) there is nothing left to
+     * do and this does no work. Call from a background thread. Returns how many links were asked (0 when it did nothing).
+     */
+    static int checkRestored(StackApplication app) {
+        synchronized (LinkChecker.class) {
+            long now = Clock.now();
+            if (autoRunning || (lastAuto != Long.MIN_VALUE && now >= lastAuto && now - lastAuto < AUTO_GAP_MS)) return 0;
+            autoRunning = true; lastAuto = now;
+        }
+        try {
+            List<LinkStore.Link> links = io(app, () -> app.library.links.restoredUnchecked());
+            int asked = 0;
+            for (LinkStore.Link link : links) { Result result = check(app, link); if (!result.busy) asked++; }
+            if (asked > 0) app.notifySyncChanged();
+            return asked;
+        } catch (Exception error) { return 0; }
+        finally { synchronized (LinkChecker.class) { autoRunning = false; } }
+    }
+
+    /** Forgets the last quiet attempt (tests, and after a restore) so the next call runs at once. */
+    static synchronized void resetAuto() { lastAuto = Long.MIN_VALUE; }
+
     /** Asks the owner to publish a fresh copy. Returns null on success, otherwise a sentence the person can read. */
     static String refresh(StackApplication app, LinkStore.Link link) {
         if (link.foreign) return "This document belongs to your partner. Only they can update it.";

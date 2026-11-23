@@ -12,6 +12,21 @@ impl Stack {
                 self.button("Sync")
                     .on_press(Message::Sync(Action::Page(Page::Overview))),
             );
+            body = body
+                .push(widget::text::heading("Filen folder"))
+                .push(self.body(match &self.ami.filen_root {
+                    Some(root) => format!(
+                        "Found at {root}. Linked documents in it open without asking."
+                    ),
+                    None => "Stack finds your Filen folder the first time you open a linked document in Ami Pro.".to_owned(),
+                }));
+            body = body.push(self.ami_install_settings());
+            if self.ami.filen_root.is_some() {
+                body = body.push(
+                    self.button("Forget this folder")
+                        .on_press(Message::Ami(crate::ami_open::Event::ForgetFolder)),
+                );
+            }
         } else {
             body = body.push(widget::text::heading("Sync"));
             if self.sync.network.status["enrolled"] == true {

@@ -18,6 +18,8 @@ pub struct SearchHit {
     pub linked: bool,
     /// The partner's name when this linked document is one the partner shares ("Shared by <name>"); else empty.
     pub shared_by: String,
+    /// This computer's own copy of a linked document is newer than the phone's saved record (local only).
+    pub changed_here: bool,
 }
 
 /// Another stack that shares documents with a chosen stack.
@@ -124,6 +126,7 @@ impl Library {
                 page_id,
                 linked: false,
                 shared_by: String::new(),
+                changed_here: false,
             });
         }
         // Linked documents have no stacks yet, so they join only unfiltered results.
@@ -135,6 +138,7 @@ impl Library {
                     (
                         added,
                         SearchHit {
+                            changed_here: self.link_changed_here(&id),
                             document_id: id,
                             title,
                             snippet,

@@ -14,6 +14,7 @@ from pathlib import Path
 TOOLS = Path(__file__).resolve().parent
 sys.path.insert(0, str(TOOLS))
 import package_apt_setup_deb
+import package_suite_deb
 
 failures = []
 
@@ -28,14 +29,14 @@ def sh(*cmd, **kw):
     return subprocess.run([str(c) for c in cmd], capture_output=True, text=kw.pop('text', True), **kw)
 
 
-def fake_deb(work, version):
-    tree = work / f'tree-{version}'
+def fake_deb(work, version, package='stack-docs'):
+    tree = work / f'tree-{package}-{version}'
     (tree / 'DEBIAN').mkdir(parents=True)
     (tree / 'usr/share/stack-docs-test').mkdir(parents=True)
     (tree / 'usr/share/stack-docs-test/hello').write_text(version)
-    (tree / 'DEBIAN/control').write_text(f'Package: stack-docs\nVersion: {version}\nSection: misc\nPriority: optional\n'
-                                         'Architecture: amd64\nMaintainer: Test <t@example.invalid>\nDescription: fake stack-docs\n')
-    deb = work / f'stack-docs_{version}_amd64.deb'
+    (tree / 'DEBIAN/control').write_text(f'Package: {package}\nVersion: {version}\nSection: misc\nPriority: optional\n'
+                                         'Architecture: amd64\nMaintainer: Test <t@example.invalid>\nDescription: fake\n')
+    deb = work / f'{package}_{version}_amd64.deb'
     subprocess.run(['dpkg-deb', '--root-owner-group', '--build', str(tree), str(deb)], check=True, capture_output=True)
     return deb
 
@@ -137,6 +138,30 @@ def main():
         (a / 'sources.list').write_text(f'deb [signed-by={other / "wrong.gpg"}] file://{apt} stable main\n')
         r = sh('apt-get', *opts, 'update', env=env)
         check('repository rejected with the wrong key', r.returncode != 0 or 'NO_PUBKEY' in r.stderr or 'not signed' in r.stderr.lower(), r.stdout + r.stderr)
+
+        # Suite metapackage with two different packages in one pool.
+        suite_deb = package_suite_deb.build(work / 'suite')
+        again = package_suite_deb.build(work / 'suite2')
+        check('suite deb is reproducible', suite_deb.read_bytes() == again.read_bytes())
+        sinfo = sh('dpkg-deb', '-f', suite_deb)
+        check('suite deb: metapackage, all, depends on both', 'Section: metapackages' in sinfo.stdout and 'Architecture: all' in sinfo.stdout
+              and 'Depends: stack-docs, amipro-linux' in sinfo.stdout, sinfo.stdout)
+        check('suite deb ships only the doc note', [l.split()[-1] for l in sh('dpkg-deb', '-c', suite_deb).stdout.splitlines() if not l.startswith('d')]
+              == ['./usr/share/doc/stack-suite/README.Debian'], sh('dpkg-deb', '-c', suite_deb).stdout)
+        for d in (fake_deb(work, '2.0.0', 'amipro-linux'), suite_deb):
+            r = sh(*publish, '--deb', d)
+            check('publish ' + d.name, r.returncode == 0, r.stderr)
+        pkgs = (suite / 'main/binary-amd64/Packages').read_text()
+        check('Packages lists all three packages', all(f'Package: {n}\n' in pkgs for n in ('stack-docs', 'amipro-linux', 'stack-suite')), pkgs)
+        check('stack-docs still limited to 3 versions', len(list((apt / 'pool/main').glob('stack-docs_*.deb'))) == 3)
+        (a / 'sources.list').write_text(f'deb [signed-by={apt / "stack-apt.gpg"}] file://{apt} stable main\n')
+        (a / 'lib-dpkg/status').write_text('')
+        r = sh('apt-get', *opts, 'update', env=env)
+        check('apt-get update with suite repository', r.returncode == 0, r.stdout + r.stderr)
+        r = sh('apt-get', '-s', *opts, 'install', 'stack-suite', env=env)
+        check('apt-get -s install stack-suite pulls both dependencies from the repo',
+              r.returncode == 0 and 'Inst stack-docs (1.10.0' in r.stdout and 'Inst amipro-linux (2.0.0' in r.stdout
+              and 'Inst stack-suite (1.0' in r.stdout, r.stdout + r.stderr)
 
         big = work / 'stack-docs_9.9.9_amd64.deb'
         with big.open('wb') as f:

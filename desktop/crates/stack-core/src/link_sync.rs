@@ -1063,11 +1063,17 @@ impl Library {
                     if origin == "foreign" {
                         // A shared copy has no file on this computer to remember.
                         tx.execute("DELETE FROM link_local_files WHERE row_id=?1", [&old.row_id])?;
+                        tx.execute("DELETE FROM link_local_state WHERE row_id=?1", [&old.row_id])?;
                     }
+                    // Text read from this computer's own copy stays in search only while it still outranks the
+                    // record (slice 6: later `modified` wins); a newer record from the phone replaces it.
+                    let body = crate::links::local_text_for(tx, &old.row_id, &hash, modified)
+                        .filter(|_| !now_protected)
+                        .unwrap_or_else(|| text.clone());
                     tx.execute("DELETE FROM link_search WHERE row_id=?1", [&old.row_id])?;
                     tx.execute(
                         "INSERT INTO link_search VALUES(?1,?2,?3)",
-                        params![old.row_id, title, text],
+                        params![old.row_id, title, body],
                     )?;
                 }
             }
@@ -1091,6 +1097,7 @@ impl Library {
                 tx.execute("DELETE FROM link_search WHERE row_id=?1", [&id])?;
                 tx.execute("DELETE FROM link_records WHERE row_id=?1", [&id])?;
                 tx.execute("DELETE FROM link_local_files WHERE row_id=?1", [&id])?;
+                tx.execute("DELETE FROM link_local_state WHERE row_id=?1", [&id])?;
                 removals.push(id);
                 report.deleted += 1;
             }

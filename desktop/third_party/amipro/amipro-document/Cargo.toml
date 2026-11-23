@@ -1,0 +1,8 @@
+[package]
+name = "amipro-document"
+version = "0.1.0"
+edition = "2024"
+license = "MPL-2.0"
+rust-version = "1.85"
+publish = false
+description = "Ami Pro for Linux document model, vendored unmodified (source only) so Stack can read the text of a .SAM file."

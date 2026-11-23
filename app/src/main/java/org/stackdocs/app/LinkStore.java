@@ -71,6 +71,12 @@ final class LinkStore {
                 id = c.getString(0); storedHash = c.getString(1); storedPreview = c.getString(2); titleEdited = c.getInt(3) != 0; priorState = c.getString(4);
             }
         }
+        boolean adopted = false;
+        if (id == null) {
+            // "Set up again": a restored row waiting for its owner takes over this publish instead of a duplicate being created.
+            String[] row = adoptable(db, record);
+            if (row != null) { id = row[0]; storedHash = row[1]; storedPreview = row[2]; titleEdited = !"0".equals(row[3]); priorState = row[4]; adopted = true; }
+        }
         boolean created = id == null;
         boolean contentChanged = created || !record.hash.equals(storedHash);
         if (created) id = UUID.randomUUID().toString();
@@ -88,7 +94,7 @@ final class LinkStore {
         } else if (previewFile != null) previewFile.delete();
 
         String duplicateOf = null;
-        try (Cursor c = db.rawQuery("SELECT id FROM link_records WHERE hash=? AND origin='own' AND state<>'trashed' AND NOT (owner=? AND link_id=?) LIMIT 1", new String[]{record.hash, record.owner, record.linkId})) {
+        try (Cursor c = db.rawQuery("SELECT id FROM link_records WHERE hash=? AND origin='own' AND state<>'trashed' AND id<>? LIMIT 1", new String[]{record.hash, id})) {
             if (c.moveToFirst()) duplicateOf = c.getString(0);
         }
         long now = Clock.now();
@@ -100,6 +106,13 @@ final class LinkStore {
             values.put("locators", locatorsJson(record)); values.put("received_at", now);
             // A publish is the owner saying the file exists: it brings a trashed, missing or unreachable record back to live.
             values.put("state", "live");
+            if (adopted) {
+                // The owner now knows this document under a new link_id. Sync identity is (owner, link_id), so the next sync
+                // sees the old key vanish (written as `gone`, the desktop drops its row) and the new key appear (a new row with the same
+                // content); the update trigger below includes link_id, so the dirty flag is raised. stacks, tags, notes, the user's
+                // title and `added_at` live on this row and are kept.
+                values.put("link_id", record.linkId); values.put("restored", 0);
+            }
             if (created || !"live".equals(priorState)) { values.put("state_since", now); values.put("removed_reason", ""); }
             if (created || !titleEdited) values.put("title", record.title);
             if (contentChanged) {
@@ -124,6 +137,45 @@ final class LinkStore {
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
         return new Result(id, created, contentChanged, duplicateOf);
+    }
+
+    /**
+     * The one restored, own, not-trashed row of the same owner that this publish should take over: the same filen uuid if the record has a
+     * filen locator, otherwise the same hash. None or more than one match gives null (the publish then creates a record as usual).
+     * Returns {id, hash, preview_file, title_user_edited, state}.
+     */
+    private String[] adoptable(SQLiteDatabase db, LinkRecord record) {
+        String uuid = null;
+        for (LinkRecord.Locator l : record.locators) if (LinkRecord.Locator.FILEN.equals(l.type) && l.uuid != null) { uuid = l.uuid; break; }
+        List<String[]> found = new ArrayList<>();
+        try (Cursor c = db.rawQuery("SELECT id,hash,preview_file,title_user_edited,state,locators FROM link_records WHERE owner=? AND origin='own' AND restored>0 AND state<>'trashed'", new String[]{record.owner})) {
+            while (c.moveToNext()) {
+                boolean match = false;
+                if (uuid != null) {
+                    List<LinkRecord.Locator> list = LinkRecord.parseLocators(c.getString(5));
+                    if (list != null) for (LinkRecord.Locator l : list) if (LinkRecord.Locator.FILEN.equals(l.type) && uuid.equals(l.uuid)) { match = true; break; }
+                } else if (hasNoFilen(record.locators)) match = record.hash.equals(c.getString(1));
+                if (match) found.add(new String[]{c.getString(0), c.getString(1), c.getString(2), Integer.toString(c.getInt(3)), c.getString(4)});
+            }
+        }
+        return found.size() == 1 ? found.get(0) : null;
+    }
+
+    private static boolean hasNoFilen(List<LinkRecord.Locator> list) {
+        for (LinkRecord.Locator l : list) if (LinkRecord.Locator.FILEN.equals(l.type)) return false;
+        return true;
+    }
+
+    /** 0 = an ordinary link; 1 = restored from a backup and not yet checked; 2 = checked, and the owner does not know it ("Set up again"). */
+    int restoredState(String id) {
+        try (Cursor c = database.get().rawQuery("SELECT restored FROM link_records WHERE id=?", new String[]{id})) { return c.moveToFirst() ? c.getInt(0) : 0; }
+    }
+
+    /** Own links restored from a backup that no check has settled yet (restored = 1). */
+    List<Link> restoredUnchecked() {
+        List<Link> out = new ArrayList<>();
+        for (Link link : list("")) if (!link.foreign && restoredState(link.id) == 1) out.add(link);
+        return out;
     }
 
     /** Newest first. A blank query lists everything; otherwise title and text are searched like documents are. */
@@ -237,15 +289,24 @@ final class LinkStore {
                 stored = c.getString(0);
             }
             boolean differs = LIVE.equals(outcome.state) && outcome.hash != null && !outcome.hash.equals(stored);
+            int restored;
+            try (Cursor c = db.rawQuery("SELECT restored FROM link_records WHERE id=?", new String[]{id})) { c.moveToFirst(); restored = c.getInt(0); }
             ContentValues values = new ContentValues();
             values.put("state", outcome.state); values.put("checked_at", now);
+            String applied = outcome.state;
+            if (restored > 0 && !LIVE.equals(outcome.state)) {
+                // A restored link the owner does not know stays `unreachable`, never `missing` (nothing was deleted: the phone is new).
+                // An explicit "not found" settles it as 'set up again'; a failed call changes nothing about that and is retried later.
+                applied = UNREACHABLE; values.put("state", UNREACHABLE);
+                if (MISSING.equals(outcome.state)) values.put("restored", 2);
+            } else if (restored > 0) values.put("restored", 0);
             if (LIVE.equals(outcome.state)) {
                 if (outcome.locators != null) values.put("locators", outcome.locators);
                 // The saved text is of the old file, so its "changed" date must stay with it until a refresh brings the new copy.
                 if (outcome.modified >= 0 && !differs) values.put("modified", outcome.modified);
             }
             // state_since moves only when the state really changes, so a repeated check does not restart the 30 days.
-            db.execSQL("UPDATE link_records SET state_since=? WHERE id=? AND revision=? AND state<>'trashed' AND state<>?", new Object[]{now, id, expectedRevision, outcome.state});
+            db.execSQL("UPDATE link_records SET state_since=? WHERE id=? AND revision=? AND state<>'trashed' AND state<>?", new Object[]{now, id, expectedRevision, applied});
             int changed = db.update("link_records", values, "id=? AND revision=? AND state<>'trashed'", new String[]{id, Long.toString(expectedRevision)});
             db.setTransactionSuccessful();
             return changed == 0 ? 0 : differs ? 2 : 1;
@@ -294,7 +355,7 @@ final class LinkStore {
             if (id == null) return false;
             boolean back = "missing".equals(state) || "unreachable".equals(state) || ("trashed".equals(state) && "trashed".equals(reason));
             if (json.equals(old) && !back) return false;
-            if (back) db.execSQL("UPDATE link_records SET locators=?, state='live', state_since=?, removed_reason='', revision=revision+1 WHERE id=?", new Object[]{json, Clock.now(), id});
+            if (back) db.execSQL("UPDATE link_records SET locators=?, state='live', state_since=?, removed_reason='', restored=0, revision=revision+1 WHERE id=?", new Object[]{json, Clock.now(), id});
             else db.execSQL("UPDATE link_records SET locators=?, revision=revision+1 WHERE id=?", new Object[]{json, id});
             db.setTransactionSuccessful();
             return true;
@@ -308,6 +369,28 @@ final class LinkStore {
             statement.bindString(1, owner); statement.bindString(2, linkId);
             return statement.executeUpdateDelete() > 0;
         }
+    }
+
+    /**
+     * The caller's own records for `list_owned` (an owner app rebuilding its link map after a restore): link_id, title, hash, modified, state and only the
+     * filen locators. Own rows only (never foreign), states live/unreachable/missing, never protected or trashed, newest modified first, at most `limit`
+     * (one extra row is read to tell whether the list was cut). No text, preview, stacks or notes.
+     */
+    org.json.JSONObject listOwned(String owner, int limit) throws org.json.JSONException {
+        org.json.JSONArray records = new org.json.JSONArray();
+        boolean truncated = false;
+        try (Cursor c = database.get().rawQuery("SELECT link_id,title,hash,modified,state,locators FROM link_records WHERE owner=? AND origin='own' AND protected=0 "
+                + "AND state IN ('live','unreachable','missing') ORDER BY modified DESC, id LIMIT ?", new String[]{owner, Integer.toString(limit + 1)})) {
+            while (c.moveToNext()) {
+                if (records.length() >= limit) { truncated = true; break; }
+                org.json.JSONArray filen = new org.json.JSONArray();
+                List<LinkRecord.Locator> list = LinkRecord.parseLocators(c.getString(5));
+                if (list != null) for (LinkRecord.Locator l : list) if (LinkRecord.Locator.FILEN.equals(l.type)) filen.put(new org.json.JSONObject().put("type", "filen").put("uuid", l.uuid).put("path", l.path));
+                records.put(new org.json.JSONObject().put("link_id", c.getString(0)).put("title", c.getString(1)).put("hash", c.getString(2))
+                    .put("modified", c.getLong(3)).put("state", c.getString(4)).put("locators", filen));
+            }
+        }
+        return new org.json.JSONObject().put("records", records).put("truncated", truncated);
     }
 
     /** For the device checks: state, shared, removed reason and locators of every record whose locators mention this UUID. */

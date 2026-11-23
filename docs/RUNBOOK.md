@@ -66,18 +66,18 @@ Read ~/Projects/Stack/docs/STACK_LINK_CONTRACT.md section "Desktop Open, Results
 ```
 
 ## 5. Opus review (2026-11-22), ranked changes and where they stand
-1. Terminal commands in phone screens: **done** (BackupActivity text now names Key Vault's own screens). Not published (phone release needs the owner's go-ahead).
-2. One-step install: **done in 0.6.3** (not published). Ami Pro Linux in the same apt repo: **open** (Ami Pro Linux session).
-3. One file chooser per document on the computer: **open**; needs Ami Pro's `filen` locator (slice 5, part B) and a folder-once design in Stack desktop.
-4. False hash warning: **done in 0.6.3** (same file name opens quietly).
-5. Edits made on the computer never reach Stack's search: **open** (Ami Pro Linux publishing, or Stack re-reads the remembered file's hash); needs a design decision.
-6. Ami Pro slice 4 release and slice 5: **open** (A, B, C).
-7. Second launch error: message made plain in 0.6.3 (Stack says it is already open); bringing the window forward needs libcosmic single-instance activation, **open**.
+1. Terminal commands in phone screens: **released** in Stack 0.19.0.
+2. One-step install: **released** in desktop 0.7.0. Ami Pro Linux in the same apt repo: **open** (Ami Pro Linux session).
+3. One file chooser per document on the computer: **in progress** (the `filen` locator now exists: Ami Pro slice 5 verified): learn the Filen folder from the first chosen file, derive every other path from the `filen` locator.
+4. False hash warning: **released** in desktop 0.7.0 (same file name opens quietly).
+5. Edits made on the computer never reach Stack's search: **in progress**, decided: Stack desktop re-checks remembered files' hash/mtime at launch and on window focus and refreshes the saved text and preview; no Ami Pro Linux dependency.
+6. Ami Pro slice 4 and 5 (and Filen 0.4.7 events): **verified; Filen 0.4.7 released; Ami Pro release is the Ami Pro session's.**
+7. Second launch: plain message **released** in 0.7.0; bringing the window forward (single-instance activation) **in progress**.
 8. Phone prompts explained before they appear; Ami Pro daily update check; Filen versionCode compare: **open** (phone app sessions).
 9. Partner journey without a Refresh button and without Key Vault: **designed** (slice 7 design).
-10. "Set up again" state for restored links: **open** (Stack phone).
+10. "Set up again" for restored links: **in progress** (restored links adopt the owner's next share of the same file instead of duplicating; automatic check after a restore).
 11. Retire the Flatpak repo: **open**, after the partner's install.
-12. Stale contract text: **done**.
+12. Stale contract text: **done** (released with the docs).
 Also open: rebuild the real-LAN test (T3) into the repo (`test_android_link_lan.py`, `LinkLanChecks`) so tie review over the network, 1000 links, release-build timing and phone kill tests can be run; the old copy existed only in a scratch patch.
 
 ## 6. Waiting for the owner (nothing below happens without a go-ahead)
@@ -89,3 +89,39 @@ Also open: rebuild the real-LAN test (T3) into the repo (`test_android_link_lan.
 
 ## 7. Corrections from the Filen session (2026-11-22)
 Filen Files has only `GRANT_BACKUP_FOLDER`. `GRANT_SHARE_FOLDER`, `GRANT_RECEIVED_FOLDER`, `OPEN_SHARED` (and its extras) and a received-folder change notice do NOT exist; they are slice 7 work for Filen that the owner has to scope. Stack treats them as optional: the system folder picker is used for the partner folders and Open shows a plain "needs Filen Files" message. Stack's checks build can call Filen's provider as a pinned caller (`-e filenLocate <uri>`, `-e filenLookup <uuid>`), which unblocks Ami Pro's slice 5 part B.
+
+## 8. Released (2026-11-22)
+- Desktop 0.7.0: signed apt repo https://nchiker.github.io/stack-flatpak/apt/ (also carries 0.6.3's one-step install and the security fixes); source release `desktop-v0.7.0`. Every computer needs the update (library schema 8).
+- Stack phone 0.19.0 (versionCode 36): https://github.com/nchiker/stack/releases/tag/v0.19.0, signed with the development key (certificate e873f2fd...e311), APK digest 4f0c2ebf...fe3dd. Release-build smoke on the test phone: upgrade 0.17.3 to 0.19.0, Settings and Pair with partner screens, no crash, picker fallback with Filen 0.4.7.
+- Security review (Opus, 2026-11-22): no critical findings; fixes for items 1-5, 8, 10, 11, 12 are in; deferred: isolated-process PDF rendering, QR is a long-lived secret (documented in the app), Release Valid-Until.
+- Still open: the two-account Filen handshake test (Filen 0.4.8 re-enables pairing), the partner's own install and pairing run, one file chooser per document on the computer, edits made on the computer reaching search, the "Set up again" state after a restore, retiring the Flatpak repo.
+
+## Refreshing the apt repo
+One command: `python3 desktop/tools/refresh_apt_repo.py`. It fetches and verifies the latest Ami Pro Linux release
+(`sync_amipro_linux.py`: SHA256SUMS, package name, architecture and version checked), builds `stack-suite_1.0_all.deb`
+if absent (`package_suite_deb.py`, depends on stack-docs and amipro-linux), and publishes those plus the stack-docs and
+apt-source debs found in `desktop/target/deb` (newest 3 versions per package kept). Default is a dry run into a temp site
+checkout; only `--push` commits and pushes the real site. Build a new stack-docs deb first when Stack itself changed.
+
+## 9. Release rules
+- **"Latest" is always the phone APK.** https://github.com/nchiker/stack/releases/latest is what Ami Pro's "Get Stack" button and the in-app updater follow, so it must land on a release with Stack-<version>.apk. Desktop source releases (`desktop-v<version>`) are created with `gh release create ... --latest=false`; phone releases (`v<version>`) are created normally (or with `--latest`). After any release, check with `gh release list -R nchiker/stack` that the row marked Latest is the phone APK.
+- Phone release steps: bump versionCode/versionName in app/build.gradle, build `:app:assembleRelease` (signed with the development key), name the file `Stack-<version>.apk`, write `SHA256SUMS`, push the source snapshot with `tools/backup_github.py --mirror ~/.cache/stack-source-backup --push --public`, then `gh release create v<version> ... --target <that commit> --notes-file docs/RELEASE_NOTES_<version>.md`.
+- Desktop release steps: `desktop/tools/package_deb.py --output <fresh dir>`, `gh release create desktop-v<version> <dir>/SOURCE.tar.gz --latest=false ...`, then `desktop/tools/publish_apt_repo.py --deb <deb> --push` (or `refresh_apt_repo.py --push`).
+- Nothing is published without the owner's go-ahead typed in the Stack session.
+
+## 10. RESUME NOTE (written 2026-11-22 at shutdown; read this first next session)
+Everything is committed locally. NOTHING from the list below is released or pushed except desktop 0.7.0 and phone 0.19.0 (section 8). The local `main` is ahead of GitHub by many commits (the last source snapshot pushed was 1101068); the release tools push snapshots, do not `git push` by hand.
+
+**Built, committed, tested on the phone (not released):** `list_owned` provider call (Ami Pro verified it answers), Companion apps screen (pinned certificate lists, SHA256SUMS/digest/none integrity order), Set up again for restored links (schema 17), the two UI-text passes (docs/UI_TEXT_REVIEW.md; the new strings still need a device re-run), the list_owned test fixes. Device groups last run green before the text passes: linkContract 13 (needs re-run after the test fix), companions 7, linkRestore 6, partnerImport 10, partnerPublish 4, shareArchive 9, linkSync 16, archive 22, features 15; `partnerFilen` needs re-run after its wording assertion fix.
+**Built on the computer, committed (desktop 0.7.1, not released):** one chooser per Filen folder, "Changed on this computer" detection with local text refresh (vendored Ami Pro readers, desktop/third_party/amipro, MPL-2.0), single-instance activation, schema 9, "Add Ami Pro?" card via PackageKit (never run for real), apt tooling for Ami Pro Linux + stack-suite (never published; `refresh_apt_repo.py` dry run needs network).
+
+**Partner journey, state of the four pieces:**
+1. "I'm joining my partner" first run: PARTIAL. Only the pure logic exists (`PartnerJourney.java`: step state machine, grant route, first-run decision). NOT built: `PartnerJoinActivity` (4 screens + finish), Home first-run cards in `MainActivity`, manifest entries, `partnerJourney=true` test group, string review rows.
+2. Static start page: DONE in site/start/ (index.html + start.css; no images, the placeholder picture was removed 2026-11-23) with `desktop/tools/publish_start_page.py` (dry run by default, selftest passes; script logic checked in node against the real package index). No screenshot is planned. Publishing only with the owner's go-ahead (`--push`).
+3. "Invite partner": PARTIAL. `PartnerInvite.java` (START_URL, message, share intent) exists; the screen, the button in Partner sharing and the Home menu item are NOT built.
+4. "Install Ami Pro" on desktop first launch: DONE in code and mock-tested; needs a real PackageKit check on COSMIC.
+Recovery sheet: NOT started.
+
+**Phone queue (TEST phone 0A121JEC203530):** free. Order next time: (a) re-run Stack's device groups (linkContract after the list_owned fix, partnerFilen, plus everything above), (b) (unknown-sources screenshot dropped), (c) device checks for the partner journey once built, (d) Filen's second-profile/junk-account tests, (e) LAN harness `desktop/tools/test_android_link_lan.py --scenario all` if desired. Ask Filen/AmiPro through the orchestrator before taking it. The installed Filen Files is a test-flag build; real Stack 0.19.0 is installed too.
+**Next step:** finish `PartnerJoinActivity` + invite screen + Home cards (phone), run the full one-button run (`python3 -I desktop/tools/run_all_checks.py`, ~8 min, uses the phone), rehearse the joining flow on the test phone, then ask the owner for the go-ahead to release phone 0.20.0 + desktop 0.7.1 and publish the start page (apt repo and Ami Pro Linux refresh too). Then the recovery sheet.
+**Waiting on others:** Filen 0.4.8 (re-enables one-tap pairing: GRANT_SHARE_FOLDER/GRANT_RECEIVED_FOLDER, needs a two-account test); Ami Pro release; the owner's decisions (retire the Flatpak repo: owner must type it in the Stack session; key rotation: not recommended).

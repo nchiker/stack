@@ -31,6 +31,19 @@ final class LinkOpener {
         return (intent.getFlags() & grants) == 0 && intent.getClipData() == null && intent.getSelector() == null;
     }
 
+    /**
+     * The owner app's own launcher screen, for "Set up again": the document is not known there yet, so there is nothing to open, only
+     * the app to start so the person can share the document with Stack again. Only an owner whose provider passes the same trust check
+     * as every other call is started. Not on the main thread (the check reads package certificates).
+     */
+    static Intent launch(Context context, String owner) throws Failure {
+        String name = ownerName(owner);
+        if (!LinkCallers.trustedOwnerProvider(context, owner)) throw new Failure(name + " isn't installed, or is too old to work with Stack.");
+        Intent intent = context.getPackageManager().getLaunchIntentForPackage(owner);
+        if (intent == null || intent.getComponent() == null || !owner.equals(intent.getComponent().getPackageName())) throw new Failure(name + " could not be started.");
+        return new Intent(intent).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+    }
+
     /** Asks the owner for the intent that opens the document. Runs a provider call, so not on the main thread. */
     @SuppressWarnings("deprecation")
     static Intent request(Context context, LinkStore.Link link, String mode) throws Failure {
@@ -44,16 +57,16 @@ final class LinkOpener {
         } catch (java.util.concurrent.TimeoutException late) {
             throw new Failure(name + " took too long to answer. Try again.");
         } catch (IllegalArgumentException | SecurityException | UnsupportedOperationException | IllegalStateException error) {
-            throw new Failure(name + " isn't installed, or this version doesn't work with Stack yet. You can still read the saved text and preview here.");
+            throw new Failure(name + " isn't installed, or is too old to work with Stack. You can still read the saved text here.");
         } catch (Exception error) {
             Throwable cause = error.getCause();
             if (cause instanceof IllegalArgumentException || cause instanceof SecurityException || cause instanceof UnsupportedOperationException)
-                throw new Failure(name + " isn't installed, or this version doesn't work with Stack yet. You can still read the saved text and preview here.");
+                throw new Failure(name + " isn't installed, or is too old to work with Stack. You can still read the saved text here.");
             throw new Failure(name + " could not be reached. Try again.");
         }
-        if (reply == null) throw new Failure(name + " isn't installed, or this version doesn't work with Stack yet. You can still read the saved text and preview here.");
+        if (reply == null) throw new Failure(name + " isn't installed, or is too old to work with Stack. You can still read the saved text here.");
         String problem = reply.getString("error");
-        if (problem != null) throw new Failure("not_found".equals(problem) ? name + " can't find this document any more. It may have been moved or deleted." : name + " could not open it.");
+        if (problem != null) throw new Failure("not_found".equals(problem) ? name + " can't find this document any more." : name + " could not open it.");
         Intent intent;
         try { intent = reply.getParcelable("intent"); } catch (RuntimeException error) { intent = null; }
         if (!valid(intent, link.owner)) throw new Failure(name + " sent an answer Stack can't use. Update both apps.");

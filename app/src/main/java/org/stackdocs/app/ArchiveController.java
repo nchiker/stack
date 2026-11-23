@@ -67,7 +67,7 @@ final class ArchiveController {
                 int removed=AutoBackup.prune(resolver,tree,name,keepDays);
                 try{BackupHistory.completed(app,Clock.now());}catch(RuntimeException ignored){}
                 message="Library backup saved as "+name+"."+(removed>0?" Removed "+removed+" older automatic "+(removed==1?"backup.":"backups."):"")
-                        +" "+note+" If the folder belongs to a cloud app, that app finishes the upload.";
+                        +" "+note+" A cloud folder finishes the upload itself.";
                 state="success";done.finished(true,message,name,size);
             } catch(Exception error) {
                 boolean kept=error instanceof SizeMismatch,removed=false;if(file!=null&&!kept)try{removed=DocumentsContract.deleteDocument(app.getContentResolver(),file);}catch(Exception ignored){}
@@ -86,8 +86,8 @@ final class ArchiveController {
         BackupKeys.Slots slots=BackupKeys.configured(app)?BackupKeys.load(app):null;
         int mode=slots!=null?LibraryArchive.LINKS_ENCRYPTED:plainLinks?LibraryArchive.LINKS_INCLUDED:LibraryArchive.LINKS_NONE;
         int left=mode==LibraryArchive.LINKS_NONE?app.io.submit(() -> app.library.links.list("").size()).get():0;
-        note=slots!=null?"Encrypted. Keep the recovery key safe in Key Vault; without it this backup cannot be opened."
-                :"Keep it private; the archive is not encrypted."+(left>0?" "+left+" linked "+(left==1?"document was":"documents were")+" left out. Turn on backup encryption to include them.":"");
+        note=slots!=null?"Encrypted. Without the recovery key (in Key Vault) it cannot be opened."
+                :"Not encrypted: keep it private."+(left>0?" "+left+" linked "+(left==1?"document was":"documents were")+" left out; turn on encryption to include them.":"");
         try(LibraryArchive.Snapshot snapshot=app.io.submit(() -> app.library.archive().snapshot(progress,false,mode)).get()) {
             try(OutputStream raw=app.getContentResolver().openOutputStream(destination,"wt")) {
                 if(raw==null)throw new IOException("The destination could not be opened. Choose another location.");stream=raw;
@@ -101,7 +101,7 @@ final class ArchiveController {
         }
         // Some providers (Google Drive) report 0 right after a write; only a non-zero mismatch is a failure.
         long reported=AutoBackup.reportedSize(app.getContentResolver(),destination);
-        if(reported>0&&reported!=written)throw new SizeMismatch("The destination reports "+reported+" bytes but Stack wrote "+written+". The file was left in place; check it before relying on it.");
+        if(reported>0&&reported!=written)throw new SizeMismatch("The saved file is the wrong size ("+reported+" of "+written+" bytes). Check it before relying on it.");
         return written;
     }
     /** The file may well be fine (providers report stale sizes), so it is never deleted on this failure. */
@@ -131,15 +131,15 @@ final class ArchiveController {
                         if(passphrase==null&&recoveryKey==null)throw new IOException("This backup is encrypted. Enter the passphrase or the recovery key.");
                         try(BackupEnvelope.Reader plain=BackupEnvelope.decrypt(buffered,passphrase,recoveryKey)) {
                             candidate=archive.stage(plain,progress);plain.finish();
-                            if(candidate.manifest.getInt("version")!=4)throw new IOException("The encrypted backup has an unexpected inner format.");
+                            if(candidate.manifest.getInt("version")!=4)throw new IOException("This backup is in a format Stack cannot read.");
                         }
                     } else candidate=archive.stage(buffered,progress);
                 } finally {stream=null;}
                 unencrypted=!encrypted;
                 progress.check();LibraryArchive.Staged selected=candidate;
                 LibraryArchive.Plan plan=app.io.submit(() -> archive.plan(selected)).get();
-                progress.check();staged=candidate;String made="";try{made="This backup was made "+java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM,java.text.DateFormat.SHORT).format(new java.util.Date(selected.manifest.getLong("created_at")))+". Check it is the one you expect. ";}catch(org.json.JSONException ignored){}
-                review=made+plan.summary()+(unencrypted?" This backup is not encrypted, so it cannot be checked for tampering. Make sure it is yours.":"");state="review";
+                progress.check();staged=candidate;String made="";try{made="Made "+java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.MEDIUM,java.text.DateFormat.SHORT).format(new java.util.Date(selected.manifest.getLong("created_at")))+". ";}catch(org.json.JSONException ignored){}
+                review=made+plan.summary()+(unencrypted?" Not encrypted, so Stack cannot tell if it was changed. Add it only if it is yours.":"");state="review";
             } catch(Exception error) {if(candidate!=null)candidate.close();failure(error,"");}
         });
     }
@@ -150,7 +150,7 @@ final class ArchiveController {
             try {
                 int linkCount=selected.plan==null?0:selected.plan.links.size(),skipped=selected.plan==null?0:selected.plan.skippedLinks;
                 int count=app.io.submit(() -> archive.commit(selected,progress)).get();
-                state="success";message=count+" documents restored"+(linkCount>0?" and "+linkCount+" linked documents":"")+(skipped>0?"; "+skipped+" linked documents already here were kept":"")+". Existing documents and the unfinished scan were kept.";
+                LinkChecker.resetAuto();state="success";message=count+" documents restored"+(linkCount>0?" and "+linkCount+" linked documents":"")+(skipped>0?"; "+skipped+" linked documents already here were kept":"")+". Your existing documents were not changed.";
             } catch(Exception error) {failure(error," Reopen Stack if cleanup is pending; existing documents are kept.");}
             finally {selected.close();staged=null;}
         });
@@ -169,6 +169,6 @@ final class ArchiveController {
     private void failure(Exception exception,String suffix) {
         Throwable error=exception;while(error.getCause()!=null)error=error.getCause();
         state=progress.canceled?"canceled":"failed";
-        message=(progress.canceled?"Operation canceled.":error.getMessage()==null?"The operation failed. Free local space or choose another file/location and retry.":error.getMessage())+suffix;
+        message=(progress.canceled?"Operation canceled.":error.getMessage()==null?"Could not finish. Free some space or choose another place.":error.getMessage())+suffix;
     }
 }

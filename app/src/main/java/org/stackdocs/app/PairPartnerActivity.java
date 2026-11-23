@@ -21,10 +21,10 @@ import java.util.EnumMap;
 
 /**
  * Shows the key this phone shares with, as a QR code the partner scans in person, plus a short fingerprint both people can read aloud.
- * The screen is excluded from screenshots and recents. "Stop sharing / make a new key" replaces the key and publishes again with it.
+ * The screen is excluded from screenshots and recents. "Make a new code" replaces the key and publishes again with it.
  */
 public final class PairPartnerActivity extends LibraryActivity {
-    static final String CODE_WARNING = "Anyone who photographs this code could read what you share until you make a new code. Making a new code does not remove copies already stored in Filen.";
+    static final String CODE_WARNING = "Anyone who photographs this code can read what you share. A new code does not remove copies already in Filen.";
     private static final int SCAN = 83, SHARE = 86, RECEIVE = 87;
     private ImageView code;
     private TextView fingerprint, status, waiting;
@@ -46,7 +46,7 @@ public final class PairPartnerActivity extends LibraryActivity {
         ScrollView scroll = new ScrollView(this);
         LinearLayout body = Ui.column(this);
         body.setPadding(Ui.dp(this, 24), Ui.dp(this, 12), Ui.dp(this, 24), Ui.dp(this, 24));
-        TextView words = Ui.text(this, "Ask your partner to scan this code in Stack on their phone. Only someone who has scanned it can open the documents you share.", 15, false);
+        TextView words = Ui.text(this, "Ask your partner to scan this code in Stack. Only people who scan it can open your shared documents.", 15, false);
         body.addView(words);
         code = new ImageView(this);
         code.setBackgroundColor(Color.WHITE);
@@ -57,7 +57,7 @@ public final class PairPartnerActivity extends LibraryActivity {
         fingerprint.setGravity(android.view.Gravity.CENTER);
         fingerprint.setPadding(0, Ui.dp(this, 12), 0, Ui.dp(this, 4));
         body.addView(fingerprint);
-        TextView read = Ui.text(this, "Your partner's phone shows the same short code after scanning. If the two differ, do not continue.", 13, false);
+        TextView read = Ui.text(this, "Your partner's phone should show the same short code. If not, stop.", 13, false);
         read.setTextColor(Ui.MUTED);
         body.addView(read);
         TextView warning = Ui.text(this, CODE_WARNING, 13, false);
@@ -67,15 +67,20 @@ public final class PairPartnerActivity extends LibraryActivity {
         status.setTextColor(Ui.MUTED);
         status.setPadding(0, Ui.dp(this, 8), 0, 0);
         body.addView(status);
-        body.addView(Ui.button(this, "Stop sharing / make a new key", this::confirmRotate));
+        body.addView(Ui.button(this, "Make a new code", this::confirmRotate));
         // Always visible (when Filen Files offers the step) rather than enabled by a "partner scanned" signal: this phone has no way to know that
         // the partner scanned, because the partner's scan only changes the partner's phone. Filen Files itself waits for the partner and says so.
         if (FilenFolder.useFilen(FilenFolder.shareAvailable(this))) {
-            TextView next = Ui.text(this, "After your partner has scanned the code, continue here to share the folder in Filen Drive with them.", 14, false);
+            TextView next = Ui.text(this, "Once your partner has scanned, share the Filen Drive folder with them.", 14, false);
             next.setTextColor(Ui.MUTED);
             next.setPadding(0, Ui.dp(this, 16), 0, 0);
             body.addView(next);
-            body.addView(Ui.button(this, "Partner scanned it, continue", this::startShare));
+            body.addView(Ui.button(this, "Share the folder", this::startShare));
+        } else {
+            TextView next = Ui.text(this, "Once your partner has scanned, share that folder with them in Filen Files.", 14, false);
+            next.setTextColor(Ui.MUTED);
+            next.setPadding(0, Ui.dp(this, 16), 0, 0);
+            body.addView(next);
         }
         waiting = Ui.text(this, FilenFolder.WAITING_LINE, 14, false);
         waiting.setTextColor(Ui.MUTED);
@@ -106,14 +111,14 @@ public final class PairPartnerActivity extends LibraryActivity {
     }
 
     private void loadKey() {
-        status.setText(PartnerShare.enabled(this) ? "" : "Choose a sharing folder in Settings, under Partner sharing folder, so documents can be shared.");
+        status.setText(PartnerShare.enabled(this) ? "" : "Choose the Partner sharing folder first.");
         new Thread(() -> {
             byte[] key = null;
             try {
                 key = PartnerKeys.ensureSendKey(this, PartnerKeys.DEFAULT_PARTNER);
                 show(key);
             } catch (Exception error) {
-                runOnUiThread(() -> status.setText("Stack could not prepare the code on this phone. Try “Stop sharing / make a new key”."));
+                runOnUiThread(() -> status.setText("Could not make the code. Try “Make a new code”."));
             } finally { if (key != null) Arrays.fill(key, (byte) 0); }
         }, "Stack pairing code").start();
     }
@@ -164,8 +169,8 @@ public final class PairPartnerActivity extends LibraryActivity {
             runOnUiThread(() -> {
                 if (isFinishing() || isDestroyed()) { Arrays.fill(key, (byte) 0); return; }
                 if (!ask) { confirmTrust(key, print, ownerEmail, nonce); return; }
-                new AlertDialog.Builder(this).setTitle("Replace your partner's key?")
-                        .setMessage("This phone already has a key from your partner. If you replace it, documents shared with the old key stop updating. The new code is " + print + ".")
+                new AlertDialog.Builder(this).setTitle("Replace key?")
+                        .setMessage("Documents shared with the old key stop updating. New code: " + print + ".")
                         .setCancelable(false)
                         .setPositiveButton("Replace", (d, w) -> confirmTrust(key, print, ownerEmail, nonce))
                         .setNegativeButton("Cancel", (d, w) -> Arrays.fill(key, (byte) 0)).show();
@@ -178,8 +183,8 @@ public final class PairPartnerActivity extends LibraryActivity {
         EditText field = new EditText(this);
         field.setSingleLine(true); field.setText(PartnerImport.name(this)); field.selectAll();
         new AlertDialog.Builder(this).setTitle("Trust this code?")
-                .setMessage((ownerEmail == null ? "" : "Filen account in the code: " + ownerEmail + "\n\n")
-                        + "Short code: " + print + "\nYour partner's phone should show the same short code. If it differs, cancel.\n\nName for your partner, shown on their documents as \"Shared by …\":")
+                .setMessage((ownerEmail == null ? "" : "Filen account: " + ownerEmail + "\n\n")
+                        + "Short code: " + print + "\nIt must match your partner's phone.\n\nYour partner's name, shown as \"Shared by …\":")
                 .setView(field).setCancelable(false)
                 .setPositiveButton("Trust this code", (d, w) -> {
                     String name = field.getText().toString();
@@ -189,11 +194,11 @@ public final class PairPartnerActivity extends LibraryActivity {
                             PartnerImport.setName(this, name);
                             PartnerImport.keyChanged(this);
                             PartnerImport.importNow(app());
-                            runOnUiThread(() -> status.setText("Paired. Documents your partner shares will appear in Stack."
-                                    + (PartnerImport.enabled(this) ? "" : " Choose the folder your partner shares under Settings, Partner sharing, Partner shared folder.")));
+                            runOnUiThread(() -> status.setText("Paired. Their documents will appear in Stack."
+                                    + (PartnerImport.enabled(this) ? "" : " Choose the Partner shared folder.")));
                             if (ownerEmail != null) runOnUiThread(() -> startReceived(ownerEmail, nonce));
                         } catch (Exception error) {
-                            runOnUiThread(() -> status.setText("Stack could not save the code on this phone. Nothing was changed."));
+                            runOnUiThread(() -> status.setText("Could not save the code. Nothing changed."));
                         } finally { java.util.Arrays.fill(key, (byte) 0); }
                     }, "Stack partner key").start();
                 })
@@ -219,7 +224,7 @@ public final class PairPartnerActivity extends LibraryActivity {
             if (!FilenFolder.shareAvailable(this)) throw new ActivityNotFoundException();
             startActivityForResult(FilenFolder.pairShareRequest(pairNonce), SHARE); clearWaiting(); retry = this::startShare;
         }
-        catch (ActivityNotFoundException unavailable) { status.setText("Filen Files is not available. Choose the sharing folder in Settings, under Partner sharing."); }
+        catch (ActivityNotFoundException unavailable) { status.setText("Filen Files is not available. Choose the Partner sharing folder."); }
     }
 
     private void filenResult(int request, int result, Intent data) {
@@ -227,20 +232,20 @@ public final class PairPartnerActivity extends LibraryActivity {
         Runnable again = request == SHARE ? this::startShare : retry;
         String line = FilenFolder.statusLine(granted, granted, data == null ? null : data.getStringExtra(FilenFolder.EXTRA_ERROR), data == null ? null : data.getStringExtra(FilenFolder.EXTRA_MESSAGE));
         if (!granted) { if (again != null) showWaiting(line, again); else status.setText(line); return; }
-        if (!FilenFolder.treeTrusted(this, data)) { status.setText("Filen Files is not available. Choose the folder in Settings, under Partner sharing."); clearWaiting(); return; }
+        if (!FilenFolder.treeTrusted(this, data)) { status.setText("Filen Files is not available. Choose the " + (request == SHARE ? "Partner sharing folder." : "Partner shared folder.")); clearWaiting(); return; }
         clearWaiting();
-        Runnable bad = () -> status.setText("Stack could not keep access to that folder. Choose it in Settings, under Partner sharing.");
-        Runnable ok = () -> status.setText(request == SHARE ? "Sharing folder ready. Documents you switch on will be shared." : "Paired. Documents your partner shares will appear in Stack.");
+        Runnable bad = () -> status.setText("Could not keep access to that folder. Choose the " + (request == SHARE ? "Partner sharing folder." : "Partner shared folder."));
+        Runnable ok = () -> status.setText(request == SHARE ? "Folder ready. Documents you switch on are shared." : "Paired. Their documents will appear in Stack.");
         whenAllowed(() -> { if (request == SHARE) PartnerGrant.sharedFolder(app(), data, ok, bad); else PartnerGrant.receivedFolder(app(), data, ok, bad); });
     }
 
     private void confirmRotate() {
-        new AlertDialog.Builder(this).setTitle("Stop sharing and make a new key?")
-                .setMessage("Your partner will no longer be able to open what you share until they scan the new code. The old code stops working. " + CODE_WARNING)
-                .setPositiveButton("Make a new key", (d, w) -> new Thread(() -> {
+        new AlertDialog.Builder(this).setTitle("Make a new code?")
+                .setMessage("Your partner must scan the new code to keep opening your shares. The old code stops working, but copies already in Filen stay.")
+                .setPositiveButton("Make new code", (d, w) -> new Thread(() -> {
                     byte[] key = null;
-                    try { key = PartnerShare.rotate(app()); pairNonce = PartnerQr.newNonce(); show(key); runOnUiThread(() -> status.setText("New key made. Ask your partner to scan the new code.")); }
-                    catch (Exception error) { runOnUiThread(() -> status.setText("Stack could not make a new key. Nothing was changed.")); }
+                    try { key = PartnerShare.rotate(app()); pairNonce = PartnerQr.newNonce(); show(key); runOnUiThread(() -> status.setText("New code ready. Ask your partner to scan it.")); }
+                    catch (Exception error) { runOnUiThread(() -> status.setText("Could not make a new code. Nothing changed.")); }
                     finally { if (key != null) Arrays.fill(key, (byte) 0); }
                 }, "Stack new sharing key").start())
                 .setNegativeButton("Cancel", null).show();

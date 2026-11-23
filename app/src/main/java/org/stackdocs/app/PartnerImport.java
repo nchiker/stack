@@ -25,9 +25,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 final class PartnerImport {
     static final long DAY = 24L * 60 * 60 * 1000, FOREGROUND_GAP = 30L * 1000;
     static final String DEFAULT_NAME = "Partner";
-    static final String OLDER_PROBLEM = "The shared file is older than one already imported.";
-    static final String TOO_LARGE_PROBLEM = "The shared file is too large for this phone to read.";
-    static final String KEY_PROBLEM = "The shared file cannot be opened with your key. Ask your partner to pair again.";
+    static final String OLDER_PROBLEM = "The shared file is older than the last one read.";
+    static final String TOO_LARGE_PROBLEM = "The shared file is too large for this phone.";
+    static final String KEY_PROBLEM = "Your key cannot open the shared file. Ask your partner to pair again.";
     private static final AtomicBoolean running = new AtomicBoolean();
 
     private PartnerImport() {}
@@ -97,7 +97,7 @@ final class PartnerImport {
 
     static String label(Context context) {
         SharedPreferences p = prefs(context);
-        if (tree(context) == null) return "Off · Choose the folder your partner shares with you";
+        if (tree(context) == null) return "Off · Choose your partner's folder";
         String folder = p.getString("tree_name", "");
         StringBuilder out = new StringBuilder("Reading from ").append(folder.isEmpty() ? "the chosen folder" : folder);
         long ok = p.getLong("last_ok", 0);

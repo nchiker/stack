@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Join me on Stack</title>
+<link rel="stylesheet" href="start.css">
+</head>
+<body>
+<main id="top">
+<h1>Join me on Stack</h1>
+<p class="lead">Pick your device. It takes a few minutes.</p>
+<nav aria-label="Choose your device">
+<a href="#phone">Phone</a> <a href="#computer">Computer</a>
+</nav>
+
+<div id="sections">
+<section id="phone" aria-labelledby="phone-h">
+<h2 id="phone-h">On your phone</h2>
+<ol>
+<li>
+<h3>Install Stack</h3>
+<p>Tap the button. Android will ask once to allow installs from your browser.</p>
+<a class="button" href="https://github.com/nchiker/stack/releases/latest">Install Stack</a>
+</li>
+<li>
+<h3>Open Stack</h3>
+<p>Tap <strong>I'm joining my partner</strong>.</p>
+</li>
+<li>
+<h3>Meet your partner</h3>
+<p>Scan their code on their phone.</p>
+</li>
+</ol>
+</section>
+
+<section id="computer" aria-labelledby="computer-h">
+<h2 id="computer-h">On your computer</h2>
+<p class="note">For Linux (Ubuntu, Debian, Mint).</p>
+<ol>
+<li>
+<h3>Install Stack</h3>
+<p>Tap the button to download the file.</p>
+<a class="button" id="deb" href="../apt/">Install Stack</a>
+<noscript><p><a href="../apt/">Get the file from the download page</a></p></noscript>
+</li>
+<li>
+<h3>Open the file</h3>
+<p>Double-click the file, then Install. Stack updates itself with your other updates.</p>
+</li>
+<li>
+<h3>Connect your phone</h3>
+<p>Open Stack and click Connect phone. On your phone, open Settings, then Sync, and scan the code.</p>
+</li>
+</ol>
+</section>
+</div>
+</main>
+<script>
+(function () {
+  var ua = navigator.userAgent || '';
+  var root = document.documentElement;
+  if (/Android/i.test(ua)) root.className = 'is-phone';
+  else if (/Linux|X11/i.test(ua)) root.className = 'is-computer';
+  function part(s) { return s.match(/(\d+|\D+)/g) || []; }
+  function cmp(a, b) {
+    var x = part(a), y = part(b), n = Math.max(x.length, y.length);
+    for (var i = 0; i < n; i++) {
+      var p = x[i] || '', q = y[i] || '';
+      if (p === q) continue;
+      var pn = /^\d/.test(p), qn = /^\d/.test(q);
+      if (pn && qn) return Number(p) < Number(q) ? -1 : 1;
+      return p < q ? -1 : 1;
+    }
+    return 0;
+  }
+  if (!window.fetch) return;
+  fetch('../apt/dists/stable/main/binary-amd64/Packages').then(function (r) {
+    if (!r.ok) throw 0;
+    return r.text();
+  }).then(function (text) {
+    var best = null;
+    text.split(/\n\s*\n/).forEach(function (block) {
+      var f = {};
+      block.split('\n').forEach(function (l) {
+        var m = /^(Package|Version|Filename):\s*(.+)$/.exec(l);
+        if (m) f[m[1]] = m[2].trim();
+      });
+      if (f.Package === 'stack-docs' && f.Version && f.Filename &&
+          (!best || cmp(best.Version, f.Version) < 0)) best = f;
+    });
+    if (best) document.getElementById('deb').href = '../apt/' + best.Filename;
+  }).catch(function () {});
+})();
+</script>
+</body>
+</html>

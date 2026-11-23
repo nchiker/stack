@@ -306,7 +306,7 @@ final class LibraryArchive {
                         }
                         values.put("id",id);values.put("preview_file",withPreview.contains(old)?id+".pdf":"");values.put("received_at",now);
                         // Whatever state the backup recorded, locators from another device or time may be dead: the next check settles it.
-                        values.put("state","unreachable");values.put("state_since",now);
+                        values.put("state","unreachable");values.put("state_since",now);values.put("restored",1);
                         db.insertOrThrow("link_records",null,values);
                         db.execSQL("INSERT INTO link_search(record_id,title,body) VALUES(?,?,?)",new Object[]{id,original.getString("title"),original.getString("text")});
                     }

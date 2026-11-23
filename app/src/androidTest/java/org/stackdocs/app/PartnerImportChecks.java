@@ -120,7 +120,7 @@ final class PartnerImportChecks {
         PartnerKeys.Stamp seenAhead = new PartnerKeys.Stamp(current4.epoch, current4.counter + 5);
         PartnerImport.Result replayed = PartnerImport.importOnce(b, source, receive, "Sam", now + 2, "", null, seenAhead);
         require(replayed.kind == PartnerImport.Kind.OLDER && replayed.imported == null && replayed.stamp == null, "an archive with a lower counter in the same epoch is refused");
-        require(PartnerImport.OLDER_PROBLEM.equals("The shared file is older than one already imported."), "the quiet line");
+        require(PartnerImport.OLDER_PROBLEM.equals("The shared file is older than the last one read."), "the quiet line");
         PartnerImport.Result sameCounter = PartnerImport.importOnce(b, source, receive, "Sam", now + 2, "", null, new PartnerKeys.Stamp(current4.epoch, current4.counter));
         require(sameCounter.kind == PartnerImport.Kind.IMPORTED && sameCounter.stamp.counter == current4.counter, "the same counter is read again");
         PartnerShare.publish(a, sink, key, now + 2, new PartnerKeys.Stamp("fedcba9876543210fedcba9876543210", 1));
@@ -178,7 +178,7 @@ final class PartnerImportChecks {
         // 8. A wrong key is reported quietly; a missing file and garbage are "nothing new"; a replaced file is read again.
         PartnerShare.publish(a, sink, key, now + 7, nextStamp());
         require(PartnerImport.importOnce(b, source, new byte[32], "Sam", now + 8, "", null).kind == PartnerImport.Kind.BAD_KEY, "a wrong key is BAD_KEY, not an exception");
-        require(PartnerImport.KEY_PROBLEM.equals("The shared file cannot be opened with your key. Ask your partner to pair again."), "the quiet line has the agreed words");
+        require(PartnerImport.KEY_PROBLEM.equals("Your key cannot open the shared file. Ask your partner to pair again."), "the quiet line has the agreed words");
         File moved = new File(folder, "away");
         require(file.renameTo(moved), "move the file away");
         PartnerImport.Result missing = PartnerImport.importOnce(b, source, receive, "Sam", now + 9, "", null);

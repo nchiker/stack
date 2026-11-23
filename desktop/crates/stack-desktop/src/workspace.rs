@@ -4,11 +4,26 @@ use cosmic::{Element, iced, widget};
 use stack_core::{SearchHit, Sort};
 
 /// What the detail view says for a document the partner shares: there is no Open on a computer.
-pub(crate) const FOREIGN_NOTICE: &str = "Opening needs your phone: it opens through Filen Files.";
+pub(crate) const FOREIGN_NOTICE: &str = "Open this one on your phone, in Filen Files.";
+
+/// What the detail view says when this computer's copy of the file is newer than the phone's saved record and its
+/// text could not be read here (Search keeps the saved text).
+pub(crate) const CHANGED_NOTICE: &str =
+    "Changed on this computer. Search uses the older text until your phone saves it.";
+
+/// The same, when the text was read from this computer's copy (search and the text below use it).
+pub(crate) const CHANGED_NOTICE_REFRESHED: &str =
+    "Changed on this computer. Search and the text below use this copy until your phone saves it.";
 
 /// The small line under a linked document's name in the list and search: "Shared by <name>" for the partner's.
 pub(crate) fn linked_caption(shared_by: &str) -> String {
-    if shared_by.is_empty() {
+    linked_caption_for(shared_by, false)
+}
+
+pub(crate) fn linked_caption_for(shared_by: &str, changed_here: bool) -> String {
+    if changed_here {
+        "Changed on this computer".to_owned()
+    } else if shared_by.is_empty() {
         "Linked document".to_owned()
     } else {
         format!("Shared by {shared_by}")
@@ -234,6 +249,7 @@ impl Stack {
             widget::column::with_capacity(4)
                 .push(toolbar)
                 .push_maybe(self.overlap_chips())
+                .push_maybe(self.ami_install_card())
                 .push_maybe((self.hits.len() > RESULTS_PER_PAGE).then(|| {
                     widget::column::with_capacity(3)
                         .spacing(8)
@@ -328,7 +344,7 @@ impl Stack {
                 )),
         );
         if hit.linked {
-            text = text.push(widget::text::caption(linked_caption(&hit.shared_by)));
+            text = text.push(widget::text::caption(linked_caption_for(&hit.shared_by, hit.changed_here)));
         } else if let Some(tile) = self.tiles.metadata.get(&hit.document_id) {
             let names: Vec<_> = tile
                 .memberships
@@ -379,6 +395,22 @@ impl Stack {
     fn ami_controls(&self) -> Element<'_, Message> {
         let mut column = widget::column::with_capacity(4).spacing(8);
         let state = self.ami_button_state();
+        let missing = self.ami_install.probe.filter(|p| !p.installed && p.source);
+        if let Some(probe) = missing {
+            // Ami Pro is not on this computer: say so, and offer the same Install button.
+            column = column.push(self.body(crate::ami_install::MISSING));
+            if probe.can_install() && !self.ami_install.busy {
+                column = column.push(self.button("Install").on_press(Message::AmiInstall(crate::ami_install::Event::Install)));
+            } else if self.ami_install.busy {
+                column = column.push(self.body(crate::ami_install::WORKING));
+            } else {
+                column = column.push(self.body(crate::ami_install::FROM_STORE));
+            }
+            if let Some(line) = self.ami_install.result.filter(|_| !self.ami_install.busy) {
+                column = column.push(self.body(line));
+            }
+            return column.into();
+        }
         let mut button = self.button("Open in Ami Pro");
         if matches!(
             state,
@@ -433,8 +465,19 @@ impl Stack {
             info = info
                 .push(self.body("Saved copy shown here. Open in Ami Pro edits the original file."))
                 .push(self.ami_controls());
+            if linked.changed_here {
+                info = info.push(self.body(if linked.text_from_computer {
+                    CHANGED_NOTICE_REFRESHED
+                } else {
+                    CHANGED_NOTICE
+                }));
+            }
         }
-        info = info.push(widget::text::caption("Saved text"));
+        info = info.push(widget::text::caption(if linked.text_from_computer {
+            "Text from this computer's copy"
+        } else {
+            "Saved text"
+        }));
         let text: String = linked.text.chars().take(SHOWN).collect();
         info = info.push(
             widget::container(self.body(if text.is_empty() {

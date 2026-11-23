@@ -89,6 +89,10 @@ fn linked_for_view(foreign: bool) -> stack_core::LinkedDocument {
         text: "quarterly zebra budget".into(),
         preview: None,
         remembered_file: None,
+        derived_file: None,
+        filen_path: None,
+        changed_here: false,
+        text_from_computer: false,
         foreign,
         shared_by: if foreign { "Sam".into() } else { String::new() },
     }
@@ -114,7 +118,7 @@ fn a_shared_linked_document_shows_who_shared_it_and_offers_no_open() {
             assert!(
                 labels
                     .iter()
-                    .any(|l| l == "Opening needs your phone: it opens through Filen Files."),
+                    .any(|l| l == "Open this one on your phone, in Filen Files."),
                 "{labels:?}"
             );
             assert!(labels.iter().any(|l| l.contains("quarterly zebra budget")));
@@ -1075,6 +1079,7 @@ impl Driver {
             frames: Arc::default(),
             smoke_title: None,
             ui_scale: 1.0,
+            single_instance: false,
         };
         let mut core = Core::default();
         core.set_main_window_id(Some(iced::window::Id::RESERVED));

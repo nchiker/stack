@@ -1,7 +1,7 @@
 use crate::library::{Error, Result};
 use rusqlite::Connection;
 
-pub const VERSION: i64 = 8;
+pub const VERSION: i64 = 9;
 const APPLICATION_ID: i64 = 0x53544b44;
 
 pub const V1: &str = "
@@ -64,6 +64,16 @@ const V8: &str = "
 ALTER TABLE link_records ADD COLUMN origin TEXT NOT NULL DEFAULT 'own';
 ALTER TABLE link_records ADD COLUMN shared_by TEXT NOT NULL DEFAULT '';
 ALTER TABLE link_records ADD COLUMN foreign_generation INTEGER NOT NULL DEFAULT 0;
+";
+
+/// Local-only link state (never synced, never exported, not in `link_projection`). `link_local_settings` holds the
+/// Filen folder learned from the first chosen file (key `filen_root`). `link_local_state` is what this computer last saw
+/// of a link's own file: modification time (ms), size, SHA-256, and the text read from it when it differs from the
+/// phone's record. Slice 6 merge rules decide at read time whether it still applies, so the phone's next sync of a newer
+/// `modified` simply outranks it. Additive only; an older build refuses a library this one has upgraded.
+const V9: &str = "
+CREATE TABLE link_local_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+CREATE TABLE link_local_state(row_id TEXT PRIMARY KEY,mtime_ms INTEGER NOT NULL,size INTEGER NOT NULL,file_hash TEXT NOT NULL,text TEXT);
 ";
 
 pub fn migrate(db: &mut Connection) -> Result<()> {
@@ -130,6 +140,10 @@ pub fn migrate(db: &mut Connection) -> Result<()> {
     if version >= 8 {
         db.prepare("SELECT origin,shared_by,foreign_generation FROM link_records LIMIT 0")?;
     }
+    if version >= 9 {
+        db.prepare("SELECT key,value FROM link_local_settings LIMIT 0")?;
+        db.prepare("SELECT row_id,mtime_ms,size,file_hash,text FROM link_local_state LIMIT 0")?;
+    }
     if version < VERSION {
         let tx = db.transaction()?;
         if version < 1 {
@@ -155,6 +169,9 @@ pub fn migrate(db: &mut Connection) -> Result<()> {
         }
         if version < 8 {
             tx.execute_batch(V8)?;
+        }
+        if version < 9 {
+            tx.execute_batch(V9)?;
         }
         tx.pragma_update(None, "application_id", APPLICATION_ID)?;
         tx.pragma_update(None, "user_version", VERSION)?;
@@ -210,7 +227,7 @@ mod tests {
     }
 
     #[test]
-    fn schema_5_library_with_links_migrates_to_8_additively() {
+    fn schema_5_library_with_links_migrates_to_9_additively() {
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path().join("library");
         drop(Library::open(&root).unwrap());
@@ -244,7 +261,7 @@ mod tests {
         .unwrap();
         drop(db);
         let library = Library::open(&root).unwrap();
-        assert_eq!(library.status().unwrap().schema, 8);
+        assert_eq!(library.status().unwrap().schema, 9);
         assert_eq!(library.link_count().unwrap(), 1);
         let row: (String, i64, String, i64, i64, i64, String) = library
             .db
@@ -275,7 +292,7 @@ mod tests {
             .db
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(version, 8);
+        assert_eq!(version, 9);
         drop(library);
         // Reopening is a no-op, and the previous release (VERSION 5) would refuse this library because
         // `version > VERSION` is an error (see `rejects_future_foreign_and_partial_schema...`).
@@ -313,7 +330,7 @@ mod tests {
         .unwrap();
         drop(db);
         let library = Library::open(&root).unwrap();
-        assert_eq!(library.status().unwrap().schema, 8);
+        assert_eq!(library.status().unwrap().schema, 9);
         let row: (String, String, i64) = library
             .db
             .query_row(
@@ -323,6 +340,14 @@ mod tests {
             )
             .unwrap();
         assert_eq!(row, ("own".into(), String::new(), 0));
+        // Schema 9: the local-only tables exist and start empty.
+        for table in ["link_local_settings", "link_local_state"] {
+            let n: i64 = library
+                .db
+                .query_row(&format!("SELECT count(*) FROM {table}"), [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(n, 0);
+        }
         assert!(!library.linked_document("11111111-1111-4111-8111-111111111111").unwrap().foreign);
         drop(library);
         // Reopening is a no-op. A build that stops at 7 refuses the library (version > VERSION), see the next test.
