@@ -1,7 +1,7 @@
 {
   "format": "org.stackdocs.source-backup",
   "version": 1,
-  "source_base_commit": "128b0d9c3d56b83a4e30bf0bb630eb85895f0bd4",
+  "source_base_commit": "4c5dd9c1824ef59b255e642ec929eeb973fae1ce",
   "qualification": "Source checkpoint including unfinished edits; not a verified release or personal document backup",
   "files_sha256": {
     ".gitattributes": "7bf9de77e8c51162d51671642c4ee456af0d39d7ac430c7fffabab8a072e6a38",
@@ -745,7 +745,7 @@
     "docs/FOLDER_SHARING_INTERFACES.md": "fceb0b661ad5795a5cbd35b1c79135f7a2f2d655805fe1109552769efb646c5b",
     "docs/FOLDER_SHARING_PHASE0.md": "36f0a78cec5142b2f9503fb53bb06a34e10add7158d18e1064aa529792efa9af",
     "docs/FOLDER_SHARING_PLAN.md": "7868af49d5a2db52eb6805e4890d2ccb1f568808864cae71c239b35ebc56c780",
-    "docs/FOLDER_SHARING_REPORT.md": "eb1c4f06f3a6dba970b5978c8855f913a9dfbd05110c0d4d4d0f6d23d79f5f79",
+    "docs/FOLDER_SHARING_REPORT.md": "660b3042c39fc27c8e58dbefcfcf3a6827c146061ae4be98a1d78294e3d55b66",
     "docs/NEW_DEVICE_SETUP_SCOPE.md": "315941db8eabd428eaabe370b9461c7e122929f42323b129ff9537ba46fd2d09",
     "docs/PROJECT_ROLLUP.md": "c77e47f4758dc2ee30f7198955f23fc7ece4707ad7b60e5a07390d3c387366f8",
     "docs/RELEASE_NOTES_0.19.0.md": "956edcabe13491d2c02e27092ad9b99b52e045e83bcdf9e773b2c35fa2181b9c",

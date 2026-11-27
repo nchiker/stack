@@ -1,6 +1,6 @@
 # Folder sharing with a partner: release report (2026-11-27)
 
-Status: **built, tested on the test phone, security-reviewed. Not released, not pushed.** Waiting for your go-ahead.
+Status: **RELEASED 2026-11-27** on the owner's go-ahead: Filen 0.5.0 (v0.5.0, nchiker/Filen-Filemanager), Stack 0.21.0 (v0.21.0, nchiker/stack, source snapshot 8ba1a85), Ami Pro 0.7.0 (v0.7.0, nchiker/AmiPro-APK). Filen upstream reports sent: filen-rs #23, #24. Last fixes before release: Stack 47077e2 (no scan writes while the partner is unknown; partner identity from the same call), Filen cb6d6a3; Opus quick check done.
 
 ## What you get
 - **One search for everything.** Stack searches its own documents, your Filen folders (added once, files stay where they
