@@ -24,5 +24,4 @@ Smaller, when convenient:
 - What happens to stacks/tags when partners stop sharing entirely or change accounts.
 - Fully isolated OCR (needs new native code: Tesseract init from memory).
 - Device check of Filen's "keep adding files while locked" prompt (needs a screen-lock PIN in a test profile).
-- Upstream: filen-rs #23 is unverified; #24 was wrong (see Filen `docs/UPSTREAM_REPORTS.md`). No new reports without
-  a running reproduction.
+- Upstream: we never file anything with Filen again (owner's rule). filen-rs #23 is unverified; #24 was wrong.
