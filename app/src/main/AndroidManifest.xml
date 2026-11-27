@@ -15,10 +15,10 @@
     <queries>
         <!-- Filen Files hands Stack a backup folder in Filen Drive (FilenFolder). -->
         <intent><action android:name="app.filenfiles.action.GRANT_BACKUP_FOLDER" /></intent>
-        <intent><action android:name="app.filenfiles.action.GRANT_SHARE_FOLDER" /></intent>
-        <intent><action android:name="app.filenfiles.action.GRANT_RECEIVED_FOLDER" /></intent>
-        <intent><action android:name="app.filenfiles.action.OPEN_SHARED" /></intent>
-        <!-- The Filen Files pairing account call (FilenFolder.ownerEmail). -->
+        <!-- Folder sharing (FilenPartner): partner setup, the share confirm sheet, the shared scan folder, and the partner/share-state calls. -->
+        <intent><action android:name="app.filenfiles.action.PARTNER_SETUP" /></intent>
+        <intent><action android:name="app.filenfiles.action.SHARE_WITH_PARTNER" /></intent>
+        <intent><action android:name="app.filenfiles.action.CREATE_SHARED_FOLDER" /></intent>
         <provider android:authorities="app.filenfiles.stacklink" />
         <package android:name="app.amipro.editor"/>
         <package android:name="app.filenfiles"/>
@@ -38,6 +38,12 @@
         <service android:name=".SyncJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
         <service android:name=".PhotoImportJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
         <service android:name=".AutoBackupJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
+        <service android:name=".SourceIndexJob" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
+        <!-- Reads the text of folder files, one at a time, and draws pages for the viewer, in an ISOLATED process (ExtractService): another uid with no access to Stack's files, database, keys or the network; a bad file can kill that process, never Stack. -->
+        <service android:name=".ExtractService" android:process=":extract" android:isolatedProcess="true" android:exported="false" />
+        <!-- Tesseract needs a directory to start from, which an isolated process cannot have: OCR of drawn pages (pixels only) runs here, not isolated. -->
+        <service android:name=".OcrService" android:process=":ocr" android:exported="false" />
+        <service android:name=".RenderService" android:process=":render" android:isolatedProcess="true" android:exported="false" />
         <activity android:name=".PdfSelectionActivity" android:exported="true">
             <intent-filter><action android:name="android.intent.action.GET_CONTENT"/><category android:name="android.intent.category.DEFAULT"/><category android:name="android.intent.category.OPENABLE"/><data android:mimeType="application/pdf"/></intent-filter>
         </activity>
@@ -55,10 +61,8 @@
         <activity android:name=".CompanionsActivity" android:exported="false" />
         <activity android:name=".DocumentActivity" android:exported="false" />
         <activity android:name=".LinkActivity" android:exported="false" />
-        <activity android:name=".PartnerShareActivity" android:exported="false" />
-        <activity android:name=".PairPartnerActivity" android:exported="false" />
-        <activity android:name=".PartnerJoinActivity" android:exported="false" />
-        <activity android:name=".PartnerInviteActivity" android:exported="false" />
+        <activity android:name=".FoldersActivity" android:exported="false" />
+        <activity android:name=".SourceViewerActivity" android:exported="false" />
         <activity android:name=".ScanActivity" android:exported="false" />
         <activity android:name=".PageEditorActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true"

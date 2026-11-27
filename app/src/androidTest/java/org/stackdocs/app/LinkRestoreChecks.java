@@ -138,7 +138,7 @@ final class LinkRestoreChecks {
         LibraryDatabase second = new LibraryDatabase(isolated, name);
         try {
             SQLiteDatabase db = second.getWritableDatabase();
-            require(db.getVersion() == 17, "a version 16 library upgrades to 17");
+            require(db.getVersion() == LibraryDatabase.VERSION, "a version 16 library upgrades to the current version");
             try (Cursor c = db.rawQuery("SELECT title,state,restored FROM link_records WHERE id=?", new String[]{id})) {
                 require(c.moveToFirst() && c.getString(0).equals("Old row") && c.getString(1).equals("unreachable") && c.getInt(2) == 0, "the row survives and restored is 0");
             }

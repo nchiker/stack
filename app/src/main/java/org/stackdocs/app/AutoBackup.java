@@ -90,24 +90,19 @@ final class AutoBackup {
         ContentResolver resolver = context.getContentResolver();
         Uri previous = tree(context);
         resolver.takePersistableUriPermission(tree, grantFlags & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION));
-        if (previous != null && !previous.equals(tree)) release(resolver, previous);
         prefs(context).edit().putString("tree", tree.toString()).putString("tree_name", displayName == null ? "" : displayName)
                 .remove("last_error").putLong("last_attempt", 0).commit();
+        if (previous != null && !previous.equals(tree)) SourceStore.releaseUnlessUsed(context, previous);
         schedule(context);
     }
 
     static void disable(Context context) {
         Uri previous = tree(context);
-        if (previous != null) release(context.getContentResolver(), previous);
         int keep = keepDays(context); // turning off keeps the chosen keep time for next time
         prefs(context).edit().clear().putInt("keep_days", keep).commit();
+        if (previous != null) SourceStore.releaseUnlessUsed(context, previous);   // after the setting is cleared: the backup no longer holds the tree, a folder source may
         JobScheduler jobs = context.getSystemService(JobScheduler.class);
         if (jobs != null) jobs.cancel(JOB);
-    }
-
-    private static void release(ContentResolver resolver, Uri tree) {
-        try { resolver.releasePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION); }
-        catch (RuntimeException ignored) { /* the grant is already gone */ }
     }
 
     /** Daily check; the real interval is enforced by {@link #due}, so changing it never needs a reschedule. */

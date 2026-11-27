@@ -96,12 +96,27 @@ Filen Files has only `GRANT_BACKUP_FOLDER`. `GRANT_SHARE_FOLDER`, `GRANT_RECEIVE
 - Security review (Opus, 2026-11-22): no critical findings; fixes for items 1-5, 8, 10, 11, 12 are in; deferred: isolated-process PDF rendering, QR is a long-lived secret (documented in the app), Release Valid-Until.
 - Still open: the two-account Filen handshake test (Filen 0.4.8 re-enables pairing), the partner's own install and pairing run, one file chooser per document on the computer, edits made on the computer reaching search, the "Set up again" state after a restore, retiring the Flatpak repo.
 
+## 8b. Released (2026-11-23, on the owner's go-ahead)
+- Stack phone 0.20.0 (versionCode 37): https://github.com/nchiker/stack/releases/tag/v0.20.0 (marked Latest), `Stack-0.20.0.apk` SHA-256 820b6648...f84b9, signed with the development key (certificate e873f2fd...e311), built from commit 846fc53, target the source snapshot 77fefcc. The exact APK tested on the TEST phone (update over 0.19.0 kept the library: 164 documents, 2 links, 16 stacks).
+- Desktop 0.7.1: signed apt repo https://nchiker.github.io/stack-flatpak/apt/ (`stack-docs_0.7.1_amd64.deb`, SHA-256 4aa4c338...b6067, newest three versions kept: 0.6.2, 0.7.0, 0.7.1); source release `desktop-v0.7.1` (not Latest). Library moves to schema 9; 0.6.2 can upgrade straight to 0.7.1.
+- Start page https://nchiker.github.io/stack-flatpak/start/ (text only). Links checked: Install Stack goes to releases/latest (v0.20.0), the computer button resolves to the 0.7.1 .deb.
+- Not published, by decision: `stack-suite`, Ami Pro for Linux in the apt repo, the Flatpak retirement.
+
+## 8c. Decided for after the weekend (owner's decision, relayed by the orchestrator 2026-11-23; no code yet)
+- **One update control in Stack, Filen Files and Ami Pro (phone apps).** A bar at the top of Home that says "Update available" only when there is an update; one tap downloads it and then Android asks to confirm; "Check for updates" sits at the same place in each app's Settings. Today Stack needs a check first and then a second tap to upgrade (Home notice or Settings, Update check). Each app keeps its own pinned download rules (see the Companion apps screen); only the look and the steps become the same. Owners: each app's own session; Stack's part is the Home bar and the Settings row.
+
 ## Refreshing the apt repo
 One command: `python3 desktop/tools/refresh_apt_repo.py`. It fetches and verifies the latest Ami Pro Linux release
 (`sync_amipro_linux.py`: SHA256SUMS, package name, architecture and version checked), builds `stack-suite_1.0_all.deb`
 if absent (`package_suite_deb.py`, depends on stack-docs and amipro-linux), and publishes those plus the stack-docs and
 apt-source debs found in `desktop/target/deb` (newest 3 versions per package kept). Default is a dry run into a temp site
 checkout; only `--push` commits and pushes the real site. Build a new stack-docs deb first when Stack itself changed.
+
+## 8d. Phone native library and file type registry (folder sharing, 2026-11-26)
+- `org.stackdocs.app.types` is the one list of file types (`FileTypes.all()`: stack-scan, pdf, jpeg, png, webp, amipro, text). Library import, page previews, the photo picker/importer and the archive/sync MIME whitelists ask it. Add a type = one handler class + synthetic files in `app/src/androidTest/assets/types/<id>/` (never real documents). Check: `-e types true` (also in `run_all_checks.py` as `phone-types`).
+- `libstacknative.so` (Rust, `app/src/main/rust/stacknative`, arm64-v8a, about 1.2 MB) is built by the normal Gradle build (`buildStackNative`, before `preBuild`); nothing to run by hand and nothing needed on a user's phone beyond the installed app. It vendors `amipro-text/-document/-formats` in `app/src/main/rust/third_party/amipro` (README names the AmiPro-Linux commit).
+- Developers need: `cargo` on PATH (the crate's `rust-toolchain.toml` pins Rust 1.99.0 with the `aarch64-linux-android` target; rustup installs it), and the Android NDK found the Gradle way: `ndk.dir=` in `local.properties`, else `ANDROID_NDK_HOME`/`ANDROID_NDK_ROOT`, else the newest `<sdk.dir>/ndk/<version>`. The build stops with a plain message when the NDK is missing. No crates are downloaded (`--offline --locked`, no dependencies). AGP prints a harmless NDK-version note when the NDK differs from its default.
+- Devices that are not arm64-v8a install fine but read no Ami Pro text (`NativeText.available()` is false and the handler answers UNREADABLE).
 
 ## 9. Release rules
 - **"Latest" is always the phone APK.** https://github.com/nchiker/stack/releases/latest is what Ami Pro's "Get Stack" button and the in-app updater follow, so it must land on a release with Stack-<version>.apk. Desktop source releases (`desktop-v<version>`) are created with `gh release create ... --latest=false`; phone releases (`v<version>`) are created normally (or with `--latest`). After any release, check with `gh release list -R nchiker/stack` that the row marked Latest is the phone APK.

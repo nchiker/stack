@@ -24,16 +24,22 @@ android {
         applicationId checksBuild ? 'org.stackdocs.app.checks' + (checksNamespace.isEmpty() ? '' : '.' + checksNamespace) : 'org.stackdocs.app'
         manifestPlaceholders = [appLabel: checksBuild ? ('TEST Stack' + (checksNamespace.isEmpty() ? '' : ' ' + checksNamespace)) : '@string/app_name']
         // Checks builds only: one extra pinned caller as package:sha256 (for example a debug-signed owner app under test). Empty in every other build.
+        // True in checks builds only: lets ExtractService run the scripted hang, crash and out-of-memory of the checks.
+        resValue 'bool', 'stack_checks', checksBuild ? 'true' : 'false'
         resValue 'string', 'stack_extra_pin', checksBuild ? providers.gradleProperty('stackExtraPin').orElse('').get() : ''
         minSdk 24
         targetSdk 36
-        versionCode 37
-        versionName '0.20.0'
+        versionCode 38
+        versionName '0.21.0'
         testInstrumentationRunner providers.gradleProperty('preservationProbe').isPresent() ? 'org.stackdocs.app.PreservationRunner' : 'org.stackdocs.app.ScannerChecks'
     }
 
     buildFeatures {
         resValues true
+    }
+
+    sourceSets {
+        main { jniLibs.srcDir new File(buildDir, 'stacknative/jniLibs') }
     }
 
     compileOptions {
@@ -110,3 +116,75 @@ tasks.register('checkClockUse') {
     }
 }
 preBuild.dependsOn 'checkClockUse'
+
+// Phone native library (Rust, arm64-v8a): Ami Pro text for org.stackdocs.app.types.NativeText. Built here so a normal build has it.
+// Tools are found the standard way, never from a fixed path: the NDK from ndk.dir in local.properties, else ANDROID_NDK_HOME /
+// ANDROID_NDK_ROOT / ANDROID_NDK, else the newest <sdk.dir>/ndk/<version>; cargo from PATH (rust-toolchain.toml in the crate pins the compiler and target).
+def stackNdk = {
+    def found = []
+    def props = new Properties()
+    def local = rootProject.file('local.properties')
+    if (local.isFile()) local.withInputStream { props.load(it) }
+    if (props.getProperty('ndk.dir')) found << file(props.getProperty('ndk.dir'))
+    ['ANDROID_NDK_HOME', 'ANDROID_NDK_ROOT', 'ANDROID_NDK'].each { if (System.getenv(it)) found << file(System.getenv(it)) }
+    def sdk = props.getProperty('sdk.dir') ?: System.getenv('ANDROID_HOME') ?: System.getenv('ANDROID_SDK_ROOT')
+    if (sdk && new File(sdk, 'ndk').isDirectory()) {
+        (new File(sdk, 'ndk').listFiles() ?: []).findAll { it.isDirectory() }.sort { it.name }.reverse().each { found << it }
+    }
+    return found.find { new File(it, 'toolchains/llvm/prebuilt').isDirectory() }
+}
+tasks.register('buildStackNative', Exec) {
+    group = 'build'
+    description = 'Build libstacknative.so (Rust) for arm64-v8a with the Android NDK.'
+    def crate = file('src/main/rust/stacknative')
+    def outDir = layout.buildDirectory.dir('stacknative/jniLibs/arm64-v8a')
+    // Sources only: the crate's target/ folder (build output, possibly gigabytes) is not an input.
+    inputs.files(fileTree(dir: 'src/main/rust', excludes: ['**/target/**'])).withPropertyName('rustSources')
+    inputs.property('ndkDir', providers.provider { String.valueOf(stackNdk()) })
+    outputs.dir(outDir)
+    workingDir crate
+    doFirst {
+        def ndk = stackNdk()
+        if (ndk == null) throw new GradleException('Android NDK not found. Install it (sdkmanager "ndk;<version>") and set ndk.dir=<path> in local.properties, or set ANDROID_NDK_HOME. It builds Stack\'s native library (libstacknative.so).')
+        def prebuilt = new File(ndk, 'toolchains/llvm/prebuilt').listFiles().find { it.isDirectory() }
+        def linker = new File(prebuilt, 'bin/aarch64-linux-android24-clang')
+        if (!linker.isFile()) throw new GradleException('The Android NDK at ' + ndk + ' has no aarch64-linux-android24-clang; use a current NDK (r26 or newer).')
+        // The crate's rust-toolchain.toml names the compiler. If it is not installed the build stops here with a clear
+        // message: a build must never download a toolchain on its own (rustup would otherwise fetch it silently).
+        environment 'RUSTUP_AUTO_INSTALL', '0'
+        def pin = new File(crate, 'rust-toolchain.toml').text
+        def matcher = (pin =~ /channel\s*=\s*"([^"]+)"/)
+        def channel = matcher.find() ? matcher.group(1) : null
+        if (channel != null) {
+            def ask = { List<String> cmd ->
+                try {
+                    def proc = new ProcessBuilder(cmd).redirectErrorStream(true).start()
+                    def out = proc.inputStream.text
+                    return proc.waitFor() == 0 ? out : null
+                } catch (IOException e) { return null }   // no rustup (plain cargo): nothing to download
+            }
+            def list = ask(['rustup', 'toolchain', 'list'])
+            if (list != null) {
+                if (!list.readLines().any { it.startsWith(channel + '-') || it.startsWith(channel + ' ') }) {
+                    throw new GradleException('Rust toolchain ' + channel + ' (named in ' + crate + '/rust-toolchain.toml) is not installed, and the build does not download it. Install it once: rustup toolchain install ' + channel + ' --target aarch64-linux-android')
+                }
+                def targets = ask(['rustup', 'target', 'list', '--installed', '--toolchain', channel])
+                if (targets == null || !targets.contains('aarch64-linux-android')) {
+                    throw new GradleException('Rust toolchain ' + channel + ' has no aarch64-linux-android target, and the build does not download it. Install it once: rustup target add aarch64-linux-android --toolchain ' + channel)
+                }
+            }
+        }
+        environment 'CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER', linker.path
+        environment 'CC_aarch64_linux_android', linker.path
+        environment 'AR_aarch64_linux_android', new File(prebuilt, 'bin/llvm-ar').path
+        commandLine 'cargo', 'build', '--release', '--offline', '--locked', '--target', 'aarch64-linux-android'
+        outDir.get().asFile.mkdirs()
+    }
+    doLast {
+        copy {
+            from new File(crate, 'target/aarch64-linux-android/release/libstacknative.so')
+            into outDir
+        }
+    }
+}
+preBuild.dependsOn 'buildStackNative'

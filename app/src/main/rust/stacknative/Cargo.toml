@@ -1,0 +1,23 @@
+[package]
+name = "stacknative"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"  # Stack's own code; the vendored Ami Pro crates in ../third_party/amipro stay MPL-2.0
+rust-version = "1.85"
+publish = false
+description = "Stack phone native library: Ami Pro text (JNI, org.stackdocs.app.types.NativeText)."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+amipro-text = { path = "../third_party/amipro/amipro-text" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+# panic stays "unwind": every JNI entry point catches panics and answers "damaged".
+
+[workspace]

@@ -15,7 +15,7 @@ abstract class LibraryActivity extends Activity {
     private void gate(){if(!app().access.allowed()&&!isFinishing()){getWindow().getDecorView().setAlpha(0);if(resumed&&!gatePending&&!app().access.authenticating(this)){gatePending=true;startActivity(new android.content.Intent(this,LockActivity.class));}}}
     final void whenAllowed(Runnable action){if(app().access.allowed())action.run();else deferred.add(action);}
 
-    @Override protected void onResume() { super.onResume(); resumed=true; app().addLibraryListener(libraryListener);
+    @Override protected void onResume() { super.onResume(); resumed=true; FilenPartner.refreshLevel(); app().addLibraryListener(libraryListener);
         if(!app().access.allowed()){gatePending=false;gate();return;}
         gatePending=false;
         getWindow().getDecorView().setAlpha(1);

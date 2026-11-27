@@ -27,7 +27,7 @@ final class AccessPolicy implements Application.ActivityLifecycleCallbacks {
     boolean screenLockInProgress(Activity activity){return request!=null&&request.owner==activity&&request.credential;}
     boolean enabled(){return policy.getBoolean("app_lock",false);}
     boolean allowed(){return !enabled()||(session.authenticated()&&!app.getSystemService(KeyguardManager.class).isDeviceLocked());}
-    void lock(){session.lock();if(!enabled())return;SyncJob.pause();if(request!=null&&!request.credential)cancel(request);if(app.archives!=null&&app.archives.busy())app.archives.cancel();app.notifyLibraryChanged();}
+    void lock(){session.lock();if(!enabled())return;SyncJob.pause();if(app.sourceIndexer!=null)app.sourceIndexer.cancel("locked");if(app.scanShare!=null)app.scanShare.cancel();if(request!=null&&!request.credential)cancel(request);if(app.archives!=null&&app.archives.busy())app.archives.cancel();app.notifyLibraryChanged();}
     void authenticate(Activity activity,Consumer<Boolean> callback) {
         if(request!=null)cancel(request);
         KeyguardManager keyguard=app.getSystemService(KeyguardManager.class);
@@ -57,7 +57,7 @@ final class AccessPolicy implements Application.ActivityLifecycleCallbacks {
     void credentialResult(Activity owner,int result){Request next=request;if(next!=null&&next.owner==owner&&next.credential)complete(next,result==Activity.RESULT_OK);}
     private void complete(Request next,boolean success){if(request!=next||next.owner.isDestroyed())return;request=null;boolean granted=session.result(next.token,success);next.result.accept(granted);app.notifyLibraryChanged();if(granted)resume();}
     private void cancel(Request next){if(request!=next)return;request=null;if(next.cancellation!=null)next.cancellation.cancel();session.lock();if(!next.owner.isDestroyed())next.result.accept(false);}
-    private void resume(){app.io.execute(() -> {app.library.recoverOcr();app.library.suggestions.recover();app.library.metadata.recover();app.ocr.kick();app.suggestions.kick();app.metadata.kick();app.batches.recover();});app.photos.configure();app.photos.kick(null);app.notifyLibraryChanged();}
+    private void resume(){app.io.execute(() -> {app.library.recoverOcr();app.library.suggestions.recover();app.library.metadata.recover();app.ocr.kick();app.suggestions.kick();app.metadata.kick();app.batches.recover();});if(app.sourceIndexer!=null)app.sourceIndexer.kickAll(false);app.photos.configure();app.photos.kick(null);app.notifyLibraryChanged();}
     void change(Activity activity,boolean enabled,Runnable changed){new AlertDialog.Builder(activity).setTitle(enabled?"Turn on app lock?":"Turn off app lock?").setMessage(enabled?"Unlock with Android when you return to Stack or turn on the screen.":"Unlock once to turn off app lock.").setNegativeButton("Cancel",null).setPositiveButton("Continue",(d,w) -> authenticate(activity,success -> {if(success){boolean previous=enabled();if(!policy.edit().putBoolean("app_lock",enabled).commit()){
                     // SharedPreferences mutates its in-memory map even when the disk write fails.
                     policy.edit().putBoolean("app_lock",previous).commit();

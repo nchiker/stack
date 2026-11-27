@@ -1,5 +1,6 @@
 package org.stackdocs.app;
 
+import org.stackdocs.app.types.FileTypes;
 import android.Manifest;
 import android.app.*;
 import android.app.job.*;
@@ -59,7 +60,7 @@ final class PhotoMonitor {
                 long mediaId=rows.getLong(0);cursor=mediaId;examined++;Uri uri=ContentUris.withAppendedId(collection,mediaId);String key=uri.toString();
                 if(app.io.submit(() -> new PhotoLedger(app.library).decided(key)).get())continue;
                 String path=rows.getString(5),mime=rows.getString(4);
-                if(path==null||!(Build.VERSION.SDK_INT>=29?path.equalsIgnoreCase("DCIM/Camera/"):path.equalsIgnoreCase("Camera"))||!Arrays.asList("image/jpeg","image/png","image/webp").contains(mime)||rows.getLong(3)>256L*1024*1024){app.io.submit(() -> record(key,"","ignored","")).get();continue;}
+                if(path==null||!(Build.VERSION.SDK_INT>=29?path.equalsIgnoreCase("DCIM/Camera/"):path.equalsIgnoreCase("Camera"))||!Arrays.asList(FileTypes.imageMimes()).contains(mime)||rows.getLong(3)>256L*1024*1024){app.io.submit(() -> record(key,"","ignored","")).get();continue;}
                 File directory=new File(app.getFilesDir(),"photo_staging");if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException();File file=new File(directory,UUID.randomUUID().toString());
                 try {
                     MessageDigest hash=MessageDigest.getInstance("SHA-256");

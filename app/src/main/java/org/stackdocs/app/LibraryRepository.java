@@ -7,6 +7,9 @@ import android.database.sqlite.SQLiteDatabase;
 import android.graphics.BitmapFactory;
 import android.graphics.Bitmap;
 import android.graphics.pdf.PdfRenderer;
+import org.stackdocs.app.types.FileType;
+import org.stackdocs.app.types.FileTypes;
+import org.stackdocs.app.types.Source;
 import android.net.Uri;
 import android.os.ParcelFileDescriptor;
 import android.provider.OpenableColumns;
@@ -42,6 +45,7 @@ final class LibraryRepository {
     final BatchStore batches = new BatchStore(this);
     final MetadataStore metadata = new MetadataStore(this::db,suggestions);
     final LinkStore links;
+    final SourceStore sources;
     SQLiteDatabase database() { return db(); }
     private Runnable suggestionChanged = () -> {};
     void suggestionsAvailable() { if(!db().inTransaction())suggestionChanged.run(); }
@@ -55,6 +59,7 @@ final class LibraryRepository {
         originals = new File(context.getFilesDir(), "documents");
         incoming = new File(context.getFilesDir(), "incoming");
         links = new LinkStore(this::db, new File(context.getFilesDir(), "links"));
+        sources = new SourceStore(context, this::db, new File(context.getFilesDir(), "sources"));
     }
 
     void initialize() {
@@ -102,7 +107,7 @@ final class LibraryRepository {
 
     List<StackCategory> stacks() {
         List<StackCategory> result = new ArrayList<>();
-        try (Cursor cursor = db().rawQuery("SELECT s.*, COUNT(ds.document_id) AS total "
+        try (Cursor cursor = db().rawQuery("SELECT s.*, COUNT(ds.document_id) + " + SourceStore.memberCountSql("s.id") + " AS total "
                 + "FROM stacks s LEFT JOIN document_stacks ds ON ds.stack_id=s.id AND ds.document_id NOT IN (SELECT document_id FROM trash) "
                 + "GROUP BY s.id ORDER BY s.sort_order,s.rowid", null)) {
             while (cursor.moveToNext()) result.add(new StackCategory(string(cursor, "id"),
@@ -158,10 +163,14 @@ final class LibraryRepository {
     /** Other stacks that share documents with {@code stackId}, most shared first (trashed documents ignored). */
     List<StackCategory> overlappingStacks(String stackId) {
         List<StackCategory> result = new ArrayList<>();
+        // Members are documents and folder files (item_stacks); a file counts once per stack.
+        String members = "(SELECT stack_id, document_id AS item FROM document_stacks WHERE document_id NOT IN (SELECT document_id FROM trash) "
+                + "UNION ALL SELECT m.stack_id, m.item_id FROM item_stacks m JOIN source_files f ON f.id=m.item_id "
+                + "WHERE m.item_kind='source' AND f.is_dir=0 AND f.missing_since=0)";
         try (Cursor cursor = db().rawQuery("SELECT s.id,s.name,s.color,s.visible,COUNT(*) AS total "
-                + "FROM document_stacks a JOIN document_stacks b ON b.document_id=a.document_id AND b.stack_id<>a.stack_id "
+                + "FROM " + members + " a JOIN " + members + " b ON b.item=a.item AND b.stack_id<>a.stack_id "
                 + "JOIN stacks s ON s.id=b.stack_id "
-                + "WHERE a.stack_id=? AND a.document_id NOT IN (SELECT document_id FROM trash) "
+                + "WHERE a.stack_id=? "
                 + "GROUP BY s.id ORDER BY total DESC, s.name COLLATE NOCASE", new String[]{stackId})) {
             while (cursor.moveToNext()) result.add(new StackCategory(string(cursor, "id"),
                     string(cursor, "name"), integer(cursor, "color"), integer(cursor, "visible") == 1,
@@ -172,7 +181,10 @@ final class LibraryRepository {
 
     java.util.LinkedHashMap<String,String> organizations() {
         java.util.LinkedHashMap<String,String> out=new java.util.LinkedHashMap<>();
-        try(Cursor rows=db().rawQuery("SELECT DISTINCT t.id,t.name FROM tags t JOIN document_tags d ON d.tag_id=t.id WHERE d.document_id NOT IN (SELECT document_id FROM trash) ORDER BY t.name COLLATE NOCASE",null)){while(rows.moveToNext())out.put(rows.getString(0),rows.getString(1));}return out;
+        try(Cursor rows=db().rawQuery("SELECT DISTINCT t.id,t.name FROM tags t JOIN document_tags d ON d.tag_id=t.id WHERE d.document_id NOT IN (SELECT document_id FROM trash) ORDER BY t.name COLLATE NOCASE",null)){while(rows.moveToNext())out.put(rows.getString(0),rows.getString(1));}
+        // Tags that only folder files carry are offered too (the filter then shows those files).
+        try(Cursor rows=db().rawQuery("SELECT DISTINCT t.id,t.name FROM tags t JOIN item_tags i ON i.tag_id=t.id AND i.item_kind='source' JOIN source_files f ON f.id=i.item_id AND f.is_dir=0 AND f.missing_since=0 ORDER BY t.name COLLATE NOCASE",null)){while(rows.moveToNext())out.putIfAbsent(rows.getString(0),rows.getString(1));}
+        return out;
     }
 
     private Document searchContext(Document document, String match) {
@@ -235,11 +247,10 @@ final class LibraryRepository {
             }
             String mime;
             int pages;
-            byte[] prefix = new byte[5];
-            try (InputStream input = new java.io.FileInputStream(source)) {
-                if (input.read(prefix) < 5) throw new IOException("The selected file is empty or incomplete.");
-            }
-            if (Arrays.equals(prefix, new byte[]{'%', 'P', 'D', 'F', '-'})) {
+            byte[] prefix = Source.of(source).head(4096);
+            if (prefix.length < 5) throw new IOException("The selected file is empty or incomplete.");
+            FileType type = FileTypes.match(prefix, null, null);
+            if (type != null && type.id().equals("pdf")) {
                 mime = "application/pdf";
                 try (ParcelFileDescriptor descriptor = ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY);
                      PdfRenderer renderer = new PdfRenderer(descriptor)) {
@@ -255,14 +266,14 @@ final class LibraryRepository {
                 if (bounds.outWidth <= 0 || bounds.outHeight <= 0 || bounds.outMimeType == null) {
                     throw new IOException("Choose a supported image or a PDF document.");
                 }
-                if (!bounds.outMimeType.equals("image/jpeg") && !bounds.outMimeType.equals("image/png")
-                        && !bounds.outMimeType.equals("image/webp")) {
+                FileType image = FileTypes.byMime(bounds.outMimeType);
+                if (image == null || !image.isImage()) {
                     throw new IOException("Choose a JPEG, PNG, or WebP image, or a PDF document.");
                 }
                 mime = bounds.outMimeType;
                 pages = 1;
             }
-            String title = providedName==null?displayName(uri):providedName.replaceAll("[\\p{Cntrl}]"," ").trim().replaceFirst("(?i)\\.(pdf|jpe?g|png|webp)$", "");
+            String title = providedName==null?displayName(uri):FileTypes.stripExtension(providedName.replaceAll("[\\p{Cntrl}]"," ").trim());
             if(title.isEmpty())title="Imported document";title=title.substring(0,Math.min(200,title.length()));
             if (!staging.renameTo(destination)) throw new IOException("The document could not be saved. Check available storage.");
             SQLiteDatabase database = db();
@@ -314,7 +325,7 @@ final class LibraryRepository {
         } catch (RuntimeException ignored) {
             // The source has already been saved; an optional provider name must not prevent import.
         }
-        name = name.replaceAll("[\\p{Cntrl}]", " ").trim().replaceFirst("(?i)\\.(pdf|jpe?g|png|webp)$", "");
+        name = name.replaceAll("[\\p{Cntrl}]", " ").trim();
         if (name.isEmpty()) name = "Document · " + DateFormat.getDateInstance().format(new Date(Clock.now()));
         return name.substring(0, Math.min(name.length(), 200));
     }

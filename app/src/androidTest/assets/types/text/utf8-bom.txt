@@ -1,0 +1,2 @@
+﻿Synthetic plain text sample.
+Second line with accents: café, naïve, über.

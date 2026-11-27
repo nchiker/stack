@@ -6,10 +6,10 @@ import com.googlecode.tesseract.android.TessBaseAPI;
 import java.io.IOException;
 
 /** Confined to one OCR worker; all page allocations are released after each recognition. */
-final class OcrEngine implements AutoCloseable {
+public final class OcrEngine implements AutoCloseable {
     private TessBaseAPI engine;
 
-    OcrEngine(Context context) throws IOException {
+    public OcrEngine(Context context) throws IOException {
         String path = OcrModel.install(context).getAbsolutePath();
         TessBaseAPI candidate = new TessBaseAPI();
         try {
@@ -23,7 +23,7 @@ final class OcrEngine implements AutoCloseable {
         }
     }
 
-    String recognize(Bitmap image) throws IOException {
+    public String recognize(Bitmap image) throws IOException {
         if (engine == null) throw new IOException("OCR engine is closed");
         try {
             engine.setImage(image);

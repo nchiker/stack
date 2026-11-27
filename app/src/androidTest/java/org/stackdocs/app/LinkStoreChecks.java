@@ -101,7 +101,7 @@ final class LinkStoreChecks {
         LibraryDatabase upgraded = new LibraryDatabase(isolated);
         try {
             SQLiteDatabase db = upgraded.getWritableDatabase();
-            WorkflowRepositoryChecks.require(db.getVersion() == 17 && count(db, "link_records") == 0 && count(db, "link_search") == 0, "a version 10 library upgrades to 17 with empty link tables");
+            WorkflowRepositoryChecks.require(db.getVersion() == LibraryDatabase.VERSION && count(db, "link_records") == 0 && count(db, "link_search") == 0, "a version 10 library upgrades to the current version with empty link tables");
         } finally { upgraded.close(); }
         mark.accept("Link store: publish/repeat/replace/rename/delete, text+title search with excerpt, duplicate-hash report, refused text stores nothing, sync journal and documents untouched, v10 to v11 upgrade");
     }

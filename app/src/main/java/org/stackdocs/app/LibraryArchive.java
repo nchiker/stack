@@ -1,5 +1,6 @@
 package org.stackdocs.app;
 
+import org.stackdocs.app.types.FileTypes;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
@@ -374,7 +375,7 @@ final class LibraryArchive {
             Set<String> origins=new HashSet<>(Arrays.asList("default","filename","legacy","manual","accepted","edited"));
             for(JSONObject row:objects(docs)) {
                 keys(row,version==1?DOC_V1:DOC);String id=str(row,"id",36);uuid(id);if(documents.put(id,row)!=null)throw invalid();positions.put(id,new HashSet<>());
-                name(row,"title");String mime=str(row,"mime",40);if(!Arrays.asList("application/pdf","application/x-stack-scan","image/jpeg","image/png","image/webp").contains(mime))throw invalid();
+                name(row,"title");String mime=str(row,"mime",40);if(!FileTypes.isLibraryMime(mime))throw invalid();
                 if(version>=2){str(row,"notes",MetadataStore.NOTES_LIMIT);number(row,"notes_revision",0,Long.MAX_VALUE-1);number(row,"metadata_revision",0,Long.MAX_VALUE-1);}
                 number(row,"added_at",0,Long.MAX_VALUE);long count=number(row,"page_count",1,1000);number(row,"initial_page_count",count,1000);number(row,"title_user_edited",0,1);
                 if(!row.isNull("source_scan_id")){String scan=str(row,"source_scan_id",36);uuid(scan);if(!scans.add(scan))throw invalid();}

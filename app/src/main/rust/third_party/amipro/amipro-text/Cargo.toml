@@ -1,0 +1,12 @@
+[package]
+name = "amipro-text"
+version = "0.1.0"
+edition = "2024"
+license = "MPL-2.0"
+rust-version = "1.85"
+publish = false
+description = "Plain text of Ami Pro documents (SAM and native), from bytes, for search; vendored (source only) for Stack."
+
+[dependencies]
+amipro-document = { path = "../amipro-document" }
+amipro-formats = { path = "../amipro-formats" }

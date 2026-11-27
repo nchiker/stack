@@ -179,7 +179,7 @@ final class LinkSyncChecks {
         LibraryDatabase second = new LibraryDatabase(isolated, name);
         try {
             SQLiteDatabase db = second.getWritableDatabase();
-            require(db.getVersion() == 17, "a version 12 library upgrades to 17");
+            require(db.getVersion() == LibraryDatabase.VERSION, "a version 12 library upgrades to the current version");
             try (Cursor c = db.rawQuery("SELECT title,text_sha,text_len,preview_sha,preview_len,preview_pending FROM link_records WHERE id=?", new String[]{id})) {
                 require(c.moveToFirst() && c.getString(0).equals("Old row") && c.getString(1).isEmpty() && c.getLong(2) == 0 && c.getString(3).isEmpty() && c.getLong(4) == 0 && c.getLong(5) == 0, "the row survives with empty digests and preview_pending 0");
             }

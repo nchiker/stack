@@ -21,7 +21,7 @@ final class LibraryReset {
     LibraryReset(Context context){this.context=context;request=new AtomicFile(new File(real(context.getNoBackupFilesDir()),"stack-library-reset.json"));quarantine=new File(real(context.getNoBackupFilesDir()),"stack-library-reset-quarantine");}
     private static File real(File dir){try{return dir.getCanonicalFile();}catch(IOException error){throw new IllegalStateException("Storage path is unavailable",error);}}
     boolean pending(){return request.getBaseFile().exists()||new File(request.getBaseFile()+".bak").exists();}
-    private List<File> owned()throws Exception{List<File> files=new ArrayList<>();for(String suffix:new String[]{"","-wal","-shm","-journal"})files.add(new File(context.getDatabasePath("library.db").getParentFile().getCanonicalFile(),"library.db"+suffix));for(String name:FILES)files.add(new File(context.getFilesDir().getCanonicalFile(),name));for(String name:new String[]{"pdf_plans","preview_tiles"})files.add(new File(context.getCacheDir().getCanonicalFile(),name));return files;}
+    private List<File> owned()throws Exception{List<File> files=new ArrayList<>();for(String suffix:new String[]{"","-wal","-shm","-journal"})files.add(new File(context.getDatabasePath("library.db").getParentFile().getCanonicalFile(),"library.db"+suffix));for(String name:FILES)files.add(new File(context.getFilesDir().getCanonicalFile(),name));for(String name:new String[]{"pdf_plans","preview_tiles","scan-share","source-read","source-view"})files.add(new File(context.getCacheDir().getCanonicalFile(),name));files.add(new File(context.getFilesDir().getCanonicalFile(),"sources"));return files;}
     static void safe(File file)throws Exception {
         android.system.StructStat info;try{info=Os.lstat(file.getPath());}catch(android.system.ErrnoException error){if(error.errno==OsConstants.ENOENT)return;throw error;}
         if(OsConstants.S_ISLNK(info.st_mode)||(!OsConstants.S_ISREG(info.st_mode)&&!OsConstants.S_ISDIR(info.st_mode)))throw new IOException("Reset refuses symbolic links and special files.");
@@ -48,7 +48,8 @@ final class LibraryReset {
     void initialize(LibraryRepository library)throws Exception {
         if(!pending()){library.initialize();return;}JSONObject intent=read();
         if(intent.getString("mode").equals(CONNECTION)){library.initialize();library.database();resetConnection(library.database(),intent.getString("replica"));clearPairing();completed(CONNECTION);request.delete();sync(context.getNoBackupFilesDir());return;}
-        String phase=intent.getString("phase");List<File> files=owned();if(phase.equals("rolling_back")){rollback(files,intent);library.initialize();return;}if(phase.equals("committed")){prepareEraseCompletion();remove(quarantine);completed(ERASE);request.delete();library.initialize();return;}
+        String phase=intent.getString("phase");List<File> files=owned();if(phase.equals("rolling_back")){rollback(files,intent);SourcesErase.discard(context);library.initialize();return;}if(phase.equals("committed")){prepareEraseCompletion();SourcesErase.apply(context);remove(quarantine);completed(ERASE);request.delete();library.initialize();return;}
+        if(phase.equals("requested"))SourcesErase.snapshot(context,context.getDatabasePath("library.db"));   // reads which shared copies and grants there are; nothing irreversible happens until the library has been moved aside
         if(!quarantine.exists()&&!quarantine.mkdirs())throw new IOException("Could not prepare reset recovery.");safe(quarantine);
         boolean committing=false;
         try {
@@ -61,7 +62,8 @@ final class LibraryReset {
             try(android.database.Cursor check=db.rawQuery("PRAGMA quick_check(1)",null)){if(!check.moveToFirst()||!check.getString(0).equals("ok"))throw new IOException("Replacement database integrity check failed.");}
             try(android.database.Cursor check=db.rawQuery("SELECT count(*) FROM documents",null)){check.moveToFirst();if(check.getLong(0)!=0)throw new IOException("Replacement library is not empty.");}
             probe.reached("initialized");prepareEraseCompletion();committing=true;intent.put("phase","committed");save(intent);probe.reached("committed");
-        }catch(Exception failure){library.closeForReset();if(!committing)try{intent.put("phase","rolling_back");save(intent);probe.reached("rolling-back");rollback(files,intent);}catch(Exception rollback){failure.addSuppressed(rollback);}throw failure;}
+            SourcesErase.apply(context);   // the move and the new library are durable: only now the shared copies are removed from Filen and the folder grants given back
+        }catch(Exception failure){library.closeForReset();if(!committing)try{intent.put("phase","rolling_back");save(intent);probe.reached("rolling-back");rollback(files,intent);SourcesErase.discard(context);}catch(Exception rollback){failure.addSuppressed(rollback);}throw failure;}
         // After the durable commit, cleanup is retried on next startup if needed.
         remove(quarantine);completed(ERASE);request.delete();sync(context.getNoBackupFilesDir());
     }

@@ -7,7 +7,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.graphics.Color;
 
 final class LibraryDatabase extends SQLiteOpenHelper {
-    static final int VERSION = 17;
+    static final int VERSION = 24;
 
     LibraryDatabase(Context context) { this(context, "library.db"); }
 
@@ -56,6 +56,11 @@ final class LibraryDatabase extends SQLiteOpenHelper {
         addPartnerImport(db);
         addForeignSync(db);
         addRestoredLinks(db);
+        addSources(db);
+        addPartnerId(db);
+        addScanShare(db);
+        addSourcePages(db);
+        addSourceCarry(db);
         String[] ids = {"bills", "banking", "ids", "house", "medical", "receipts", "starred"};
         String[] names = {"Bills", "Banking", "IDs", "House", "Medical", "Receipts", "Starred"};
         String[] colors = {"#DCEADB", "#E5E8FA", "#F7E6D2", "#F1DDE8", "#DCECF2", "#F7EDCA", "#E2E5E0"};
@@ -70,7 +75,7 @@ final class LibraryDatabase extends SQLiteOpenHelper {
     }
 
     @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        if (oldVersion < 1 || oldVersion > 16 || newVersion != VERSION) {
+        if (oldVersion < 1 || oldVersion > 23 || newVersion != VERSION) {
             throw new IllegalStateException("No migration from library version " + oldVersion);
         }
         if (oldVersion < 2) {
@@ -95,6 +100,116 @@ final class LibraryDatabase extends SQLiteOpenHelper {
         if (oldVersion < 15) addPartnerImport(db);
         if (oldVersion < 16) addForeignSync(db);
         if (oldVersion < 17) addRestoredLinks(db);
+        if (oldVersion < 18) addSources(db);
+        if (oldVersion < 19) { retireQrSharing(db); addScanShare(db); }
+        if (oldVersion < 20) addSourcePages(db);
+        if (oldVersion < 21) addSourceCarry(db);
+        if (oldVersion < 22) addSourceBudget(db);
+        if (oldVersion < 23) { addScanShare(db); addPlanSignature(db); }   // the journal table (CREATE IF NOT EXISTS) and the plan signature
+        if (oldVersion < 24) addPartnerId(db);                              // the partner's stable id, kept with the source
+    }
+
+    /**
+     * Folder sharing replaces the QR pairing (docs/FOLDER_SHARING_DESIGN.md section 6). The partner's shared records (origin 'foreign') go with their
+     * text, stacks and tags, the per-record sharing switch is cleared and the sharing log is emptied. The sync triggers see the deletes, so a paired
+     * computer drops the records too. Own records are not touched. The preview files, the sealed partner keys and the old folder grants are removed
+     * by {@link QrRetirement} when the app starts (they are not in the database). The columns stay, so older sync and backup files still read.
+     */
+    static void retireQrSharing(SQLiteDatabase db) {
+        db.execSQL("DELETE FROM link_search WHERE record_id IN (SELECT id FROM link_records WHERE origin='foreign')");
+        db.execSQL("DELETE FROM item_stacks WHERE item_kind='link' AND item_id IN (SELECT id FROM link_records WHERE origin='foreign')");
+        db.execSQL("DELETE FROM item_tags WHERE item_kind='link' AND item_id IN (SELECT id FROM link_records WHERE origin='foreign')");
+        db.execSQL("DELETE FROM link_records WHERE origin='foreign'");
+        db.execSQL("UPDATE link_records SET partner_share=0 WHERE partner_share<>0");
+        db.execSQL("DELETE FROM partner_share_log");
+    }
+
+    /**
+     * Scan sharing (design section 1, Scans). `scan_share_stacks` is the per-stack switch ("Share with [partner]"); `scan_share_files` is what the
+     * writer put into the shared Filen folder: one row per scan, with the file name used and a signature of the scan's pages and title, so a change
+     * is noticed and a removed scan's file can be deleted by name. Local only: not synced, not in backups. No foreign key to documents on purpose:
+     * a scan that is deleted must still be found here so its PDF is removed from the folder.
+     */
+    static void addScanShare(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS scan_share_stacks (stack_id TEXT PRIMARY KEY REFERENCES stacks(id) ON DELETE CASCADE, added_at INTEGER NOT NULL DEFAULT 0)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS scan_share_files (document_id TEXT PRIMARY KEY, file_name TEXT NOT NULL, signature TEXT NOT NULL, written_at INTEGER NOT NULL DEFAULT 0)");
+        // A name is written here BEFORE its upload and removed only once the row above exists or the delete in Filen is confirmed (state `uploading`):
+        // what is left after a crash or a failed take-down is exactly what must still be removed from the shared folder.
+        db.execSQL("CREATE TABLE IF NOT EXISTS scan_share_journal (file_name TEXT PRIMARY KEY, document_id TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'uploading', started_at INTEGER NOT NULL DEFAULT 0)");
+    }
+
+    /**
+     * Pages of a PDF being read in chunks (docs/FOLDER_SHARING_DESIGN.md section 7): one row per page once the text layers are known. `state` is
+     * `todo` (needs OCR), `ok` (text kept in `text`), `skipped` (three tries failed: "not read") or `capped` (the text cap was reached first);
+     * `tries` counts the OCR tries the page was part of, committed before each hand-over; `total` is the page count. Rows are deleted when the file
+     * gets its final answer or changes, and with the file. Local only.
+     */
+    static void addSourcePages(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS source_pages (file_id TEXT NOT NULL REFERENCES source_files(id) ON DELETE CASCADE, page INTEGER NOT NULL, "
+                + "total INTEGER NOT NULL, state TEXT NOT NULL, tries INTEGER NOT NULL DEFAULT 0, text TEXT NOT NULL DEFAULT '', plan_sig TEXT NOT NULL DEFAULT '', PRIMARY KEY(file_id, page))");
+    }
+
+    /** `plan_sig` (DB 23): what the fetched content looked like when the plan was made (listing version, size, digest). A resume with other content starts over. */
+    /** `sources.partner_id`: Filen's stable id of the partner contact a source was made for (empty when Filen did not send one). */
+    static void addPartnerId(SQLiteDatabase db) {
+        try (android.database.Cursor c = db.rawQuery("PRAGMA table_info(sources)", null)) {
+            while (c.moveToNext()) if ("partner_id".equals(c.getString(1))) return;
+        }
+        db.execSQL("ALTER TABLE sources ADD COLUMN partner_id TEXT NOT NULL DEFAULT ''");
+    }
+
+    static void addPlanSignature(SQLiteDatabase db) {
+        try (android.database.Cursor c = db.rawQuery("PRAGMA table_info(source_pages)", null)) {
+            while (c.moveToNext()) if ("plan_sig".equals(c.getString(1))) return;
+        }
+        db.execSQL("ALTER TABLE source_pages ADD COLUMN plan_sig TEXT NOT NULL DEFAULT ''");
+    }
+
+    /**
+     * Save-over carry-over that survives listing lag (docs/FOLDER_SHARING_INTERFACES.md I6). When a source file with stacks or tags is removed, the
+     * marks wait here for one hour; a new file with the same parent and name in the same source takes them. Local only, additive.
+     */
+    static void addSourceCarry(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS source_carry (source_id TEXT NOT NULL, parent_doc_id TEXT NOT NULL, name TEXT NOT NULL, "
+                + "stacks TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '', removed_at INTEGER NOT NULL, PRIMARY KEY(source_id, parent_doc_id, name))");
+        // extract time spent on one content version of a file (PDF chunks): a file has a total budget, see SourceIndexer.TOTAL_BUDGET_MS
+        addSourceBudget(db);
+    }
+
+    /** Extract time spent on one content version of a file (PDF chunks); see SourceIndexer.TOTAL_BUDGET_MS. Local only, additive. */
+    static void addSourceBudget(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS source_budget (file_id TEXT PRIMARY KEY, ms INTEGER NOT NULL DEFAULT 0)");
+    }
+
+    /**
+     * Folder sources (docs/FOLDER_SHARING_DESIGN.md section 5), additive. A source is a Filen folder tree Stack reads through a persisted READ grant.
+     * `source_files` holds every file and folder seen in it (`is_dir`), `source_search` the names and text, and `item_stacks` / `item_tags` let
+     * documents, link records and source files share one stack and tag mechanism (`item_kind` = document, link or source). `seen_scan` is the scan
+     * number that last listed the row; `missing_since` is when a FRESH parent listing first omitted it (0 = present); `type_fingerprint` is
+     * FileTypes.fingerprint() when the row was read. Local only: no sync triggers, not in backups or the library archive, not synced.
+     */
+    static void addSources(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS sources (id TEXT PRIMARY KEY, kind TEXT NOT NULL, tree_uri TEXT NOT NULL UNIQUE, title TEXT NOT NULL, "
+                + "partner_name TEXT NOT NULL DEFAULT '', account_id TEXT NOT NULL DEFAULT '', state TEXT NOT NULL DEFAULT 'new', "
+                + "last_fresh_scan INTEGER NOT NULL DEFAULT 0, reason TEXT NOT NULL DEFAULT '', scan_seq INTEGER NOT NULL DEFAULT 0, "
+                + "added_at INTEGER NOT NULL DEFAULT 0)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS source_files (id TEXT PRIMARY KEY, source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE, "
+                + "provider_doc_id TEXT NOT NULL, parent_doc_id TEXT NOT NULL, path TEXT NOT NULL DEFAULT '', name TEXT NOT NULL, "
+                + "mime TEXT NOT NULL DEFAULT '', size INTEGER NOT NULL DEFAULT 0, modified INTEGER NOT NULL DEFAULT 0, "
+                + "version TEXT NOT NULL DEFAULT '', is_dir INTEGER NOT NULL DEFAULT 0, handler_id TEXT NOT NULL DEFAULT '', "
+                + "handler_version INTEGER NOT NULL DEFAULT 0, type_fingerprint TEXT NOT NULL DEFAULT '', state TEXT NOT NULL DEFAULT 'pending', "
+                + "reason TEXT NOT NULL DEFAULT '', text_sha TEXT NOT NULL DEFAULT '', preview_file TEXT NOT NULL DEFAULT '', "
+                + "missing_since INTEGER NOT NULL DEFAULT 0, seen_scan INTEGER NOT NULL DEFAULT 0, first_scan INTEGER NOT NULL DEFAULT 0, "
+                + "attempts INTEGER NOT NULL DEFAULT 0, added_at INTEGER NOT NULL DEFAULT 0, UNIQUE(source_id, provider_doc_id))");
+        db.execSQL("CREATE INDEX IF NOT EXISTS source_files_state ON source_files(source_id, state)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS source_files_parent ON source_files(source_id, parent_doc_id)");
+        db.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS source_search USING fts4(file_id, title, body, notindexed=file_id, tokenize=unicode61)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS item_stacks (item_kind TEXT NOT NULL, item_id TEXT NOT NULL, stack_id TEXT NOT NULL REFERENCES stacks(id) ON DELETE CASCADE, "
+                + "PRIMARY KEY(item_kind, item_id, stack_id))");
+        db.execSQL("CREATE INDEX IF NOT EXISTS item_stacks_stack ON item_stacks(stack_id)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS item_tags (item_kind TEXT NOT NULL, item_id TEXT NOT NULL, tag_id TEXT NOT NULL REFERENCES tags(id) ON DELETE CASCADE, "
+                + "PRIMARY KEY(item_kind, item_id, tag_id))");
+        db.execSQL("CREATE INDEX IF NOT EXISTS item_tags_tag ON item_tags(tag_id)");
     }
 
     /**

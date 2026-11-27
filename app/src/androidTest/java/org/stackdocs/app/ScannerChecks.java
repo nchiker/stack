@@ -39,12 +39,12 @@ public final class ScannerChecks extends Instrumentation {
     private String restartKey;
     private String suggestionCorpusAsset;
     private String p1Restart="",p1Boundary="",stackRestart="";
-    private boolean p1Only,p1Corpus,p1Ui,p1Batch,p1Performance,googleMigration,stackEditor,lockUi,convenience;
+    private boolean p1Only,p1Corpus,p1Ui,p1Batch,p1Performance,googleMigration,stackEditor,lockUi,convenience,folderUi;
     private boolean features,backupLayout,navigationOnly,backupUi,archivePerformance,archiveOnly,archivePrepare,archiveResume;
     private String archiveBoundary;
     private Bundle syncArguments;
     private String filenSeed,filenShow,filenLocate,filenLookup,upgradeVerify;private boolean upgradeRecord;
-    private boolean longWorkflow,workflowOnly,providerWorkflow,workflowUi,namingOnly,shareArchive,partnerPublish,partnerImport,partnerFilen,linkContract,linkRestore,linkSync,linkLan,linkE2e,linkSeed,linkUnseed,companions,partnerJourney;
+    private boolean longWorkflow,workflowOnly,providerWorkflow,workflowUi,namingOnly,linkContract,linkRestore,linkSync,linkLan,linkE2e,linkSeed,linkUnseed,companions;
     private boolean suggestionPrepare,suggestionResume, suggestionUi, suggestionCorpus, suggestionsOnly, baseline, qualityOnly, ocrOnly, preserveOnly, restartPrepare, restartResume, corpusOnly;
 
     @Override public void onCreate(Bundle arguments) {
@@ -67,14 +67,9 @@ public final class ScannerChecks extends Instrumentation {
         providerWorkflow=arguments!=null && "true".equals(arguments.getString("providerWorkflow"));
         workflowUi=arguments!=null && "true".equals(arguments.getString("workflowUi"));
         namingOnly=arguments!=null && "true".equals(arguments.getString("namingOnly"));
-        shareArchive=arguments!=null && "true".equals(arguments.getString("shareArchive"));
-        partnerPublish=arguments!=null && "true".equals(arguments.getString("partnerPublish"));
-        partnerImport=arguments!=null && "true".equals(arguments.getString("partnerImport"));
-        partnerFilen=arguments!=null && "true".equals(arguments.getString("partnerFilen"));
         linkContract=arguments!=null && "true".equals(arguments.getString("linkContract"));
         linkRestore=arguments!=null && "true".equals(arguments.getString("linkRestore"));
         companions=arguments!=null && "true".equals(arguments.getString("companions"));
-        partnerJourney=arguments!=null && "true".equals(arguments.getString("partnerJourney"));
         upgradeRecord=arguments!=null && "true".equals(arguments.getString("upgradeRecord"));
         upgradeVerify=arguments==null?null:arguments.getString("upgradeVerify");
         linkSync=arguments!=null && "true".equals(arguments.getString("linkSync"));
@@ -109,6 +104,7 @@ public final class ScannerChecks extends Instrumentation {
         stackEditor=arguments!=null&&"true".equals(arguments.getString("stackEditor"));
         lockUi=arguments!=null&&"true".equals(arguments.getString("lockUi"));
         convenience=arguments!=null&&"true".equals(arguments.getString("convenience"));
+        folderUi=arguments!=null&&"true".equals(arguments.getString("folderUi"));
         start();
     }
 
@@ -126,7 +122,7 @@ public final class ScannerChecks extends Instrumentation {
                 throw new SecurityException("Checks require the canonical Stack installation");
             }
             StackApplication app = (StackApplication) getTargetContext().getApplicationContext();
-            if(disposableCanonical||((p1Batch||p1Ui||stackEditor||lockUi||convenience||backupUi||backupLayout)&&getTargetContext().getPackageName().equals("org.stackdocs.app.checks"))) {
+            if(disposableCanonical||((p1Batch||p1Ui||stackEditor||lockUi||convenience||folderUi||backupUi||backupLayout)&&getTargetContext().getPackageName().equals("org.stackdocs.app.checks"))) {
                 runOnMainSync(() -> app.registerActivityLifecycleCallbacks(new android.app.Application.ActivityLifecycleCallbacks(){
                     @Override public void onActivityCreated(Activity activity,Bundle state){activity.getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON|android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED|android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);}
                     public void onActivityStarted(Activity a){}public void onActivityResumed(Activity a){}public void onActivityPaused(Activity a){}public void onActivityStopped(Activity a){}public void onActivitySaveInstanceState(Activity a,Bundle b){}public void onActivityDestroyed(Activity a){}
@@ -136,6 +132,10 @@ public final class ScannerChecks extends Instrumentation {
                 if(!disposableCanonical||!getTargetContext().getPackageName().equals("org.stackdocs.app"))throw new SecurityException("Explicit disposable Pixel 4a authorization required");
                 DisposableSmokeChecks.run(this,syncArguments.getString("disposableSmoke"),this::mark);
             }
+            else if("true".equals(syncArguments.getString("folderProbeOcr"))) FolderProbeOcr.run(getTargetContext(),this::mark);
+            else if("true".equals(syncArguments.getString("indexTiming"))) { try { IndexTimingProbe.run(getTargetContext(),"true".equals(syncArguments.getString("keep")),syncArguments.getString("kind"),"true".equals(syncArguments.getString("real")),this::mark); } catch(Exception e) { throw new RuntimeException(e); } }
+            else if("true".equals(syncArguments.getString("indexReal"))) { try { IndexTimingProbe.runReal(getTargetContext(),syncArguments.getString("kind"),syncArguments.getString("screen"),this::mark); } catch(Exception e) { throw new RuntimeException(e); } }
+            else if(syncArguments.containsKey("folderProbeStep")) { try { new FolderProbeCore(getTargetContext(),syncArguments.getString("folderProbeStep"),syncArguments.getString("a"),syncArguments.getString("b"),syncArguments.getString("c")).run(); } catch(Exception e) { throw new RuntimeException(e); } mark("probe step "+syncArguments.getString("folderProbeStep")); }
             else if(syncArguments.containsKey("interopPhase")) InteropChecks.run(getTargetContext(),syncArguments,this::mark);
             else if (syncArguments.containsKey("nearbyPhase")) mark("nearby "+syncArguments.getString("nearbyPhase")+": "+NearbyPairingChecks.run(this,syncArguments));
             else if ("true".equals(syncArguments.getString("resetUi"))) LibraryResetChecks.runUi(this,this::mark);
@@ -177,16 +177,14 @@ public final class ScannerChecks extends Instrumentation {
             else if(namingOnly) NamingChecks.run(this::mark);
             else if(linkRestore) LinkRestoreChecks.run(getTargetContext(),getContext().getPackageName(),this::mark);
             else if(companions) CompanionChecks.run(this::mark);
-            else if(partnerJourney) PartnerJourneyChecks.run(getTargetContext(),this::mark);
+            else if("true".equals(syncArguments.getString("sources"))) SourceChecks.run(getContext(),getTargetContext(),syncArguments,this::mark);
+            else if("true".equals(syncArguments.getString("folderUi"))) FolderUiChecks.run(this,getTargetContext(),this::mark);
+            else if("true".equals(syncArguments.getString("types"))) TypeChecks.run(getContext(),new IsolatedContext(getTargetContext()),this::mark);
             else if(upgradeRecord) UpgradeChecks.record(getTargetContext(),this::mark);
             else if(upgradeVerify!=null) UpgradeChecks.verify(getTargetContext(),upgradeVerify,this::mark);
             else if(linkSync) LinkSyncChecks.run(this,this::mark);
             else if(linkLan) LinkLanChecks.run(this,syncArguments,this::mark);
             else if(linkE2e) LinkLifecycleChecks.endToEnd(getTargetContext(),this::mark);
-            else if(shareArchive) {ShareArchiveChecks.runEnvelope(this::mark);ShareArchiveChecks.run(this::mark);}
-            else if(partnerPublish) PartnerPublishChecks.run(getTargetContext(),this::mark);
-            else if(partnerImport) PartnerImportChecks.run(getTargetContext(),this::mark);
-            else if(partnerFilen) PartnerFilenChecks.run(this::mark);
             else if(linkContract) {LinkContractChecks.run(this::mark);LinkStoreChecks.run(new IsolatedContext(getTargetContext()),this::mark);LinkProviderChecks.run(getTargetContext(),this::mark);LinkLifecycleChecks.run(getTargetContext(),getContext().getPackageName(),this::mark);LinkUiChecks.run(getTargetContext(),new IsolatedContext(getTargetContext()),this::mark);}
             else if(filenSeed!=null) {mark("Seeded: "+FilenSeedChecks.seed(getTargetContext(),filenSeed.split(",")[0],filenSeed.split(",")[1]).trim());}
             else if(filenLocate!=null) {mark(FilenSeedChecks.call(getTargetContext(),"locate",filenLocate).trim());}

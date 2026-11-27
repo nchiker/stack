@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries><package android:name="app.filenfiles" /><provider android:authorities="app.filenfiles.stacklink" /></queries>
     <application>
         <provider android:name="org.stackdocs.app.WorkflowFixtureProvider"
             android:authorities="${applicationId}.fixtures" android:exported="true" />
@@ -6,5 +7,10 @@
             android:authorities="${applicationId}.stacklink" android:exported="true" />
         <activity android:name="org.stackdocs.app.PdfRequestProbeActivity" android:exported="true" />
         <activity android:name="org.stackdocs.app.ExportGrantProbeActivity" android:exported="true" />
+        <activity android:name="org.stackdocs.app.FolderProbeActivity" android:exported="true" />
+        <receiver android:name="org.stackdocs.app.FolderProbeReceiver" android:exported="true" />
+        <receiver android:name="org.stackdocs.app.FolderProbeChangeReceiver" android:exported="true">
+            <intent-filter><action android:name="app.filenfiles.action.SHARED_CHANGED" /></intent-filter>
+        </receiver>
     </application>
 </manifest>

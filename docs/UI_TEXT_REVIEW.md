@@ -1,49 +1,12 @@
 # UI text review
 
-Shortened user-facing strings in Stack phone and desktop. Word counts are before/after. Test assertions that checked old text were updated (`PartnerImportChecks`, `controller_tests.rs`, and the "already using" checks, now "already open").
+Shortened user-facing strings in Stack phone and desktop. Word counts are before/after. Test assertions that checked old text were updated (`controller_tests.rs`, and the "already using" checks, now "already open").
 
 | File | Before | After | Words |
 |---|---|---|---|
-| PairPartnerActivity.java | Anyone who photographs this code could read what you share until you make a new code. Making a new code does not remove copies already stored in Filen. | Anyone who photographs this code can read what you share. A new code does not remove copies already in Filen. | 28 to 20 |
-| PairPartnerActivity.java | Ask your partner to scan this code in Stack on their phone. Only someone who has scanned it can open the documents you share. | Ask your partner to scan this code in Stack. Only people who scan it can open your shared documents. | 24 to 19 |
-| PairPartnerActivity.java | Your partner's phone shows the same short code after scanning. If the two differ, do not continue. | Your partner's phone should show the same short code. If not, stop. | 17 to 12 |
-| PairPartnerActivity.java | After your partner has scanned the code, continue here to share the folder in Filen Drive with them. | Once your partner has scanned, share the Filen Drive folder with them. | 18 to 12 |
-| PairPartnerActivity.java | Partner scanned it, continue | Share the folder | 4 to 3 |
-| PairPartnerActivity.java | Choose a sharing folder in Settings, under Partner sharing folder, so documents can be shared. | Choose a sharing folder in Partner sharing first. | 15 to 8 |
-| PairPartnerActivity.java | Stack could not prepare the code on this phone. Try “Stop sharing / make a new key”. | Could not make the code. Try “Make a new code”. | 17 to 10 |
-| PairPartnerActivity.java | Stop sharing / make a new key | Make a new code | 7 to 4 |
-| PairPartnerActivity.java | Replace your partner's key? | Replace key? | 4 to 2 |
-| PairPartnerActivity.java | This phone already has a key from your partner. If you replace it, documents shared with the old key stop updating. The new code is | Documents shared with the old key stop updating. New code: | 25 to 10 |
-| PairPartnerActivity.java | Filen account in the code: | Filen account: | 5 to 2 |
-| PairPartnerActivity.java | Short code: X Your partner's phone should show the same short code. If it differs, cancel.  Name for your partner, shown on their documents as "Shared by …": | Short code: X It must match your partner's phone.  Your partner's name, shown as "Shared by …": | 28 to 17 |
-| PairPartnerActivity.java | Paired. Documents your partner shares will appear in Stack." | Paired. Their documents will appear in Stack." | 9 to 7 |
-| PairPartnerActivity.java | Choose the folder your partner shares under Settings, Partner sharing, Partner shared folder. | Choose the folder they share in Partner sharing. | 13 to 8 |
-| PairPartnerActivity.java | Stack could not save the code on this phone. Nothing was changed. | Could not save the code. Nothing changed. | 12 to 7 |
-| PairPartnerActivity.java | Filen Files is not available. Choose the sharing folder in Settings, under Partner sharing. | Filen Files is not available. Choose the folder in Partner sharing. | 14 to 11 |
-| PairPartnerActivity.java | Filen Files is not available. Choose the folder in Settings, under Partner sharing. | Filen Files is not available. Choose the folder in Partner sharing. | 13 to 11 |
-| PairPartnerActivity.java | Stack could not keep access to that folder. Choose it in Settings, under Partner sharing. | Could not keep access to that folder. Choose it in Partner sharing. | 15 to 12 |
-| PairPartnerActivity.java | Sharing folder ready. Documents you switch on will be shared. | Folder ready. Documents you switch on are shared. | 10 to 8 |
-| PairPartnerActivity.java | : "Paired. Documents your partner shares will appear in Stack. | : "Paired. Their documents will appear in Stack. | 10 to 8 |
-| PairPartnerActivity.java | Stop sharing and make a new key? | Make a new code? | 7 to 4 |
-| PairPartnerActivity.java | Your partner will no longer be able to open what you share until they scan the new code. The old code stops working. " + CODE_WARNING | Your partner must scan the new code to keep opening your shares. The old code stops working, but copies already in Filen stay. | 26 to 23 |
-| PairPartnerActivity.java | Make a new key | Make new code | 4 to 3 |
-| PairPartnerActivity.java | New key made. Ask your partner to scan the new code. | New code ready. Ask your partner to scan it. | 11 to 9 |
-| PairPartnerActivity.java | Stack could not make a new key. Nothing was changed. | Could not make a new code. Nothing changed. | 10 to 8 |
 | FilenFolder.java | Waiting for your partner to finish on their phone. Tap Try again once they have. | Waiting for your partner. Tap Try again when they are done. | 15 to 11 |
 | FilenFolder.java | Sign in to Filen in Filen Files first, then try again. | Sign in to Filen Files first. | 11 to 6 |
 | FilenFolder.java | Filen Drive could not be reached. Connect to the internet and try again. | Filen Drive is unreachable. Check your connection. | 13 to 7 |
-| PartnerShareActivity.java | Documents you switch on with “Share with partner” are saved, encrypted, into one folder. Your partner's Stack reads them from there. | Documents set to “Share with partner” are saved, encrypted, in one folder your partner reads. | 21 to 15 |
-| PartnerShareActivity.java | + " not in Filen yet, so " + (skipped == 1 ? "it is" : "they are") + " not shared. | + " not in Filen yet, so not shared. | 22 to 9 |
-| PartnerShareActivity.java | Documents your partner shares appear in Stack, marked “Shared by”. Scan your partner's code under Pair with partner, then choose the folder they share with you. | Your partner's documents appear here, marked “Shared by”. Scan their code in Pair with partner, then choose their folder. | 26 to 19 |
-| PartnerShareActivity.java | Filen Files can give Stack read access to the folder your partner shared with you. | Use the folder your partner shared in Filen Drive. | 15 to 9 |
-| PartnerShareActivity.java | No folder picker is available on this phone. | No folder picker found. | 8 to 4 |
-| PartnerShareActivity.java | Stack could not keep access to that folder. Choose another folder. | Could not keep access to that folder. Choose another. | 11 to 9 |
-| PartnerShareActivity.java | Filen Files is not available. Choose the folder another way. | Filen Files is not available. Use another folder. | 10 to 8 |
-| PartnerShareActivity.java | OK | Got it | 1 to 2 |
-| PartnerImport.java | Off · Choose the folder your partner shares with you | Off · Choose your partner's folder | 10 to 6 |
-| PartnerImport.java | The shared file is older than one already imported. | The shared file is older than the last one read. | 9 to 10 |
-| PartnerImport.java | The shared file cannot be opened with your key. Ask your partner to pair again. | Your key cannot open the shared file. Ask your partner to pair again. | 15 to 13 |
-| PartnerImport.java | The shared file is too large for this phone to read. | The shared file is too large for this phone. | 11 to 9 |
 | PartnerKeys.java | The partner sharing key is unavailable on this phone (its protection was lost or changed). Make a new key in Pair with partner. | The sharing key is unavailable on this phone. Make a new code in Pair with partner. | 23 to 16 |
 | LinkActivity.java | Open it in Ami Pro and use Share with Stack. Stack will match it to this saved copy; your stacks and notes stay. | Open it in Ami Pro and choose Share with Stack. Your stacks and notes stay. | 23 to 15 |
 | LinkActivity.java | A copy shared with you. Open it with Filen Files; the saved text and preview below are read-only. | Shared with you. Open it in Filen Files. The text and preview below are read-only. | 18 to 15 |
@@ -216,3 +179,45 @@ Filen Files has no "accept" button for a shared folder; it appears under Shared,
 |---|---|---|
 | Scanner line | Point the camera at the QR code in the Key Vault window on your computer. Hold the phone about 20 to 30 cm away and keep it steady. | Point the camera at your recovery key's QR code. Hold the phone about 20 to 30 cm away and keep it steady. |
 | Wrong code | That QR code is not a Stack recovery key. Use the one from keyvault. | That QR code is not a Stack recovery key. |
+
+## Folder sharing (new, 2026-11-26)
+
+The QR partner screens above were removed with the QR sharing. The partner is always called by the Filen display name; with no name yet it reads "your partner".
+
+| Where | Text |
+|---|---|
+| Settings row | **Folders** / Filen folders Stack reads |
+| Settings, Partner row | **Partner** / Share with your partner (none); Sharing with [name]; [name] wants to share files with you (incoming); Waiting for [name] to accept; Show [name]'s files here (connected, nothing shown yet) |
+| Partner row tapped, with a partner | Sharing with [name] / Stack shows [name]'s shared files in search. Nothing is deleted in Filen. / Close, **Stop showing [name]'s files** |
+| Search screen card | [name] wants to share files with you. / See files [name] shares with you (connected; was "[name] shares files with you", which was wrong when nothing is shared) **Show them here**, **Not now** (hides it for 30 days) |
+| Partner problems | Update Filen Files to share with your partner. / Filen Files could not be opened. / Filen did not share anything yet. Try again in a moment. |
+| Folders screen | Folders; **Add a Filen folder**; No folders yet. Add a Filen folder to find its files in search. |
+| Source names | [folder name]; [name]'s shared files; Shared by me; Scans shared with [name] |
+| Source states | Reading 12 of 57; Looking for files; Up to date; Waiting: Stack is locked; Waiting: low battery; Can't reach Filen; Sign in to Filen; Filen is signed in as someone else **[Use this account]**; Access lost **[Fix]**; Saving scans (scan folder) |
+| Share switch (own folder) | Share with [name]; Shared with [name] in [folder] (no switch); Can't check sharing right now |
+| Remove | **Remove from Stack** / Remove from Stack? Stack stops showing the files of [source]. Nothing is deleted in Filen. |
+| Folder errors | Android could not open the folder picker. / That folder could not be added. / Choose the same folder again. / Only folders from Filen Files can be added. / Stack was not given access to this folder. |
+| Result menu (three dots) | Add to stack; Tags (New tag, Save); Share with [name]; Stop sharing with [name]; Shared with [name] in [folder] (disabled) |
+| Result tile (second line) | Partner file: From [name] · [folder]; the partner's scan folder reads Shared scans (also for the older "Stack scans shared with ..." name). Own file: [folder]/[subfolder]. Shared by you · [folder]. The line before it, a reason (Reading; Password-protected; Not a supported type; ...), shows only when there is one (Reading; Password-protected; Not a supported type; ...) |
+| Opening a result | Needs the internet; Sign in to Filen to open this file; Stack no longer has access to this folder; This file could not be opened; No app can open this file |
+| Share problems | Update Filen Files to share folders. / Update Filen Files to share files / Update Filen Files to share scans. |
+| Stack menu | Switch **Share with [name]** / Every scan in this stack is saved as a PDF in a Filen folder shared with your partner. Buttons: Hide from Home / Show on Home, Delete stack, Close |
+| Scan folder | Name asked of Filen: Shared scans (no names in it, so it reads the same on the partner's side; was Stack scans shared with [name]). Source state words: Locked. Saving continues when you unlock Stack. / Can't reach Filen right now. Saving will try again. |
+| Library menu | Folders |
+
+
+## Changed: folder picker, live lists (2026-11-26)
+
+Add a Filen folder asks Android's picker to open in Filen Drive (EXTRA_INITIAL_URI, a document URI for filen:root). Android 13's picker ignored it in the test, so on a first run it still opens on Recent files. Search results and the Folders screen now refresh themselves when the indexer adds, removes or reads files; no new words.
+
+
+## Folder sharing: pre-release polish (2026-11-26)
+
+| Where | Text |
+|---|---|
+| Filen Files too old or call missing (F12), in place of the Settings Partner row, the search card, the Folders share row, the result menu item and the stack share switch | Update Filen Files to share with your partner. Button **Update** (opens Filen Files). The search card shows only for this case; no card when Filen is not installed. |
+| Filen Files not installed (F12), Settings Partner row and Folders share row | Get Filen Files. Button **Get Filen Files** (opens Filen's release page) |
+| Search card, connected | See files [name] shares with you (or "your partner") |
+| Opening a file, after 5 s | Waiting for Filen… with **Cancel** (a dialog from a result, the screen in the viewer) |
+| Opening a file, after 30 s | Needs the internet (dialog button **OK**) |
+| Tags dialog | unchanged words; the existing tags and the New tag box now show together, and Save applies a typed new tag |

@@ -1,6 +1,10 @@
 package org.stackdocs.app;
 
 import android.graphics.Bitmap;
+import org.stackdocs.app.types.FileType;
+import org.stackdocs.app.types.FileTypes;
+import org.stackdocs.app.types.Preview;
+import org.stackdocs.app.types.Source;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -120,66 +124,12 @@ final class PageRenderer {
     }
 
     static Bitmap preview(File source, String mime, int pageIndex, int maxEdge) throws IOException {
-        if (mime.equals("application/pdf")) {
-            try (ParcelFileDescriptor descriptor = ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY);
-                 PdfRenderer renderer = new PdfRenderer(descriptor);
-                 PdfRenderer.Page page = renderer.openPage(pageIndex)) {
-                float scale = Math.min((float) maxEdge / page.getWidth(), (float) maxEdge / page.getHeight());
-                Bitmap bitmap = Bitmap.createBitmap(Math.max(1, Math.round(page.getWidth() * scale)),
-                        Math.max(1, Math.round(page.getHeight() * scale)), Bitmap.Config.ARGB_8888);
-                bitmap.eraseColor(Color.WHITE);
-                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
-                return bitmap;
-            } catch (RuntimeException error) {
-                throw new IOException("This PDF page could not be displayed.", error);
-            }
-        }
-        BitmapFactory.Options bounds = new BitmapFactory.Options();
-        bounds.inJustDecodeBounds = true;
-        BitmapFactory.decodeFile(source.getPath(), bounds);
-        BitmapFactory.Options options = new BitmapFactory.Options();
-        options.inSampleSize = 1;
-        // Keep enough source pixels for the requested size. Rounding the sample upward
-        // throws away fine print before the perspective/color processing can use it.
-        while (Math.max(bounds.outWidth, bounds.outHeight) / (options.inSampleSize * 2L) >= maxEdge) {
-            options.inSampleSize *= 2;
-        }
-        Bitmap bitmap = BitmapFactory.decodeFile(source.getPath(), options);
-        if (bitmap == null) throw new IOException("This image could not be displayed.");
-        int longest = Math.max(bitmap.getWidth(), bitmap.getHeight());
-        if (longest > maxEdge) {
-            float scale = (float) maxEdge / longest;
-            Bitmap resized = Bitmap.createScaledBitmap(bitmap, Math.max(1, Math.round(bitmap.getWidth() * scale)),
-                    Math.max(1, Math.round(bitmap.getHeight() * scale)), true);
-            if (resized != bitmap) bitmap.recycle();
-            bitmap = resized;
-        }
-        {
-            int orientation;
-            try {
-                orientation = new ExifInterface(source.getPath()).getAttributeInt(
-                        ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
-            } catch (IOException ignored) {
-                orientation = ExifInterface.ORIENTATION_NORMAL;
-            }
-            Matrix matrix = new Matrix();
-            switch (orientation) {
-                case ExifInterface.ORIENTATION_FLIP_HORIZONTAL: matrix.setScale(-1, 1); break;
-                case ExifInterface.ORIENTATION_ROTATE_180: matrix.setRotate(180); break;
-                case ExifInterface.ORIENTATION_FLIP_VERTICAL: matrix.setScale(1, -1); break;
-                case ExifInterface.ORIENTATION_TRANSPOSE: matrix.setRotate(90); matrix.postScale(-1, 1); break;
-                case ExifInterface.ORIENTATION_ROTATE_90: matrix.setRotate(90); break;
-                case ExifInterface.ORIENTATION_TRANSVERSE: matrix.setRotate(270); matrix.postScale(-1, 1); break;
-                case ExifInterface.ORIENTATION_ROTATE_270: matrix.setRotate(270); break;
-                default: break;
-            }
-            if (!matrix.isIdentity()) {
-                Bitmap upright = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), matrix, true);
-                if (upright != bitmap) bitmap.recycle();
-                bitmap = upright;
-            }
-        }
-        return bitmap;
+        // The type decides how its file is drawn (PDF pages, or a picture decoded upright). An unknown MIME is read as a picture, as before.
+        FileType type = FileTypes.byMime(mime);
+        if (type == null) type = FileTypes.byId("jpeg");
+        Preview preview = type.preview(Source.of(source).page(pageIndex), maxEdge);
+        if (preview == null) throw new IOException("This file could not be displayed.");
+        return preview.bitmap;
     }
 
 }

@@ -1,5 +1,6 @@
 package org.stackdocs.app;
 
+import org.stackdocs.app.types.FileTypes;
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
@@ -41,7 +42,7 @@ public final class MainActivity extends LibraryActivity {
     private final java.util.LinkedHashSet<String> selected=new java.util.LinkedHashSet<>();
     private android.widget.Button selection;
     private android.widget.Button updateNotice,companionNotice;
-    private LinearLayout firstRun;
+    private LinearLayout partnerCard;private TextView partnerCardText;private android.widget.Button partnerCardAction;private int partnerCardLevel=FilenPartner.REQUIRED_LEVEL;
     private String organization;
     private String documentSort="newest";
     private FrameLayout filters;
@@ -101,11 +102,13 @@ public final class MainActivity extends LibraryActivity {
         }
     }
 
-    @Override protected void onResume() { super.onResume(); thumbnails.invalidate(); refresh(); observeImport(); check(() -> LinkChecker.checkRestored(app()), asked -> { if (asked > 0) refresh(); }); whenAllowed(() -> work(() -> getSharedPreferences("library_reset",MODE_PRIVATE).getString("completed",""),this::showResetRecovery)); }
+    private final Runnable sourcesChanged = () -> { if (search != null && !search.getText().toString().trim().isEmpty()) refresh(); };
+    @Override protected void onResume() { super.onResume(); app().sourceIndexer.addListener(sourcesChanged); thumbnails.invalidate(); refresh(); loadPartnerCard(); observeImport(); check(() -> LinkChecker.checkRestored(app()), asked -> { if (asked > 0) refresh(); }); whenAllowed(() -> work(() -> getSharedPreferences("library_reset",MODE_PRIVATE).getString("completed",""),this::showResetRecovery)); }
 
     private void showResetRecovery(String mode){if(mode.isEmpty())return;getSharedPreferences("library_reset",MODE_PRIVATE).edit().remove("completed").apply();new android.app.AlertDialog.Builder(this).setTitle(mode.equals("erase")?"This phone's library was erased":"Ready for a new connection").setMessage(mode.equals("erase")?"Restore a saved backup, or set up sync with a computer that still has your documents. On that computer choose Start a new connection while keeping its documents, then pair again. Automatic photo import is off.":"Saved documents are kept. Choose Start a new connection on the computer too while keeping its documents, then open Settings → Sync on the computer and select Connect phone. Approve the connection here.").setNegativeButton("Later",null).setNeutralButton("Restore backup",(d,w)->startActivity(new Intent(this,BackupActivity.class))).setPositiveButton("Open Sync",(d,w)->startActivity(new Intent(this,SyncActivity.class))).show();}
 
     @Override protected void onPause() {
+        app().sourceIndexer.removeListener(sourcesChanged);
         if(search!=null)getSharedPreferences("navigation",MODE_PRIVATE).edit().putString("tab",tab)
                 .putString("stack",stackId).putString("also_stack",alsoStackId).putString("organization",organization).putString("query",search.getText().toString()).apply();
         super.onPause();
@@ -192,8 +195,11 @@ public final class MainActivity extends LibraryActivity {
             @Override public void afterTextChanged(Editable value) {}
         });
         selection=Ui.button(this,"Selected documents",this::selectionActions);selection.setVisibility(View.GONE);root.addView(selection);
+        partnerCard=Ui.row(this);partnerCard.setVisibility(View.GONE);partnerCard.setPadding(Ui.dp(this,20),Ui.dp(this,8),Ui.dp(this,8),Ui.dp(this,8));partnerCardText=Ui.text(this,"",15,false);partnerCard.addView(partnerCardText,new LinearLayout.LayoutParams(0,-2,1));
+        partnerCardAction=Ui.button(this,"Show them here",this::partnerCardTapped);partnerCard.addView(partnerCardAction);
+        partnerCard.addView(Ui.button(this,"Not now",() -> {getSharedPreferences("partner_card",MODE_PRIVATE).edit().putLong("hidden_until",Clock.now()+PartnerSetup.CARD_HIDDEN_MS).apply();partnerCard.setVisibility(View.GONE);}));
+        root.addView(partnerCard);
         updateNotice=Ui.button(this,"",this::updateNoticeActions);updateNotice.setVisibility(View.GONE);root.addView(updateNotice);companionNotice=Ui.button(this,"",()->{});companionNotice.setVisibility(View.GONE);root.addView(companionNotice);
-        firstRun=Ui.column(this);firstRun.setVisibility(View.GONE);root.addView(firstRun);
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setProgressTintList(android.content.res.ColorStateList.valueOf(Ui.BLUE));
         progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Ui.BLUE));
@@ -297,8 +303,10 @@ public final class MainActivity extends LibraryActivity {
             String also=null;for(StackCategory overlap:overlaps)if(overlap.id.equals(alsoFilter))also=alsoFilter;
             Snapshot built=new Snapshot(catalog,app().library.documents(query,present?filter:null,also,org,order),orgs,org,app().library.documentCount());
             built.overlaps=overlaps;built.also=also;
-            // Linked documents have no stacks yet (a later slice), so they appear only when no stack or tag filter is active.
-            if(org==null&&(!present||filter==null))built.links=app().library.links.list(query);
+            // Linked documents have no stacks yet (a later slice), so they appear only when no stack or tag filter is active; folder files are members of stacks and tags.
+            boolean noFilter=org==null&&(!present||filter==null);
+            if(noFilter)built.links=app().library.links.list(query);
+            built.sources=app().library.sources.search(query,built.links,present?filter:null,also,org);
             return built;
         }, snapshot -> {
             if (generation != requestGeneration) return;
@@ -312,7 +320,6 @@ public final class MainActivity extends LibraryActivity {
             companionNotice.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("Companion apps").setMessage(companionText+". Stack can install it; Android asks you to confirm.")
                     .setPositiveButton("Open",(d,w)->startActivity(new Intent(this,CompanionsActivity.class))).setNeutralButton("Not now",(d,w)->{Companions.dismissNotice(this,companionText);refresh();}).setNegativeButton("Close",null).show());
             companionNotice.setVisibility(companions==null?View.GONE:View.VISIBLE);
-            showFirstRun(snapshot.total,snapshot.links.size(),homeTab&&filter==null&&orgFilter==null&&query.isEmpty());
             selection.setText(selected.size()+" selected · Actions");
             selection.setVisibility(selected.isEmpty()?View.GONE:View.VISIBLE);
             categories = snapshot.categories;organization=snapshot.organization;alsoStackId=snapshot.also;
@@ -352,12 +359,16 @@ public final class MainActivity extends LibraryActivity {
                 int shownLinks = showingStacks ? Math.min(6, snapshot.links.size()) : snapshot.links.size();
                 for (int i = 0; i < shownLinks; i++) rows.add(snapshot.links.get(i));
             }
+            if (!snapshot.sources.isEmpty()) {
+                rows.add(new Header("Files from folders", null, null));
+                for (SourceStore.Hit hit : snapshot.sources) rows.add(hit);
+            }
             if (showingStacks) {
                 // After the recent documents, so nothing above them moves; low priority on purpose.
                 String reminder = BackupNudge.message(this, snapshot.total);
                 if (!reminder.isEmpty()) rows.add(new Header(reminder, "Back up", this::backupNoticeActions));
             }
-            if (snapshot.documents.isEmpty() && snapshot.links.isEmpty() && !showingStacks) rows.add(query.isEmpty()
+            if (snapshot.documents.isEmpty() && snapshot.links.isEmpty() && snapshot.sources.isEmpty() && !showingStacks) rows.add(query.isEmpty()
                     ? "No documents yet" : "No documents found");
             status.setText(R.string.saving_document);
             status.setVisibility(importing ? View.VISIBLE : View.GONE);
@@ -440,7 +451,7 @@ public final class MainActivity extends LibraryActivity {
         hideAddMenu();
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
                 .setType(photo ? "image/*" : "application/pdf").putExtra(Intent.EXTRA_ALLOW_MULTIPLE,true);
-        if (photo) intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"image/jpeg", "image/png", "image/webp"});
+        if (photo) intent.putExtra(Intent.EXTRA_MIME_TYPES, FileTypes.imageMimes());
         try { startActivityForResult(intent, IMPORT); }
         catch (ActivityNotFoundException error) {
             new AlertDialog.Builder(this).setMessage("No document picker is available on this device.").setPositiveButton("OK", null).show();
@@ -459,31 +470,17 @@ public final class MainActivity extends LibraryActivity {
         });
     }
 
-    /** Two cards on a brand-new, empty phone: join a partner, or invite one. "Not now" hides them for good. */
-    private void showFirstRun(int documents,int links,boolean plainHome){
-        boolean show=PartnerJourney.showFirstRun(PartnerJourney.setupDone(this),documents,links,plainHome)&&!PartnerJourney.dismissed(this);
-        firstRun.removeAllViews();
-        if(show){
-            firstRun.setPadding(Ui.dp(this,24),0,Ui.dp(this,24),0);
-            firstRun.addView(Ui.actionRow(this,Icons.Symbol.CHECK,"I'm joining my partner","Install, sign in and scan",0xFFDCECF9,()->startActivity(new Intent(this,PartnerJoinActivity.class))));
-            firstRun.addView(Ui.actionRow(this,Icons.Symbol.SHARE,"Invite partner","Send a link to get started",0xFFF9E8DC,()->startActivity(new Intent(this,PartnerInviteActivity.class))));
-            firstRun.addView(Ui.button(this,"Not now",()->{PartnerJourney.dismiss(this);refresh();}));
-        }
-        firstRun.setVisibility(show?View.VISIBLE:View.GONE);
-    }
-
     private void libraryOptions(View anchor) {
         PopupMenu menu = new PopupMenu(this, anchor);
         menu.getMenu().add("Select documents").setOnMenuItemClickListener(item -> {selectionActions();return true;});
         menu.getMenu().add("Sort documents").setOnMenuItemClickListener(item -> {sortDocuments();return true;});
+        menu.getMenu().add("Folders").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,FoldersActivity.class));return true;});
         menu.getMenu().add("Settings").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,SettingsActivity.class));return true;});
         menu.getMenu().add("Imports & batch actions").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,BatchActivity.class));return true;});
         menu.getMenu().add("Edit stacks").setOnMenuItemClickListener(item -> { manageStacks(); return true; });
         menu.getMenu().add("Find duplicates").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,DuplicatesActivity.class));return true;});
         menu.getMenu().add("Check linked documents").setOnMenuItemClickListener(item -> {checkLinked();return true;});
         menu.getMenu().add("Recently deleted").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,TrashActivity.class));return true;});
-        menu.getMenu().add("I'm joining my partner").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,PartnerJoinActivity.class));return true;});
-        menu.getMenu().add("Invite partner").setOnMenuItemClickListener(item -> {startActivity(new Intent(this,PartnerInviteActivity.class));return true;});
         menu.getMenu().add("Backup & restore").setOnMenuItemClickListener(item -> {
             startActivity(new Intent(this,BackupActivity.class));return true;
         });
@@ -521,10 +518,33 @@ public final class MainActivity extends LibraryActivity {
 
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if(request==PartnerSetup.REQUEST&&ScanShare.pendingAfterSetup){ScanShare.afterSetup(this,result,data,this::scanShareNotice);return;}
+        if(request==ScanShare.REQUEST){ScanShare.afterCreate(this,result,data,this::scanShareNotice);return;}
+        if(request==SourceActions.SHARE_REQUEST){String stopped=FilenPartner.stoppedViaFolder(result,data);if(!stopped.isEmpty())android.widget.Toast.makeText(this,stopped,android.widget.Toast.LENGTH_LONG).show();refresh();return;}
+        if(request==PartnerSetup.REQUEST){PartnerSetup.finish(this,result,data,problem -> {if(!problem.isEmpty())android.widget.Toast.makeText(this,problem,android.widget.Toast.LENGTH_LONG).show();loadPartnerCard();refresh();});return;}
         if(request==IMPORT&&result==RESULT_OK&&data!=null){ArrayList<Uri> uris=new ArrayList<>();if(data.getClipData()!=null){for(int i=0;i<data.getClipData().getItemCount();i++)uris.add(data.getClipData().getItemAt(i).getUri());}else if(data.getData()!=null)uris.add(data.getData());
             uris.removeIf(uri -> !"content".equals(uri.getScheme()));if(uris.size()==1)importUri(uris.get(0));else if(!uris.isEmpty())importBatch(uris);
         }
     }
+
+    /** The "[name] wants to share files with you" card: only when Filen says a request is incoming and no partner source exists (PartnerSetup.cardText). */
+    private void loadPartnerCard(){
+        check(() -> {
+            if(app().library.sources.partnerName()!=null||PartnerSetup.cardHidden(getSharedPreferences("partner_card",MODE_PRIVATE).getLong("hidden_until",0),Clock.now()))return null;
+            int level=FilenPartner.level(this);
+            // Filen too old: one card that says so. No Filen at all: no card here (Settings, Partner says "Get Filen Files"), so people who do not use Filen are not nagged.
+            if(level==0)return new Object[]{FilenPartner.gateText(level),level};
+            if(!FilenPartner.supported(level))return null;
+            String text=PartnerSetup.cardText(false,FilenPartner.api(this).status());
+            return text==null?null:new Object[]{text,level};
+        },answer -> {
+            if(partnerCard==null)return;
+            partnerCard.setVisibility(answer==null?View.GONE:View.VISIBLE);
+            if(answer!=null){partnerCardText.setText((String)answer[0]);partnerCardLevel=(Integer)answer[1];partnerCardAction.setText(FilenPartner.supported(partnerCardLevel)?"Show them here":FilenPartner.gateButton(partnerCardLevel));}
+        });
+    }
+    private void partnerCardTapped(){if(FilenPartner.supported(partnerCardLevel))partnerSetup();else FilenPartner.openGate(this,partnerCardLevel);}
+    private void partnerSetup(){String[] problem={""};if(!PartnerSetup.start(this,problem))android.widget.Toast.makeText(this,problem[0],android.widget.Toast.LENGTH_LONG).show();}
 
     private void importBatch(List<Uri> uris){
         if(!app().access.allowed()){whenAllowed(() -> importBatch(uris));return;}
@@ -634,28 +654,52 @@ public final class MainActivity extends LibraryActivity {
     }
 
     private void editStack(StackCategory category) {
-        new AlertDialog.Builder(this).setTitle(category.name)
-                .setItems(new String[]{category.visible ? "Hide from Home" : "Show on Home", "Delete stack"},
-                        (dialog, position) -> {
-                            if (position == 0) {
-                                work(() -> { app().library.setStackVisible(category.id, !category.visible); return true; }, ignored -> refresh());
-                            } else new AlertDialog.Builder(this).setTitle("Delete this stack?")
-                                    .setMessage("Its documents will stay in All documents.")
-                                    .setPositiveButton("Delete", (confirm, which) -> work(() -> {
-                                        app().library.deleteStack(category.id); return true;
-                                    }, ignored -> {
-                                        if (category.id.equals(stackId)) { stackId = null; alsoStackId = null; }
-                                        refresh();
-                                    })).setNegativeButton("Cancel", null).show();
-                        }).setNegativeButton("Cancel", null).show();
+        check(() -> FilenPartner.level(this), level -> work(() -> new Object[]{app().scanShare.isOn(category.id), FilenPartner.supported(level) ? FilenPartner.name(this, app().library.sources.partnerName()) : app().library.sources.partnerName()}, state -> {
+            LinearLayout box = Ui.column(this);
+            box.setPadding(Ui.dp(this, 24), Ui.dp(this, 8), Ui.dp(this, 24), 0);
+            android.widget.Switch share = new android.widget.Switch(this);
+            share.setText("Share with " + PartnerSetup.lowerName((String) state[1])); share.setTextSize(16); share.setTextColor(Ui.INK);
+            share.setChecked((Boolean) state[0]); share.setContentDescription("Share this stack's scans with " + PartnerSetup.lowerName((String) state[1]));
+            final boolean gated = !FilenPartner.supported(level);
+            if (gated) {
+                // Filen Files is missing or too old (F12): no switch, one line and the button that fixes it. Turning sharing off stays possible below.
+                TextView need = Ui.text(this, FilenPartner.gateText(level), 15, false); need.setTag("share_gate"); box.addView(need);
+                box.addView(Ui.button(this, FilenPartner.gateButton(level), () -> FilenPartner.openGate(this, level)));
+                if ((Boolean) state[0]) box.addView(share, new LinearLayout.LayoutParams(-1, Ui.dp(this, 56)));
+            } else box.addView(share, new LinearLayout.LayoutParams(-1, Ui.dp(this, 56)));
+            if (!gated) {
+            TextView note = Ui.text(this, "Every scan in this stack is saved as a PDF in a Filen folder shared with your partner.", 13, false);
+            note.setTextColor(Ui.MUTED); box.addView(note);
+            }
+            AlertDialog dialog = new AlertDialog.Builder(this).setTitle(category.name).setView(box)
+                    .setPositiveButton(category.visible ? "Hide from Home" : "Show on Home", (d, w) -> work(() -> { app().library.setStackVisible(category.id, !category.visible); return true; }, ignored -> refresh()))
+                    .setNeutralButton("Delete stack", (d, w) -> new AlertDialog.Builder(this).setTitle("Delete this stack?")
+                            .setMessage("Its documents will stay in All documents.")
+                            .setPositiveButton("Delete", (confirm, which) -> work(() -> {
+                                app().library.deleteStack(category.id); app().scanShare.start(); return true;
+                            }, ignored -> {
+                                if (category.id.equals(stackId)) { stackId = null; alsoStackId = null; }
+                                refresh();
+                            })).setNegativeButton("Cancel", null).show())
+                    .setNegativeButton("Close", null).create();
+            share.setOnClickListener(v -> {
+                boolean on = share.isChecked();
+                if (!on) { work(() -> { app().scanShare.setOn(category.id, false); return true; }, ok -> app().scanShare.startAndReport(pending -> { if (pending) scanShareNotice(ScanShare.REMOVAL_PENDING); })); return; }
+                share.setChecked(false); dialog.dismiss();
+                ScanShare.turnOn(this, category, this::scanShareNotice);
+            });
+            dialog.show();
+        }));
     }
+
+    private void scanShareNotice(String problem) { if (!problem.isEmpty()) android.widget.Toast.makeText(this, problem, android.widget.Toast.LENGTH_LONG).show(); }
 
     private static final class Snapshot {
         final List<StackCategory> categories;
         final List<Document> documents;
         final java.util.LinkedHashMap<String,String> orgs;final String organization;
         final int total;
-        List<StackCategory> overlaps = new ArrayList<>();String also;List<LinkStore.Link> links = new ArrayList<>();
+        List<StackCategory> overlaps = new ArrayList<>();String also;List<LinkStore.Link> links = new ArrayList<>();List<SourceStore.Hit> sources = new ArrayList<>();
         Snapshot(List<StackCategory> categories, List<Document> documents,java.util.LinkedHashMap<String,String> orgs,String organization,int total) { this.categories = categories; this.documents = documents;this.orgs=orgs;this.organization=organization;this.total=total; }
     }
     private static final class Header {
@@ -781,6 +825,37 @@ public final class MainActivity extends LibraryActivity {
         });
     }
 
+    /** A file found in a folder source (search only). Opening it is the Folders screen's job; this row shows what and where, marked with the source kind and partner. */
+    private View sourceTile(SourceStore.Hit hit) {
+        LinearLayout tile = Ui.row(this);
+        tile.setBackground(Ui.ripple(this, Color.TRANSPARENT, 12));
+        LinearLayout words = Ui.column(this);
+        words.setPadding(Ui.dp(this, 14), Ui.dp(this, 8), Ui.dp(this, 0), Ui.dp(this, 12));
+        TextView name = Ui.text(this, hit.name, 17, false);
+        name.setMaxLines(2); name.setEllipsize(TextUtils.TruncateAt.END);
+        words.addView(name, new LinearLayout.LayoutParams(-1, -2));
+        String reason = SourceStore.PENDING.equals(hit.state) ? "Reading" : SourceStore.INDEXED.equals(hit.state) ? "" : hit.reason;
+        if (!reason.isEmpty()) { TextView why = Ui.text(this, reason, 13, false); why.setTextColor(0xFFB3261E); why.setPadding(0, Ui.dp(this, 2), 0, 0); words.addView(why); }
+        String from = SourceActions.where(hit);
+        TextView badge = Ui.text(this, from, 12, false);
+        badge.setTextColor(Ui.BLUE); badge.setPadding(0, Ui.dp(this, 4), 0, 0);
+        words.addView(badge);
+        String excerpt = LinkPreview.displayText(hit.excerpt, 300).trim();
+        if (!excerpt.isEmpty()) {
+            TextView snippet = Ui.text(this, excerpt, 14, false);
+            snippet.setTextColor(Ui.MUTED); snippet.setMaxLines(3); snippet.setPadding(0, Ui.dp(this, 6), 0, 0);
+            words.addView(snippet);
+        }
+        words.setFocusable(true);
+        words.setContentDescription(hit.name + ". " + from);
+        words.setOnClickListener(v -> SourceActions.open(this, hit));
+        tile.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
+        android.widget.ImageButton more = Ui.iconButton(this, Icons.Symbol.MORE, "More for " + hit.name, () -> {});
+        more.setOnClickListener(v -> SourceActions.menu(this, v, hit, this::refresh));
+        tile.addView(more, new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)));
+        return tile;
+    }
+
     private View linkTile(LinkStore.Link link) {
         LinearLayout tile = Ui.row(this);
         tile.setPadding(Ui.dp(this, 6), Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 12));
@@ -798,7 +873,7 @@ public final class MainActivity extends LibraryActivity {
         name.setMaxLines(2); name.setEllipsize(TextUtils.TruncateAt.END);
         words.addView(name, new LinearLayout.LayoutParams(-1, -2));
         String owner = LinkOpener.ownerName(link.owner);
-        TextView badge = Ui.text(this, (link.foreign ? "Shared by " + link.sharedBy + " · " : "Linked · ") + owner + (link.isProtected ? " · protected" : "") + (LinkStore.MISSING.equals(link.state) ? " · missing" : LinkStore.UNREACHABLE.equals(link.state) ? " · can't reach" : ""), 12, false);
+        TextView badge = Ui.text(this, "Linked · " + owner + (link.isProtected ? " · protected" : "") + (LinkStore.MISSING.equals(link.state) ? " · missing" : LinkStore.UNREACHABLE.equals(link.state) ? " · can't reach" : ""), 12, false);
         badge.setTextColor(LinkStore.LIVE.equals(link.state) ? Ui.BLUE : LinkStore.MISSING.equals(link.state) ? 0xFFB3261E : Ui.MUTED); badge.setPadding(0, Ui.dp(this, 4), 0, 0);
         words.addView(badge);
         String excerpt = LinkPreview.displayText(link.excerpt, 300).trim();
@@ -809,7 +884,7 @@ public final class MainActivity extends LibraryActivity {
         }
         tile.addView(words, new LinearLayout.LayoutParams(0, -2, 1));
         tile.setFocusable(true);
-        tile.setContentDescription(link.title + (link.foreign ? ", shared by " + link.sharedBy + ", document from " : ", linked document from ") + owner + (LinkStore.MISSING.equals(link.state) ? ", missing" : LinkStore.UNREACHABLE.equals(link.state) ? ", can't reach" : ""));
+        tile.setContentDescription(link.title + ", linked document from " + owner + (LinkStore.MISSING.equals(link.state) ? ", missing" : LinkStore.UNREACHABLE.equals(link.state) ? ", can't reach" : ""));
         tile.setOnClickListener(view -> { hideKeyboard(); startActivity(new Intent(this, LinkActivity.class).putExtra("link_id", link.id)); });
         return tile;
     }
@@ -834,6 +909,7 @@ public final class MainActivity extends LibraryActivity {
             if (item instanceof OverlapRow) return overlapChips((OverlapRow) item);
             if (item instanceof Document) return documentTile((Document) item, true);
             if (item instanceof LinkStore.Link) return linkTile((LinkStore.Link) item);
+            if (item instanceof SourceStore.Hit) return sourceTile((SourceStore.Hit) item);
             if (item instanceof String) {
                 LinearLayout empty = Ui.column(MainActivity.this); empty.setGravity(Gravity.CENTER);
                 empty.setPadding(Ui.dp(MainActivity.this, 24), Ui.dp(MainActivity.this, 72), Ui.dp(MainActivity.this, 24), Ui.dp(MainActivity.this, 48));

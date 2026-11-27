@@ -1,0 +1,39 @@
+AMIPRO-LINUX/3
+title	Synthetic native
+ids	11	1
+style	1	Body Text	0	Times New Roman	12	0	0	0
+skept	0	0	49152	1	1	1	16	0	272	1	2	.	,	$	0		0
+style	2	Heading 1	1	Arial	20	1	0	10
+skept	0	0	16384	1	1	1	16	0	272	1	2	.	,	$	0		0
+style	3	Heading 2	1	Arial	16	1	0	8
+skept	0	0	16384	1	1	1	16	0	272	1	2	.	,	$	0		0
+layout	2	Standard	1	0	0	0	0
+page	right	12240	15840
+box	1440	1440	1440	1440	1	240	0	-	-
+tabs	0	L:720	L:1440	L:2160	L:2880	L:3600	L:4320	L:5040	L:5760	L:6480	L:7200	L:7920	L:8640
+slots	3	0	6	0
+repeating
+frame	3	0
+placement	header	right
+look	around	1	0	16777215
+border	-	1	0	1
+shadow	0	0	0	0	0
+box	792	1440	72	1440	1	240	0	-	-
+tabs	0	C:4680	R:9360
+content	text	4
+frame	6	0
+placement	footer	right
+look	around	1	0	16777215
+border	-	1	0	1
+shadow	0	0	0	0	0
+box	72	1440	792	1440	1	240	0	-	-
+tabs	0	C:4680	R:9360
+content	text	7
+stack
+flow	1
+paragraph	9	1	Native synthetic first line
+paragraph	10	1	Native synthetic second line
+flow	4
+paragraph	5	1	
+flow	7
+paragraph	8	1	

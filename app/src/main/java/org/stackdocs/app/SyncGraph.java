@@ -1,5 +1,6 @@
 package org.stackdocs.app;
 
+import org.stackdocs.app.types.FileTypes;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -156,7 +157,7 @@ final class SyncGraph {
             if(java.util.Arrays.asList("document_id","tag_id","source_scan_id").contains(field))SyncProtocol.uuid(text);
             if(field.equals("source_file"))originalPath("originals/00000000-0000-0000-0000-000000000000/"+text);
             if(field.equals("path"))originalPath(text);
-            if(field.equals("mime")&&!java.util.Arrays.asList("application/pdf","application/x-stack-scan","image/jpeg","image/png","image/webp").contains(text))throw SyncProtocol.invalid("unsupported document MIME");
+            if(field.equals("mime")&&!FileTypes.isLibraryMime(text))throw SyncProtocol.invalid("unsupported document MIME");
             if(field.equals("status")&&!java.util.Arrays.asList("pending","running","waiting","ready","empty","failed").contains(text))throw SyncProtocol.invalid("unsupported suggestion status");
             if(java.util.Arrays.asList("title_state","filing_state","choice").contains(field)&&!java.util.Arrays.asList("offered","accepted","edited","dismissed").contains(text))throw SyncProtocol.invalid("unsupported decision");
             if(field.equals("field")&&!text.equals("title")&&!text.equals("filing"))throw SyncProtocol.invalid("unsupported choice field");

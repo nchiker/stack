@@ -24,7 +24,18 @@ final class LinkCallers {
     static final String FILEN_PACKAGE = "app.filenfiles";
     static final String[][] FILEN = {{FILEN_PACKAGE, "59ccca4c8c1126ec48257a8f3051c6be5eccdd5888df82215560ce2ff8b580bf"}};
 
+    /** Ami Pro: the package a folder file of its type is opened in, pinned like Filen Files (the same pin as in {@link #PINNED}). */
+    static final String AMIPRO_PACKAGE = "app.amipro.editor";
+
     private LinkCallers() {}
+
+    /** True when the installed app.amipro.editor carries the pinned certificate. Stack checks this before it hands Ami Pro a file. */
+    static boolean amiProInstalledAndPinned(Context context) {
+        String cert = certificateOf(context, AMIPRO_PACKAGE);
+        if (cert == null) return false;
+        for (String[] pin : pinnedFor(context)) if (pin[0].equals(AMIPRO_PACKAGE) && pin[1].equals(cert)) return true;
+        return false;
+    }
 
     /** The caller's package for a Binder uid, or null when the uid is shared by several packages or has none. */
     static String packageOf(Context context, int uid) {
