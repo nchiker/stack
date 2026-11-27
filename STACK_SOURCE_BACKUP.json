@@ -1,7 +1,7 @@
 {
   "format": "org.stackdocs.source-backup",
   "version": 1,
-  "source_base_commit": "4c5dd9c1824ef59b255e642ec929eeb973fae1ce",
+  "source_base_commit": "1bf984815af4a274e67e1975d351b5e81e0e9e24",
   "qualification": "Source checkpoint including unfinished edits; not a verified release or personal document backup",
   "files_sha256": {
     ".gitattributes": "7bf9de77e8c51162d51671642c4ee456af0d39d7ac430c7fffabab8a072e6a38",
@@ -743,6 +743,7 @@
     "docs/FOLDER_SHARING_DESIGN.md": "9adae2d6d5f46795fb350ef58eda85f357fe60468122f9443783cc184886ed10",
     "docs/FOLDER_SHARING_HANDOFF.md": "82ba635be3c7c9fe38c63725cd9f618d694d5795c241beedad8b0d8d686f60be",
     "docs/FOLDER_SHARING_INTERFACES.md": "fceb0b661ad5795a5cbd35b1c79135f7a2f2d655805fe1109552769efb646c5b",
+    "docs/FOLDER_SHARING_NEXT.md": "b742d34c7aebf194c97a327f967b3c32475aadc75dcf780ca8a63db1164d7c23",
     "docs/FOLDER_SHARING_PHASE0.md": "36f0a78cec5142b2f9503fb53bb06a34e10add7158d18e1064aa529792efa9af",
     "docs/FOLDER_SHARING_PLAN.md": "7868af49d5a2db52eb6805e4890d2ccb1f568808864cae71c239b35ebc56c780",
     "docs/FOLDER_SHARING_REPORT.md": "660b3042c39fc27c8e58dbefcfcf3a6827c146061ae4be98a1d78294e3d55b66",
