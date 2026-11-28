@@ -1,6 +1,6 @@
 //! Reading the text of an Ami Pro file on this computer (`.sam` and `.amipro`), read-only, so a document edited here
-//! can be found by search before the phone saves it again. Uses the vendored Ami Pro for Linux importer
-//! (`third_party/amipro`, MPL-2.0). The file is only ever read. A password-protected or unreadable file gives `None`.
+//! can be found by search before the phone saves it again. Uses Ami Pro for Linux's importer
+//! (a pinned git dependency, MPL-2.0). The file is only ever read. A password-protected or unreadable file gives `None`.
 use std::path::Path;
 
 /// Files larger than this are not read for text (the importer reads the whole file into memory).

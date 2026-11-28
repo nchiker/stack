@@ -12,8 +12,8 @@ Released: Filen 0.5.0, Stack 0.21.0, Ami Pro 0.7.0 (see `FOLDER_SHARING_REPORT.m
 4. **Signing keys.** Checked 2026-11-27: Ami Pro, Filen and Stack keys are all in the Key Vault backups (newest
    2026-11-22, verified, offsite on Filen). The owner runs a fresh "Back up now" + Verify (the live folder changed after
    the last backup, probably only README.txt). No USB copy configured (Key Vault's rule is three copies, two places).
-5. **Upkeep.** Three apps, a copy of the Ami Pro reader in Stack (re-vendor from AmiPro-Linux when it changes; pin in
-   `app/src/main/rust/third_party/amipro/README`), and our own PDF text reader. Add the fuzzers to the regular checks so
+5. **Upkeep.** Three apps and our own PDF text reader. (Done 2026-11-28: no more copies of the Ami Pro reader; both
+   builds take it from the public AmiPro-Linux repo at one pinned commit, see `RUNBOOK.md`.) Add the fuzzers to the regular checks so
    a change can't reopen a crash. Run `~/Projects/Filen/tools/sdk_upstream.sh` before Filen work.
    Filen opportunity: list received trees with the SDK's `listDirRecursive` (it takes shared folders) instead of one
    call per folder.

@@ -1,7 +1,6 @@
 [workspace]
 members = ["crates/stack-core", "crates/stack-archive", "crates/stack-render", "crates/stack-cli", "crates/stack-desktop", "crates/stack-sync", "crates/stack-transport"]
 resolver = "3"
-exclude = ["third_party/amipro/amipro-document", "third_party/amipro/amipro-formats"]
 
 [workspace.package]
 version = "0.1.0-dev"
@@ -16,8 +15,9 @@ stack-core = { path = "crates/stack-core" }
 stack-archive = { path = "crates/stack-archive" }
 stack-render = { path = "crates/stack-render" }
 stack-transport = { path = "crates/stack-transport" }
-amipro-formats = { path = "third_party/amipro/amipro-formats" }
-amipro-document = { path = "third_party/amipro/amipro-document" }
+# Ami Pro for Linux's reader, straight from its public repo. Keep this rev equal to app/src/main/rust/stacknative/Cargo.toml's.
+amipro-formats = { git = "https://github.com/nchiker/AmiPro-Linux", rev = "24605e1714fa92d3700931273c104126041c5394" }
+amipro-document = { git = "https://github.com/nchiker/AmiPro-Linux", rev = "24605e1714fa92d3700931273c104126041c5394" }
 rustls = { version = "=0.23.46", default-features = false, features = ["std", "ring"] }
 rcgen = { version = "=0.14.10", default-features = false, features = ["crypto", "ring"] }
 image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }

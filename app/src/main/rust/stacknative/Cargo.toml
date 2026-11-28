@@ -2,7 +2,7 @@
 name = "stacknative"
 version = "0.1.0"
 edition = "2024"
-license = "Apache-2.0"  # Stack's own code; the vendored Ami Pro crates in ../third_party/amipro stay MPL-2.0
+license = "Apache-2.0"  # Stack's own code; the Ami Pro crates it depends on stay MPL-2.0
 rust-version = "1.85"
 publish = false
 description = "Stack phone native library: Ami Pro text (JNI, org.stackdocs.app.types.NativeText)."
@@ -11,7 +11,8 @@ description = "Stack phone native library: Ami Pro text (JNI, org.stackdocs.app.
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-amipro-text = { path = "../third_party/amipro/amipro-text" }
+# Ami Pro for Linux's reader, straight from its public repo. Keep this rev equal to desktop/Cargo.toml's.
+amipro-text = { git = "https://github.com/nchiker/AmiPro-Linux", rev = "24605e1714fa92d3700931273c104126041c5394" }
 
 [profile.release]
 opt-level = "s"

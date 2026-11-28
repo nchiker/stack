@@ -30,8 +30,8 @@ pub fn extract_text(bytes: &[u8], limits: &Limits) -> Extracted;
   random, truncated, huge declared sizes, deep nesting). Depends only on `amipro-document` and `amipro-formats`.
 
 ## I2. Stack native library (Stack repo, Android, `libstacknative.so`, arm64-v8a)
-Rust crate in Stack (`app/src/main/rust/stacknative`), built by the Gradle build with the NDK; vendors `amipro-text`
-and its two dependencies at a pinned AmiPro-Linux commit (like `desktop/third_party/amipro`). JNI, Java side:
+Rust crate in Stack (`app/src/main/rust/stacknative`), built by the Gradle build with the NDK; takes `amipro-text`
+and its two dependencies from AmiPro-Linux at a pinned commit (a Cargo git dependency, as the desktop does; copies until 2026-11-28). JNI, Java side:
 ```java
 package org.stackdocs.app.types;
 final class NativeText {

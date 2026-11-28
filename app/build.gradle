@@ -143,7 +143,17 @@ tasks.register('buildStackNative', Exec) {
     inputs.property('ndkDir', providers.provider { String.valueOf(stackNdk()) })
     outputs.dir(outDir)
     workingDir crate
+    // The phone and the computer must read Ami Pro files with the same code: one AmiPro-Linux commit in both Cargo.toml files.
+    inputs.file(rootProject.file('desktop/Cargo.toml')).withPropertyName('desktopCargo')
     doFirst {
+        // Every `amipro-… =` dependency line in each file must carry a full rev (so a reformatted line cannot slip past).
+        def amiRevs = [file('src/main/rust/stacknative/Cargo.toml'), rootProject.file('desktop/Cargo.toml')].collectMany { toml ->
+            def lines = toml.readLines().findAll { it ==~ /amipro-[a-z]+\s*=.*/ }
+            def revs = lines.collectMany { line -> (line =~ /AmiPro-Linux", rev = "([0-9a-f]{40})" \}/).collect { m -> m[1] } }
+            if (lines.isEmpty() || revs.size() != lines.size()) throw new GradleException("${toml}: every amipro- dependency must be { git = \".../AmiPro-Linux\", rev = \"<40 hex digits>\" }")
+            revs
+        }.unique()
+        if (amiRevs.size() != 1) throw new GradleException("The AmiPro-Linux rev differs between stacknative/Cargo.toml and desktop/Cargo.toml: ${amiRevs}")
         def ndk = stackNdk()
         if (ndk == null) throw new GradleException('Android NDK not found. Install it (sdkmanager "ndk;<version>") and set ndk.dir=<path> in local.properties, or set ANDROID_NDK_HOME. It builds Stack\'s native library (libstacknative.so).')
         def prebuilt = new File(ndk, 'toolchains/llvm/prebuilt').listFiles().find { it.isDirectory() }

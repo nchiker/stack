@@ -20,7 +20,7 @@ and sync MIME whitelists, link preview naming) and about 10 on the desktop (rend
 
 ## 2. Plan statements that are out of date
 - "Ami Pro text is produced by Ami Pro itself": true on the phone only. **Stack desktop already contains the Ami Pro
-  reading core** (`desktop/third_party/amipro`, MPL-2.0) and reads `.sam`/`.amipro` itself.
+  reading core** (`desktop/third_party/amipro` then; a pinned git dependency since 2026-11-28, MPL-2.0) and reads `.sam`/`.amipro` itself.
 - "Partner's own stacks and tags on partner records are kept": **not implemented**. Stacks and tags attach only to
   `documents` rows; link records have none (`STACK_LINK_CONTRACT.md:186` says so too).
 - "Option B reuses publish/import": the publish/import moves one archive file. There is no recursive folder walker,

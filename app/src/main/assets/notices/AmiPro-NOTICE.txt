@@ -1,0 +1,7 @@
+Stack reads Ami Pro (.SAM and .amipro) files with the amipro-text, amipro-document and amipro-formats libraries from
+Ami Pro for Linux. They are used unmodified and are licensed under the Mozilla Public License 2.0 (AmiPro-MPL-2.0.txt).
+
+Their source code, exactly as built into this app, is available at:
+https://github.com/nchiker/AmiPro-Linux/tree/24605e1714fa92d3700931273c104126041c5394
+
+Independent project, not affiliated with IBM, HCL or Lotus.
